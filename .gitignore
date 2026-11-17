@@ -1,0 +1,28 @@
+# os and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# secrets, never commit
+.env
+.env.*
+*.jks
+*.keystore
+key.properties
+service-account*.json
+
+# flutter and dart (for when the app starts)
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+coverage/
+
+# local databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
