@@ -233,10 +233,17 @@ Stock rooms and basements often have no signal. Phase 2, but the data model is r
 - sync pulls changes since a cursor: products, variants, barcodes, stock levels, archived items.
 - on logout or when access to an org is removed, the local copy for that org is wiped.
 
+## what customers see of the stock
+
+The merchant decides, with one switch per business: **off**, **availability** (in stock, only a
+few left, out of stock) or **exact** number. Shops can override it, products can opt out. Details
+and the reasons for each choice are in [06](06-customers-and-comms.md#what-customers-see).
+
 ## prices and costs
 
 - price is with vat, per variant, optional override per shop.
-- price changes go to the audit log, so there is a price history.
+- every price a variant had is kept in `price_history` (base, shop override, offer). needed for
+  the EU rule on "was" prices in offers, see [06](06-customers-and-comms.md#offers-and-prices).
 - cost: the last cost entered on receive. stock value at cost uses that. no FIFO or weighted
   average in v1. good enough for small shops, and simple to explain.
 

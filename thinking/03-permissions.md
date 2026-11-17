@@ -97,6 +97,7 @@ For a shop scoped member, "customers" means customers whose subscriptions reach 
 | `posts.channel.push` | include push in a post |
 | `posts.channel.email` | include email in a post |
 | `posts.delete` | delete posts (sent pushes and emails cannot be taken back, the feed item goes) |
+| `offers.price.set` | set offer prices on products linked to an offer post, for the post's shops |
 | `joinlinks.manage` | create, print and disable QR codes and join links |
 
 ### reports (level shop)
@@ -162,6 +163,7 @@ edit its own admin, manager, staff and viewer roles. The owner role is locked.
 | posts.channel.push | x | x | x | | |
 | posts.channel.email | x | x | x | | |
 | posts.delete | x | x | | | |
+| offers.price.set | x | x | x | | |
 | joinlinks.manage | x | x | x | | |
 | reports.view | x | x | x | | x |
 | reports.financial.view | x | x | | | x |
