@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-17T21:30:00+02:00",
-  "overall": 68,
+  "updated": "2026-11-17T21:50:00+02:00",
+  "overall": 72,
   "areas": [
     {
       "key": "thinking",
@@ -12,9 +12,9 @@
     {
       "key": "demo",
       "name": "Clickable demo (GitHub Pages)",
-      "percent": 95,
-      "state": "building",
-      "note": "Live with every planned flow: roles and delegation, team and role editor, scanning, back in stock, counts, transfers, reports with charts, posts and push, lock screen, customer join flow, feed, offers, catalog and profile. English, Greek and Russian. Works on phones. Applying an Apple design review now."
+      "percent": 100,
+      "state": "done",
+      "note": "Live with every planned flow in English, Greek and Russian, on phones and desktop. Passed an independent Apple design review: 45 fixes applied (contrast, tab labels, accent discipline, sticky receive, modal composer, edge swipe back, reduced transparency, self hosted font)."
     },
     {
       "key": "setup",
@@ -92,6 +92,64 @@
     {
       "at": "2026-11-17T21:30:00+02:00",
       "text": "Phone app first version done: work side with scanning and customer side, wired to the real API."
+    },
+    {
+      "at": "2026-11-17T21:50:00+02:00",
+      "text": "Demo design review fixes live. Screens from the real web and phone apps added here."
+    }
+  ],
+  "screens": [
+    {
+      "src": "../apps/mobile/screenshots/home-manager-el-light.png",
+      "caption": "Phone app, manager home, Greek"
+    },
+    {
+      "src": "../apps/mobile/screenshots/receive-2-moment.png",
+      "caption": "Phone app, receive with the back in stock moment"
+    },
+    {
+      "src": "../apps/mobile/screenshots/product-manager-en-light.png",
+      "caption": "Phone app, product with stock per shop"
+    },
+    {
+      "src": "../apps/mobile/screenshots/stock-staff-ru-dark.png",
+      "caption": "Phone app, staff stock list, Russian, dark"
+    },
+    {
+      "src": "../apps/mobile/screenshots/feed-anna-ru-light.png",
+      "caption": "Phone app, customer feed, Russian"
+    },
+    {
+      "src": "../apps/mobile/screenshots/offers-anna-el-dark.png",
+      "caption": "Phone app, customer offers, Greek, dark"
+    },
+    {
+      "src": "../apps/web/screenshots/phone-el-join.png",
+      "caption": "Web, QR join page, Greek"
+    },
+    {
+      "src": "../apps/web/screenshots/phone-el-shelf.png",
+      "caption": "Web, shelf product page, Greek"
+    },
+    {
+      "src": "../apps/web/screenshots/desktop-en-home.png",
+      "caption": "Web admin, dashboard",
+      "wide": true
+    },
+    {
+      "src": "../apps/web/screenshots/desktop-en-product.png",
+      "caption": "Web admin, product",
+      "wide": true
+    },
+    {
+      "src": "../apps/web/screenshots/desktop-en-reports.png",
+      "caption": "Web admin, reports",
+      "wide": true
+    },
+    {
+      "src": "../apps/web/screenshots/desktop-en-settings.png",
+      "caption": "Web admin, what customers see",
+      "wide": true
     }
   ]
 }
