@@ -8,6 +8,11 @@ export interface UnsubTarget {
   scopeId: string;
 }
 
+// its own key: CUSTOCK_UNSUB_SECRET, or one derived from the jwt secret so the two never match
+export function unsubKey(cfg: { jwtSecret: string; unsubSecret?: string }): string {
+  return cfg.unsubSecret ?? createHmac('sha256', cfg.jwtSecret).update('custock unsubscribe links').digest('base64url');
+}
+
 function sign(payload: string, secret: string): string {
   return createHmac('sha256', secret).update(payload).digest('base64url').slice(0, 32);
 }

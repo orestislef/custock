@@ -8,13 +8,14 @@ import { platform } from './tenant';
 const DAY = 86_400_000;
 
 export async function idempotent(c: Context<AppEnv>, run: () => Promise<{ status: number; body: unknown }> | { status: number; body: unknown }) {
-  const key = c.req.header('Idempotency-Key');
-  if (!key) {
+  const raw = c.req.header('Idempotency-Key');
+  if (!raw) {
     const r = await run();
     return c.json(r.body as object, r.status as 200);
   }
   const db = platform(cfgOf(c).db);
   const user = c.get('user').id;
+  const key = `${c.req.param('org') ?? '-'}|${c.req.method}|${c.req.path}|${raw}`;
   const now = nowOf(c);
   db.run('DELETE FROM idempotency_keys WHERE created_at < @old', { old: now - DAY });
   const hit = db.get<{ status: number; response: string; path: string }>('SELECT status, response, path FROM idempotency_keys WHERE user_id = @u AND key = @k', { u: user, k: key });
