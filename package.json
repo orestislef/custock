@@ -1,0 +1,27 @@
+{
+  "name": "custock",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A clean blend of Customer and Stock. CRM and IMS for shops.",
+  "license": "MIT",
+  "author": "Orestis Lef",
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @custock/api dev",
+    "dev:web": "pnpm --filter @custock/web dev",
+    "dev:mobile": "pnpm --filter @custock/mobile start",
+    "db:reset": "pnpm --filter @custock/db reset",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "check": "node scripts/check.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "vitest": "^5.1.0"
+  }
+}
