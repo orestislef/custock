@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-17T21:00:00+02:00",
-  "overall": 62,
+  "updated": "2026-11-17T21:30:00+02:00",
+  "overall": 68,
   "areas": [
     {
       "key": "thinking",
@@ -47,9 +47,9 @@
     {
       "key": "mobile",
       "name": "Phone app (Expo)",
-      "percent": 3,
+      "percent": 60,
       "state": "building",
-      "note": "Staff side with scanning and the customer side with feed, offers and catalog."
+      "note": "Expo SDK 58. Sign in for staff and customers, work side with tabs from permissions, scanning with expo-camera (look up, sell with undo, receive with the back in stock moment, counts), stock and product pages, customers, posts composer, team and settings. Customer side: feed, offers, catalog with merchant stock settings, shops, QR join, profile. Bundles for web and Android, works against the real API. Next: transfers, offline outbox, all writes, native Android build."
     }
   ],
   "log": [
@@ -88,6 +88,10 @@
     {
       "at": "2026-11-17T21:00:00+02:00",
       "text": "Backend write side done: ledger, counts, transfers, posts sending, invites, audit log. 142 tests passing. Security review started."
+    },
+    {
+      "at": "2026-11-17T21:30:00+02:00",
+      "text": "Phone app first version done: work side with scanning and customer side, wired to the real API."
     }
   ]
 }
