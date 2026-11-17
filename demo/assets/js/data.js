@@ -76,6 +76,7 @@
       id: 'lemoni', name: 'Lemoni',
       settings: { catalog: 'subscribers', prices: true, stock: 'availability', fewLeft: 3, quietFrom: 22, quietTo: 9, pushCap: 2, needsApproval: false }
     };
+    const sunday = (function () { const d = new Date(now); const add = (7 - d.getDay()) % 7 || 7; d.setDate(d.getDate() + add); d.setHours(23, 59, 0, 0); return d.getTime(); })();
     const shops = [
       { id: 'kif', img: 's-kifisia', name: L('Kifisia', 'Κηφισιά', 'Кифисия'), addr: L('12 Kassaveti St, Kifisia', 'Κασσαβέτη 12, Κηφισιά', 'ул. Кассавети 12, Кифисия'), hours: '09:00 to 21:00', customerStock: null, visible: true },
       { id: 'mar', img: 's-marousi', name: L('Marousi', 'Μαρούσι', 'Маруси'), addr: L('40 Ermou St, Marousi', 'Ερμού 40, Μαρούσι', 'ул. Эрму 40, Маруси'), hours: '09:00 to 21:00', customerStock: null, visible: true },
@@ -113,19 +114,19 @@
     }
     const products = [
       { id: 'olive-oil', img: 'p-olive-oil', cat: 'pantry', vat: 13, pop: 1.8,
-        name: L('Extra virgin olive oil 1 l', 'Εξαιρετικό παρθένο ελαιόλαδο 1 l', 'Оливковое масло extra virgin, 1 л'),
+        name: L('Extra virgin olive oil 1 l', 'Εξαιρετικό παρθένο ελαιόλαδο 1 l', 'Оливковое масло extra virgin, 1 л'),
         desc: L('Koroneiki, new harvest from Messinia.', 'Κορωνέικη, νέα σοδειά από τη Μεσσηνία.', 'Сорт коронейки, новый урожай из Мессинии.'),
         variants: [V('olive-oil', null, 1490, 820, { kif: 24, mar: 18, gly: 31 }, { kif: 8, mar: 8, gly: 8 })] },
       { id: 'thyme-honey', img: 'p-thyme-honey', cat: 'pantry', vat: 13, pop: 1.1,
-        name: L('Thyme honey 450 g', 'Θυμαρίσιο μέλι 450 g', 'Тимьяновый мёд, 450 г'),
+        name: L('Thyme honey 450 g', 'Θυμαρίσιο μέλι 450 g', 'Тимьяновый мёд, 450 г'),
         desc: L('Raw, from Crete.', 'Ακατέργαστο, από την Κρήτη.', 'Сырой, с Крита.'),
         variants: [V('thyme-honey', null, 1250, 690, { kif: 6, mar: 11, gly: 7 }, { kif: 5, mar: 5, gly: 5 })] },
       { id: 'greek-coffee', img: 'p-greek-coffee', cat: 'pantry', vat: 13, pop: 2.6,
-        name: L('Greek coffee 200 g', 'Ελληνικός καφές 200 g', 'Греческий кофе, 200 г'),
+        name: L('Greek coffee 200 g', 'Ελληνικός καφές 200 g', 'Греческий кофе, 200 г'),
         desc: L('Freshly ground, medium roast.', 'Φρεσκοαλεσμένος, μέτριο καβούρδισμα.', 'Свежемолотый, средняя обжарка.'),
         variants: [V('greek-coffee', null, 420, 210, { kif: 40, mar: 36, gly: 22 }, { kif: 10, mar: 10, gly: 10 })] },
       { id: 'mastiha', img: 'p-mastiha', cat: 'drinks', vat: 24, pop: 0.6,
-        name: L('Chios mastiha liqueur 500 ml', 'Λικέρ μαστίχα Χίου 500 ml', 'Ликёр мастика с Хиоса, 500 мл'),
+        name: L('Chios mastiha liqueur 500 ml', 'Λικέρ μαστίχα Χίου 500 ml', 'Ликёр мастика с Хиоса, 500 мл'),
         desc: L('Serve it ice cold.', 'Σερβίρεται παγωμένο.', 'Подавать охлаждённым.'),
         variants: [V('mastiha', null, 1890, 1040, { kif: 9, mar: 6, gly: 12 })] },
       { id: 'olive-soap', img: 'p-olive-soap', cat: 'care', vat: 24, pop: 0.8,
@@ -135,8 +136,8 @@
       { id: 'ceramic-cup', img: 'p-ceramic-cup', cat: 'home', vat: 24, pop: 0.5,
         name: L('Ceramic cup', 'Κεραμική κούπα', 'Керамическая чашка'),
         desc: L('Glazed by hand in Sifnos.', 'Εφυαλωμένη στο χέρι στη Σίφνο.', 'Глазурь ручной работы, Сифнос.'),
-        variants: [V('ceramic-cup-250', L('250 ml', '250 ml', '250 мл'), 900, 350, { kif: 6, mar: 4, gly: 0 }, { kif: 2, mar: 2, gly: 2 }),
-          V('ceramic-cup-350', L('350 ml', '350 ml', '350 мл'), 1100, 420, { kif: 2, mar: 5, gly: 3 }, { kif: 2, mar: 2, gly: 2 })] },
+        variants: [V('ceramic-cup-250', L('250 ml', '250 ml', '250 мл'), 900, 350, { kif: 6, mar: 4, gly: 0 }, { kif: 2, mar: 2, gly: 2 }),
+          V('ceramic-cup-350', L('350 ml', '350 ml', '350 мл'), 1100, 420, { kif: 2, mar: 5, gly: 3 }, { kif: 2, mar: 2, gly: 2 })] },
       { id: 'linen-tote', img: 'p-linen-tote', cat: 'home', vat: 24, pop: 0.4,
         name: L('Linen tote bag', 'Λινή τσάντα', 'Льняная сумка-шопер'),
         desc: L('Washed linen, long handles.', 'Πλυμένο λινό, μακριά χερούλια.', 'Стираный лён, длинные ручки.'),
@@ -144,7 +145,7 @@
           V('linen-tote-black', L('Black', 'Μαύρο', 'Чёрный'), 1600, 600, { kif: 1, mar: 4, gly: 2 }, { kif: 2, mar: 2, gly: 2 }),
           V('linen-tote-olive', L('Olive', 'Λαδί', 'Оливковый'), 1600, 600, { kif: 0, mar: 2, gly: 3 }, { kif: 2, mar: 2, gly: 2 })] },
       { id: 'sea-salt', img: 'p-sea-salt', cat: 'pantry', vat: 13, pop: 0.7,
-        name: L('Sea salt flakes 250 g', 'Ανθός αλατιού 250 g', 'Морская соль хлопьями, 250 г'),
+        name: L('Sea salt flakes 250 g', 'Ανθός αλατιού 250 g', 'Морская соль хлопьями, 250 г'),
         desc: L('Hand harvested in Messolonghi.', 'Μαζεμένος στο χέρι στο Μεσολόγγι.', 'Собрана вручную в Месолонги.'),
         variants: [V('sea-salt', null, 540, 220, { kif: 14, mar: -2, gly: 9 })] },
       { id: 'mountain-tea', img: 'p-mountain-tea', cat: 'pantry', vat: 13, pop: 0.9,
@@ -160,7 +161,7 @@
         desc: L('Stone ground, nothing added.', 'Αλεσμένο σε πέτρα, χωρίς πρόσθετα.', 'Перемолот на камне, без добавок.'),
         variants: [V('tahini', null, 590, 280, { kif: 11, mar: 9, gly: 4 })] },
       { id: 'pistachio', img: 'p-pistachio', cat: 'pantry', vat: 13, pop: 0.6,
-        name: L('Aegina pistachios 200 g', 'Φιστίκι Αιγίνης 200 g', 'Фисташки с Эгины, 200 г'),
+        name: L('Aegina pistachios 200 g', 'Φιστίκι Αιγίνης 200 g', 'Фисташки с Эгины, 200 г'),
         desc: L('Roasted and lightly salted.', 'Καβουρδισμένο, ελαφρά αλατισμένο.', 'Обжаренные, слегка солёные.'),
         variants: [V('pistachio', null, 980, 560, { kif: 2, mar: 7, gly: 13 })] },
       { id: 'candle', img: 'p-candle', cat: 'home', vat: 24, pop: 0.3,
@@ -168,7 +169,7 @@
         desc: L('About 40 hours of burn time.', 'Περίπου 40 ώρες καύσης.', 'Около 40 часов горения.'),
         variants: [V('candle', null, 1900, 750, { kif: 6, mar: 4, gly: 0 }, { kif: 2, mar: 2, gly: 2 })] },
       { id: 'feta', img: 'p-feta', cat: 'deli', vat: 13, pop: 1.2,
-        name: L('Epirus feta PDO 400 g', 'Φέτα ΠΟΠ Ηπείρου 400 g', 'Фета PDO из Эпира, 400 г'),
+        name: L('Epirus feta PDO 400 g', 'Φέτα ΠΟΠ Ηπείρου 400 g', 'Фета PDO из Эпира, 400 г'),
         desc: L('Barrel aged, creamy and salty.', 'Ωρίμανση σε βαρέλι, κρεμώδης και αλμυρή.', 'Выдержана в бочке, сливочная и солёная.'),
         variants: [V('feta', null, 790, 480, { kif: 13, mar: 10, gly: 8 })] }
     ];
@@ -343,7 +344,7 @@
           'Свежее оливковое масло коронейки, сырой тимьяновый мёд с Крита и горный чай с Олимпа. С сегодняшнего дня во всех трёх магазинах.'),
         stats: { reached: 298, pushSent: 161, pushOpened: 72, emailSent: 190, emailOpened: 88, feedViews: 241 } },
       { id: 'p-offer', kind: 'offer', status: 'sent', author: 'nikos', scopes: [{ scope: 'group', id: 'nath' }], img: 'post-offer',
-        channels: ['feed', 'push'], sentAt: now - 1 * D, validFrom: now - 1 * D, validUntil: now + 4 * D,
+        channels: ['feed', 'push'], sentAt: now - 1 * D, validFrom: now - 1 * D, validUntil: sunday,
         products: [{ vid: 'mastiha', offer: 1490 }, { vid: 'loukoumi', offer: 520 }],
         title: L('Up to 20% off mastiha and loukoumi', 'Έως 20% έκπτωση σε μαστίχα και λουκούμι', 'Скидки до 20% на мастику и лукум'),
         body: L('Until Sunday in Kifisia and Marousi. Perfect with a Greek coffee.', 'Έως την Κυριακή σε Κηφισιά και Μαρούσι. Ταιριάζει τέλεια με ελληνικό καφέ.', 'До воскресенья в Кифисии и Маруси. Идеально к греческому кофе.'),
@@ -371,7 +372,7 @@
 
     const notifs = {
       anna: [
-        { id: 'n1', org: 'lemoni', merchant: L('Lemoni Kifisia', 'Lemoni Κηφισιά', 'Lemoni Кифисия'), title: posts[1].title, body: posts[1].body, img: 'post-offer', at: now - 1 * D, route: { role: 'anna', tab: 'c-offers', name: 'c-post', params: { id: 'p-offer' } } },
+        { id: 'n1', org: 'lemoni', merchant: L('Lemoni Kifisia', 'Lemoni Κηφισιά', 'Lemoni Кифисия'), title: posts[1].title, body: posts[1].body, img: 'post-offer', at: now - 1 * D, route: { role: 'anna', tab: 'c-home', name: 'c-post', params: { id: 'p-offer' } } },
         { id: 'n2', org: 'anemos', merchant: otherOrgs[0].name, title: otherOrgs[0].posts[0].title, body: otherOrgs[0].posts[0].body, img: null, at: now - 2 * D - 5 * H, route: { role: 'anna', tab: 'c-home', name: 'c-home' } },
         { id: 'n3', org: 'lemoni', merchant: L('Lemoni', 'Lemoni', 'Lemoni'), title: posts[0].title, body: posts[0].body, img: 'post-harvest', at: now - 3 * D + 2 * H, route: { role: 'anna', tab: 'c-home', name: 'c-post', params: { id: 'p-harvest' } } }
       ],

@@ -7,7 +7,7 @@
 
   // lowercase, drop accents (tonos, dialytika, the dots of ё, the breve of й), final sigma becomes sigma
   function base(s) {
-    return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ς/g, 'σ').trim();
+    return String(s || '').replace(/ /g, ' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ς/g, 'σ').trim();
   }
   function translit(s) {
     let x = base(s);
