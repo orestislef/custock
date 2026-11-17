@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import type { StockCount, UncountedPolicy } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
-import { Group, Row, Segmented, Why } from '@/components/ui/kit';
+import { Group, Row, Segmented, Why, signed } from '@/components/ui/kit';
 import { useToast } from '@/components/ui/client-kit';
 import { IconBarcode, IconChevronLeft, IconPlus } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
@@ -102,7 +102,7 @@ export default function CountPage({ params }: { params: Promise<{ id: string }> 
               <span className="t-title3 tnum">{number(l.countedQty, locale)}</span>
             ) : (
               <span className="t-title3 tnum" style={{ color: l.difference < 0 ? 'var(--c-neg-text)' : l.difference > 0 ? 'var(--c-success)' : 'var(--c-ink-2)' }}>
-                {l.difference > 0 ? '+' : ''}{number(l.difference, locale)}
+                {signed(l.difference, number(Math.abs(l.difference), locale))}
               </span>
             )}
           />
@@ -119,10 +119,10 @@ export default function CountPage({ params }: { params: Promise<{ id: string }> 
       {canApprove ? (
         <section className="mb-10">
           {c.kind === 'full' ? (
-            <section className="group">
-              <h2 className="group-head">{t('counts.uncountedQ')}</h2>
+            <section className="inset-group">
+              <h2 className="inset-group-head">{t('counts.uncountedQ')}</h2>
               <div className="px-1"><Segmented label={t('counts.uncountedQ')} value={policy} onChange={setPolicy} options={[{ value: 'ignore', label: t('counts.leave') }, { value: 'set_zero', label: t('counts.zero') }]} /></div>
-              <p className="group-foot">{t(`counts.uncountedFoot.${policy}`)}</p>
+              <p className="inset-group-foot">{t(`counts.uncountedFoot.${policy}`)}</p>
             </section>
           ) : null}
           <div className="flex gap-2 flex-wrap">

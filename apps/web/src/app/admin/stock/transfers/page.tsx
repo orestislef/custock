@@ -1,14 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { Transfer } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { StockTabs } from '@/components/admin/stock-tabs';
 import { ProductPicker } from '@/components/admin/product-picker';
 import { Empty, Group, Row, Why } from '@/components/ui/kit';
-import { Sheet, useToast } from '@/components/ui/client-kit';
+import { Picker, Sheet, isMac, useShortcuts } from '@/components/ui/client-kit';
 import { IconClose, IconPlus, IconTruck } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { productName } from '@/lib/names';
@@ -20,6 +20,8 @@ export default function TransfersPage() {
   const allowed = can('stock.transfer.send', null) || can('stock.transfer.receive', null);
   const list = useAsync(() => (allowed ? api.transfers(org.orgId, shopId ? { shopId } : undefined) : Promise.resolve([])), [shopId, allowed]);
   const [creating, setCreating] = useState(false);
+  const canSend = shops.some((s) => can('stock.transfer.send', s.id));
+  useShortcuts({ create: useCallback(() => { if (canSend) setCreating(true); }, [canSend]) });
   // names of every shop, also the ones outside this member's reach
   const allShops = useAsync(() => api.shops(org.orgId), []);
   const name = (id: string) => (allShops.data ?? shops).find((s) => s.id === id)?.name ?? t('transfers.otherShop');
@@ -34,13 +36,15 @@ export default function TransfersPage() {
   ];
 
   return (
-    <Page title={t('transfers.title')} actions={shops.some((s) => can('stock.transfer.send', s.id)) ? <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}><IconPlus size={18} />{t('transfers.new')}</button> : null}>
+    <Page title={t('transfers.title')}
+      actions={canSend ? <button type="button" className="btn btn-primary" title={`${t('transfers.new')} (${isMac() ? '⌘' : 'Ctrl+'}N)`} onClick={() => setCreating(true)}><IconPlus size={18} />{t('transfers.new')}</button> : null}
+      phoneAction={canSend ? <button type="button" className="icon-btn" style={{ background: 'var(--c-accent-tint)' }} aria-label={t('transfers.new')} onClick={() => setCreating(true)}><IconPlus size={22} /></button> : undefined}>
       <StockTabs />
       {list.data && !items.length ? <Empty icon={<IconTruck size={40} />} title={t('transfers.emptyTitle')} body={t('transfers.emptyBody')} /> : null}
       {groups.filter((g) => g.items.length).map((g) => (
         <Group key={g.key} title={t(`transfers.group.${g.key}`)} footer={g.key === 'incoming' ? t('transfers.incomingFoot') : undefined}>
           {g.items.map((x) => (
-            <Row key={x.id} href={`/admin/stock/transfers/${x.id}`} leading={<span className="icon-tile" style={{ background: x.status === 'sent' ? 'var(--c-info)' : 'var(--c-ink-3)' }}><IconTruck size={18} /></span>}
+            <Row key={x.id} href={`/admin/stock/transfers/${x.id}`} leading={<span className="icon-tile"><IconTruck size={18} /></span>}
               title={`${name(x.fromShopId)} → ${name(x.toShopId)}`}
               subtitle={`${t(`transfers.status.${x.status}`)} · ${t('transfers.items', { count: x.lines.reduce((a, l) => a + l.qtySent, 0) })} · ${relative(x.sentAt ?? x.createdAt, locale)}`} />
           ))}
@@ -53,7 +57,7 @@ export default function TransfersPage() {
 
 function NewTransfer({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
   const { api, org, t, locale, can, shops, shopId } = useAdmin();
-  const toast = useToast();
+  const [error, setError] = useState<string | null>(null);
   const from = shops.filter((s) => can('stock.transfer.send', s.id));
   const allShops = useAsync(() => (open ? api.shops(org.orgId) : Promise.resolve([])), [open]);
   const [fromId, setFrom] = useState(shopId && from.some((s) => s.id === shopId) ? shopId : from[0]?.id ?? '');
@@ -69,29 +73,28 @@ function NewTransfer({ open, onClose, onCreated }: { open: boolean; onClose: () 
       setLines([]);
       onCreated(x.id);
     } catch (e) {
-      toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
+      setError(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
     }
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={t('transfers.new')}
-      footer={<button type="button" className="btn btn-primary btn-large" disabled={!fromId || !targets.length || !lines.length} onClick={() => void create()}>{t('transfers.saveDraft')}</button>}>
-      <div className="list mb-4">
-        <label className="row">
+    <Sheet open={open} onClose={onClose} title={t('transfers.new')} error={error}
+      footer={<>
+        <button type="button" className="btn btn-primary btn-large" disabled={!fromId || !targets.length || !lines.length} onClick={() => void create()}>{t('transfers.saveDraft')}</button>
+        {!lines.length ? <p className="why-line">{t('transfers.needLines')}</p> : null}
+      </>}>
+      <ul className="list mb-4" role="list">
+        <li className="row">
           <span className="row-main row-title">{t('transfers.from')}</span>
-          <select className="t-body bg-transparent border-0 outline-none text-right" style={{ color: 'var(--c-ink-2)' }} value={fromId} onChange={(e) => setFrom(e.target.value)}>
-            {from.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </label>
-        <label className="row">
+          <Picker variant="plain" label={t('transfers.from')} value={fromId} onChange={setFrom} options={from.map((s) => ({ value: s.id, label: s.name }))} />
+        </li>
+        <li className="row">
           <span className="row-main row-title">{t('transfers.to')}</span>
-          <select className="t-body bg-transparent border-0 outline-none text-right" style={{ color: 'var(--c-ink-2)' }} value={toId || targets[0]?.id || ''} onChange={(e) => setTo(e.target.value)}>
-            {targets.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </label>
-      </div>
-      <section className="group">
-        <h3 className="group-head">{t('transfers.lines')}</h3>
+          <Picker variant="plain" label={t('transfers.to')} value={toId || targets[0]?.id || ''} onChange={setTo} options={targets.map((s) => ({ value: s.id, label: s.name }))} />
+        </li>
+      </ul>
+      <section className="inset-group">
+        <h3 className="inset-group-head">{t('transfers.lines')}</h3>
         <div className="list">
           {lines.map((l, i) => (
             <div key={l.variantId} className="row">
@@ -103,7 +106,7 @@ function NewTransfer({ open, onClose, onCreated }: { open: boolean; onClose: () 
           ))}
           <button type="button" className="row" style={{ color: 'var(--c-accent)' }} onClick={() => setPicking(true)}><IconPlus size={20} /><span className="row-main row-title">{t('counts.addProduct')}</span></button>
         </div>
-        <p className="group-foot">{t('transfers.draftFoot')}</p>
+        <p className="inset-group-foot">{t('transfers.draftFoot')}</p>
       </section>
       <ProductPicker open={picking} title={t('counts.addProduct')} onClose={() => setPicking(false)}
         onPick={({ product, variantId }) => { setPicking(false); if (!lines.some((l) => l.variantId === variantId)) setLines((x) => [...x, { variantId, name: productName(product, locale), qty: 1 }]); }} />

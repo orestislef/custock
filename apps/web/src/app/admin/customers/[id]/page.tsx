@@ -65,8 +65,8 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
       <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-2 gap-x-6">
         <div>
           <Group title={t('customer.contact')} footer={d.contactMasked ? <Why>{t('customers.maskedWhy')}</Why> : undefined}>
-            <Row leading={<span className="icon-tile" style={{ background: 'var(--c-info)' }}><IconMail size={18} /></span>} title={d.email ?? '-'} subtitle={t('common:channel.email')} />
-            <Row leading={<span className="icon-tile" style={{ background: 'var(--c-success)' }}><IconPhone size={18} /></span>} title={<span className="tnum">{d.phone ?? '-'}</span>} subtitle={t('customer.phone')} />
+            <Row leading={<span className="icon-tile"><IconMail size={18} /></span>} title={d.email ?? '-'} subtitle={t('common:channel.email')} />
+            <Row leading={<span className="icon-tile"><IconPhone size={18} /></span>} title={<span className="tnum">{d.phone ?? '-'}</span>} subtitle={t('customer.phone')} />
             <Row title={t('customer.language')} value={LOCALE_NAMES[d.locale]} />
           </Group>
 
@@ -109,7 +109,7 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
           ) : null}
           {d.favorites.length ? (
             <Group title={t('customer.saved')}>
-              {d.favorites.map((f) => <Row key={f.productId} leading={<span className="icon-tile" style={{ background: 'var(--c-accent-fill)' }}><IconHeart size={18} /></span>} title={f.productName} href={`/admin/stock/${f.productId}`} />)}
+              {d.favorites.map((f) => <Row key={f.productId} leading={<span className="icon-tile"><IconHeart size={18} /></span>} title={f.productName} href={`/admin/stock/${f.productId}`} />)}
             </Group>
           ) : null}
 
@@ -129,17 +129,6 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
             )) : <Row title={<span className="t-2">{t('customer.noConsents')}</span>} />}
           </Group>
 
-          {can('customers.erase', null) ? (
-            <Group title={t('customer.privacy')} footer={t('customer.eraseFoot')}>
-              {erasing ? (
-                <button type="button" className="row" style={{ color: 'var(--c-error)' }} onClick={() => void api.eraseCustomer(org.orgId, id).then(() => { toast(t('customer.erased')); router.push('/admin/customers'); }).catch((e: { code?: string }) => toast(t(`common:error.${e.code ?? 'internal'}`)))}>
-                  <span className="row-main row-title">{t('customer.eraseConfirm', { name: d.name ?? '' })}</span>
-                </button>
-              ) : (
-                <button type="button" className="row" style={{ color: 'var(--c-error)' }} onClick={() => setErasing(true)}><span className="row-main row-title">{t('customer.erase')}</span></button>
-              )}
-            </Group>
-          ) : null}
 
           <Group title={t('customer.messages')}>
             {d.deliveries.length ? d.deliveries.map((x, i) => (
@@ -148,6 +137,28 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
           </Group>
         </div>
       </div>
+      {can('customers.erase', null) ? (
+        <section className="inset-group max-w-[560px]">
+          <h2 className="inset-group-head">{t('customer.privacy')}</h2>
+          {erasing ? (
+            <div className="card p-4" role="group" aria-label={t('customer.erase')}>
+              <p className="t-sub m-0">{t('customer.eraseConsequence', { name: d.name ?? '' })}</p>
+              <div className="flex gap-2 mt-4 flex-wrap">
+                <button type="button" className="btn btn-danger-fill" onClick={() => void api.eraseCustomer(org.orgId, id).then(() => { toast(t('customer.erased')); router.push('/admin/customers'); }).catch((e: { code?: string }) => toast(t(`common:error.${e.code ?? 'internal'}`)))}>
+                  {t('customer.eraseButton', { name: d.name ?? '' })}
+                </button>
+                <button type="button" className="btn btn-gray" onClick={() => setErasing(false)}>{t('common:action.cancel')}</button>
+              </div>
+            </div>
+          ) : (
+            <ul className="list" role="list"><li>
+              <button type="button" className="row" style={{ color: 'var(--c-error)' }} onClick={() => setErasing(true)}><span className="row-main row-title">{t('customer.erase')}</span></button>
+            </li></ul>
+          )}
+          <p className="inset-group-foot">{t('customer.eraseFoot')}</p>
+        </section>
+      ) : null}
+
     </div>
   );
 }

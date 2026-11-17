@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAdmin } from './admin-context';
 
-// products, counts and transfers live under stock. a segmented row of links, like a ios scope bar.
+// products, counts and transfers live under stock. underline tabs on phones and tablets,
+// the sidebar shows them as a second level on wide screens.
 export function StockTabs() {
   const { t, can } = useAdmin();
   const pathname = usePathname();
@@ -16,18 +17,9 @@ export function StockTabs() {
   if (tabs.length < 2) return null;
   const active = (href: string) => (href === '/admin/stock' ? !/\/admin\/stock\/(counts|transfers)/.test(pathname) : pathname.startsWith(href));
   return (
-    <nav aria-label={t('stockTabs.label')} className="seg mb-5" style={{ display: 'inline-grid' }}>
+    <nav aria-label={t('stockTabs.label')} className="tabs md:hidden">
       {tabs.map((x) => (
-        <Link key={x.href} href={x.href} aria-current={active(x.href) ? 'page' : undefined}
-          className="inline-flex items-center justify-center hover:no-underline"
-          style={{
-            padding: '4px 14px', borderRadius: 7, fontSize: 13, minHeight: 28, color: 'var(--c-ink)',
-            fontWeight: active(x.href) ? 600 : 500,
-            background: active(x.href) ? 'var(--c-surface)' : 'transparent',
-            boxShadow: active(x.href) ? '0 3px 8px rgba(0,0,0,0.12), 0 3px 1px rgba(0,0,0,0.04)' : undefined,
-          }}>
-          {t(`stockTabs.${x.key}`)}
-        </Link>
+        <Link key={x.href} href={x.href} aria-current={active(x.href) ? 'page' : undefined}>{t(`stockTabs.${x.key}`)}</Link>
       ))}
     </nav>
   );

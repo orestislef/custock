@@ -38,7 +38,8 @@ export default function TransferPage({ params }: { params: Promise<{ id: string 
       <Link href="/admin/stock/transfers" className="inline-flex items-center min-h-[44px] -ml-2 t-body"><IconChevronLeft size={24} />{t('transfers.title')}</Link>
       <p className="t-sub t-2 m-0 mt-2">{t(`transfers.status.${x.status}`)}{x.sentAt ? ` · ${dateTime(x.sentAt, locale)}` : ''}</p>
       <h1 className="t-title1 t-display m-0 mt-1">{name(x.fromShopId)} → {name(x.toShopId)}</h1>
-      {x.note ? <p className="t-body t-2 mt-2">{x.note}</p> : null}
+      {x.note ? <p className="t-body t-2 mt-2 mb-0">{x.note}</p> : null}
+      <div className="h-6" />
 
       <Group title={t('transfers.lines')} footer={canReceive ? t('transfers.receiveFoot') : x.status === 'received' ? t('transfers.lostFoot') : undefined}>
         {x.lines.map((l) => (
@@ -46,7 +47,7 @@ export default function TransferPage({ params }: { params: Promise<{ id: string 
             subtitle={
               x.status === 'received'
                 ? <span className="inline-flex gap-2 items-center flex-wrap">{t('transfers.sentGot', { sent: number(l.qtySent, locale), got: number(l.qtyReceived ?? 0, locale) })}{l.lost > 0 ? <StockBadge state="negative" label={t('transfers.lost', { n: number(l.lost, locale) })} /> : null}</span>
-                : t('transfers.sentN', { n: number(l.qtySent, locale) })
+                : canReceive ? t('transfers.sentN', { n: number(l.qtySent, locale) }) : undefined
             }
             trailing={canReceive ? (
               <input className="t-title3 tnum text-right bg-transparent border-0 outline-none w-20 rounded-[8px] px-2 py-1" style={{ background: 'var(--c-fill)' }} inputMode="numeric"

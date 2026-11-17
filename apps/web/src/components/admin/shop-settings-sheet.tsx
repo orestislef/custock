@@ -45,7 +45,7 @@ export function ShopSettingsSheet({ product, level, onClose, onSaved }: { produc
     <Sheet open onClose={onClose} title={shop?.name ?? ''}
       footer={<button type="button" className="btn btn-primary btn-large" disabled={busy || (!canPrice && !canReorder)} onClick={() => void save()}>{t('common:action.save')}</button>}>
       <p className="t-headline m-0 mb-4">{productName(product, locale)}</p>
-      <section className="group">
+      <section className="inset-group">
         <div className="list">
           <label className="row">
             <span className="row-main">
@@ -56,9 +56,9 @@ export function ShopSettingsSheet({ product, level, onClose, onSaved }: { produc
               inputMode="decimal" disabled={!canPrice} placeholder={t('product.samePrice')} value={price} onChange={(e) => setPrice(e.target.value)} aria-label={t('shopSettings.price')} />
           </label>
         </div>
-        <p className="group-foot">{canPrice ? t('shopSettings.priceFoot') : <Why>{t('common:why.hiddenForRole')}</Why>}</p>
+        <p className="inset-group-foot">{canPrice ? t('shopSettings.priceFoot') : <Why>{t('common:why.hiddenForRole')}</Why>}</p>
       </section>
-      <section className="group">
+      <section className="inset-group">
         <div className="list">
           <label className="row">
             <span className="row-main">
@@ -69,7 +69,7 @@ export function ShopSettingsSheet({ product, level, onClose, onSaved }: { produc
               inputMode="decimal" disabled={!canReorder} placeholder={t('shopSettings.none')} value={reorder} onChange={(e) => setReorder(e.target.value)} aria-label={t('shopSettings.reorder')} />
           </label>
         </div>
-        <p className="group-foot">{canReorder ? t('shopSettings.reorderFoot') : <Why>{t('common:why.hiddenForRole')}</Why>}</p>
+        <p className="inset-group-foot">{canReorder ? t('shopSettings.reorderFoot') : <Why>{t('common:why.hiddenForRole')}</Why>}</p>
       </section>
     </Sheet>
   );

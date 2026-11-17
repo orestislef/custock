@@ -7,7 +7,7 @@ import { useAdmin } from '@/components/admin/admin-context';
 import { StockSheet, type StockMode } from '@/components/admin/stock-sheet';
 import { ShopSettingsSheet } from '@/components/admin/shop-settings-sheet';
 import { useRouter } from 'next/navigation';
-import { Group, Row, StockBadge, Why, stockState } from '@/components/ui/kit';
+import { Group, Row, StockBadge, Why, signed, stockState } from '@/components/ui/kit';
 import { Photo, useToast } from '@/components/ui/client-kit';
 import { Tally } from '@/components/ui/tally';
 import { IconBell, IconChevronLeft, IconPlus, IconEdit, IconTruck, IconGear } from '@/components/ui/icons';
@@ -95,7 +95,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                         {toldN ? (
                           <span className="badge badge-ok told-pop">{t('common:stock.told', { count: toldN })}</span>
                         ) : l.waiting > 0 ? (
-                          <span className="badge badge-accent"><IconBell size={13} />{t('common:stock.waiting', { count: l.waiting })}</span>
+                          <span className="badge badge-gray"><IconBell size={13} />{t('common:stock.waiting', { count: l.waiting })}</span>
                         ) : null}
                         {l.lastMovementAt ? <span className="t-foot t-2">{relative(l.lastMovementAt, locale)}</span> : null}
                       </span>
@@ -152,7 +152,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                   key={m.id}
                   title={t(`common:movement.${m.kind}`)}
                   subtitle={[shops.find((s) => s.id === m.shopId)?.name, m.createdByName, m.reason ? t(`common:reason.${m.reason}`) : null, relative(m.recordedAt, locale)].filter(Boolean).join(' · ')}
-                  value={<span style={{ color: m.qtyDelta > 0 ? 'var(--c-success)' : 'var(--c-ink-2)' }}>{m.qtyDelta > 0 ? '+' : ''}{qtyNumber(m.qtyDelta, p.uom, locale)}</span>}
+                  value={<span style={{ color: m.qtyDelta > 0 ? 'var(--c-success)' : 'var(--c-ink-2)' }}>{signed(m.qtyDelta, qtyNumber(Math.abs(m.qtyDelta), p.uom, locale))}</span>}
                 />
               )) : <Row title={t('product.noHistory')} />}
             </Group>
