@@ -18,9 +18,9 @@ window.CUSTOCK_IMAGES = {
   "s-marousi": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Moody%27s_Delicatessen_in_Waltham.jpg/960px-Moody%27s_Delicatessen_in_Waltham.jpg",
   "s-glyfada": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/95/Santorin_%28GR%29%2C_Akrotiri%2C_Supermarkt_--_2017_--_2877-83.jpg/960px-Santorin_%28GR%29%2C_Akrotiri%2C_Supermarkt_--_2017_--_2877-83.jpg",
   "post-new-arrivals": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/89/Spice_House%2C_Milwaukee%2C_store_shelves.jpg/960px-Spice_House%2C_Milwaukee%2C_store_shelves.jpg",
-  "post-offer": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/Citrus_and_olive_stall_in_the_souk_of_Meknes_%28423901962%29.jpg/960px-Citrus_and_olive_stall_in_the_souk_of_Meknes_%28423901962%29.jpg",
+  "post-offer": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Daisy_Fresh_Delicatessen_%28interior_view%29%2C_Settle_-_geograph.org.uk_-_3115170.jpg/960px-Daisy_Fresh_Delicatessen_%28interior_view%29%2C_Settle_-_geograph.org.uk_-_3115170.jpg",
   "post-event": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/58/Mindful_wine_tasting_-_February_2023_-_Sarah_Stierch_02.jpg/960px-Mindful_wine_tasting_-_February_2023_-_Sarah_Stierch_02.jpg",
   "post-harvest": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ed/Olive-Harvest-Sitia-Lasithi-Crete-Greece.jpg/960px-Olive-Harvest-Sitia-Lasithi-Crete-Greece.jpg",
-  "hero-scan": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Package_tracking_barcode_scanner_3.jpg/960px-Package_tracking_barcode_scanner_3.jpg",
+  "hero-scan": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9d/The_scanning_the_barcode_on_the_box.jpg/960px-The_scanning_the_barcode_on_the_box.jpg",
   "hero-shop": "https://live.staticflickr.com/2904/14228432457_cc8cb691cd_z.jpg"
 };

@@ -22,8 +22,12 @@ every photo in the demo is hotlinked from Wikimedia Commons or Flickr under a fr
 | `s-marousi` | Moody's Delicatessen in Waltham | Kenneth C. Zirkel | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | [page](https://commons.wikimedia.org/wiki/File:Moody%27s_Delicatessen_in_Waltham.jpg) |
 | `s-glyfada` | Santorin (GR), Akrotiri, Supermarkt -- 2017 -- 2877-83 | Dietmar Rabich | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | [page](https://commons.wikimedia.org/wiki/File:Santorin_(GR),_Akrotiri,_Supermarkt_--_2017_--_2877-83.jpg) |
 | `post-new-arrivals` | Spice House, Milwaukee, store shelves | Runner1928 | [CC0](http://creativecommons.org/publicdomain/zero/1.0/deed.en) | [page](https://commons.wikimedia.org/wiki/File:Spice_House,_Milwaukee,_store_shelves.jpg) |
-| `post-offer` | Citrus and olive stall in the souk of Meknes (423901962) | Fulvio Spada from Torino, Italy | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0) | [page](https://commons.wikimedia.org/wiki/File:Citrus_and_olive_stall_in_the_souk_of_Meknes_(423901962).jpg) |
+| `post-offer` | Daisy Fresh Delicatessen (interior view), Settle | Lynda Thorowgood | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0) | [page](https://commons.wikimedia.org/wiki/File:Daisy_Fresh_Delicatessen_(interior_view),_Settle_-_geograph.org.uk_-_3115170.jpg) |
 | `post-event` | Mindful wine tasting - February 2023 - Sarah Stierch 02 | Sarah Stierch (Missvain) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0) | [page](https://commons.wikimedia.org/wiki/File:Mindful_wine_tasting_-_February_2023_-_Sarah_Stierch_02.jpg) |
 | `post-harvest` | Olive-Harvest-Sitia-Lasithi-Crete-Greece | Petro Stelte | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | [page](https://commons.wikimedia.org/wiki/File:Olive-Harvest-Sitia-Lasithi-Crete-Greece.jpg) |
-| `hero-scan` | Package tracking barcode scanner 3 | IAEA 3 | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0) | [page](https://commons.wikimedia.org/wiki/File:Package_tracking_barcode_scanner_3.jpg) |
+| `hero-scan` | The scanning the barcode on the box | Mingjunli | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0) | [page](https://commons.wikimedia.org/wiki/File:The_scanning_the_barcode_on_the_box.jpg) |
 | `hero-shop` | Babylonstoren shop counter | flowcomm | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [page](https://www.flickr.com/photos/21162417@N07/14228432457) |
+
+## font
+
+Commissioner by the Commissioner Project Authors (Kostas Bartsokas), self hosted from `assets/fonts`, under the [SIL Open Font License 1.1](assets/fonts/OFL.txt).
