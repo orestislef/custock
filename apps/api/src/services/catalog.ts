@@ -50,7 +50,7 @@ export function loadProducts(t: Tenant, ids: string[], opts: LoadOpts): ProductW
   const products = t.all<ProductRow>(
     `SELECT p.id, p.category_id, c.name AS category_name, p.name, p.description, p.brand, p.uom, p.tax_rate_bp,
             p.track_stock, p.customer_visible, p.customer_stock_hidden, p.archived_at
-       FROM products p LEFT JOIN categories c ON c.id = p.category_id
+       FROM products p LEFT JOIN categories c ON c.id = p.category_id AND c.org_id = p.org_id
       WHERE p.org_id = @org AND p.id IN (SELECT value FROM json_each(@ids))`,
     { ids },
   );

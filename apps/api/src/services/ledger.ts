@@ -27,6 +27,8 @@ const DIRECT = new Set(['initial', 'receive', 'sale', 'return', 'adjust', 'damag
 const POSITIVE = new Set(['initial', 'receive', 'return', 'transfer_in']);
 const NEGATIVE = new Set(['sale', 'damage', 'transfer_out']);
 const RESTOCK = new Set(['receive', 'transfer_in', 'return']);
+// counts and transfers have their own undo (a new count, a transfer back), never a reversal
+const REVERSIBLE = new Set(['initial', 'receive', 'sale', 'return', 'adjust', 'damage']);
 // a movement this old was made offline and is accepted even in strict mode
 export const OFFLINE_AFTER_MS = 120_000;
 
@@ -117,7 +119,7 @@ export function recordMovement(ctx: LedgerCtx, input: MovementInput, opts: { int
       { id: m.refId ?? '' },
     );
     if (!original) return { status: 'rejected', id: m.id, code: 'not_found' };
-    if (original.kind === 'reversal') return { status: 'rejected', id: m.id, code: 'validation' };
+    if (!REVERSIBLE.has(original.kind)) return { status: 'rejected', id: m.id, code: 'validation' };
     const already = t.get("SELECT 1 FROM stock_movements WHERE org_id = @org AND kind = 'reversal' AND ref_id = @id", { id: original.id });
     if (already) return { status: 'rejected', id: m.id, code: 'conflict' };
     const perm = KIND_PERM[original.kind] ?? 'stock.adjust';
@@ -133,6 +135,8 @@ export function recordMovement(ctx: LedgerCtx, input: MovementInput, opts: { int
     if (POSITIVE.has(m.kind) && m.qtyDelta <= 0) return { status: 'rejected', id: m.id, code: 'validation' };
     if (NEGATIVE.has(m.kind) && m.qtyDelta >= 0) return { status: 'rejected', id: m.id, code: 'validation' };
     if ((m.kind === 'adjust' || m.kind === 'damage') && !m.reason && !opts.internal) return { status: 'rejected', id: m.id, code: 'validation' };
+    // references are set by the server (counts, transfers, reversals), never by the client
+    if (!opts.internal) m = { ...m, refType: undefined, refId: undefined };
   }
 
   const variant = t.get<VariantRow>(
@@ -146,8 +150,9 @@ export function recordMovement(ctx: LedgerCtx, input: MovementInput, opts: { int
   const after = before.onHand + m.qtyDelta;
   const offline = now - m.occurredAt > OFFLINE_AFTER_MS;
   if (!org.allow_negative_stock && after < 0 && m.qtyDelta < 0) {
-    if (!offline) return { status: 'rejected', id: m.id, code: 'negative_stock_blocked' };
-    audit(t, { id: ctx.userId }, 'stock.negative_accepted_offline', { type: 'stock_movement', id: m.id }, null, { shopId: m.shopId, variantId: m.variantId, onHand: after }, now);
+    // offline movements are only let through for people who may adjust stock, and land in a review list
+    if (!offline || !ctx.can('stock.adjust', m.shopId)) return { status: 'rejected', id: m.id, code: 'negative_stock_blocked' };
+    audit(t, { id: ctx.userId }, 'stock.negative_accepted_offline', { type: 'stock_movement', id: m.id }, null, { shopId: m.shopId, variantId: m.variantId, onHand: after, qtyDelta: m.qtyDelta }, now);
   }
   if (variant.archived) audit(t, { id: ctx.userId }, 'stock.movement_on_archived', { type: 'stock_movement', id: m.id }, null, { variantId: m.variantId }, now);
 
@@ -163,7 +168,8 @@ export function recordMovement(ctx: LedgerCtx, input: MovementInput, opts: { int
     }
     unitCost = unitCost ?? variant.cost_minor;
   }
-  if ((m.kind === 'damage' || m.kind === 'adjust') && unitCost == null) unitCost = variant.cost_minor;
+  // a client cost only counts with products.cost.edit
+  if ((m.kind === 'damage' || m.kind === 'adjust' || m.kind === 'initial') && (unitCost == null || !ctx.can('products.cost.edit', m.shopId))) unitCost = variant.cost_minor;
 
   t.run(
     `INSERT INTO stock_movements (id, org_id, shop_id, variant_id, qty_delta, kind, reason, unit_price_minor, unit_cost_minor,

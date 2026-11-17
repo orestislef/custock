@@ -180,6 +180,7 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
     if (!row) throw notFound('product');
     checkIfMatch(c, productEtag(row.updated_at));
     const patch = ProductInput.partial().parse(await c.req.json());
+    if (patch.categoryId && !t.get('SELECT 1 FROM categories WHERE org_id = @org AND id = @id', { id: patch.categoryId })) throw badRequest('unknown category', { categoryId: 'not_found' });
     if (patch.priceMinor != null && !has(c, 'products.price.edit')) throw forbidden('products.price.edit');
     if (patch.costMinor != null && !has(c, 'products.cost.edit')) throw forbidden('products.cost.edit');
     const now = nextStamp(row.updated_at, nowOf(c));
@@ -231,6 +232,8 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
     const shopId = c.req.param('shop');
     const variantId = c.req.param('variant');
     const input = ShopVariantSettingsInput.parse(await c.req.json());
+    if (!Object.keys(input).length) throw badRequest('nothing to change');
+    if (!orgOf(c).topology.shops.includes(shopId)) throw notFound('shop');
     if ('priceOverrideMinor' in input || 'isListed' in input) need(c, 'prices.shop.edit', shopId);
     if ('reorderPoint' in input || 'reorderQty' in input) need(c, 'stock.settings.manage', shopId);
     const { t } = orgOf(c);
@@ -293,6 +296,7 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
     const { t } = orgOf(c);
     const row = t.get<{ code: string; shop_id: string }>('SELECT code, shop_id FROM unknown_scans WHERE org_id = @org AND id = @id AND resolved_at IS NULL', { id: c.req.param('id') });
     if (!row) throw notFound('unknown scan');
+    if (variantId && !t.get('SELECT 1 FROM product_variants WHERE org_id = @org AND id = @v', { v: variantId })) throw notFound('variant');
     cfgOf(c).db.transaction(() => {
       if (variantId) attach(c, variantId, row.code);
       t.run('UPDATE unknown_scans SET resolved_at = @now, resolved_variant_id = @v WHERE org_id = @org AND id = @id', { now: nowOf(c), v: variantId, id: c.req.param('id') });
@@ -387,7 +391,8 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
     const count = loadCount(c, c.req.param('id'));
     if (count.status !== 'open') throw new ApiProblem(409, 'conflict', 'count is not open');
     const { t, org } = orgOf(c);
-    t.run("UPDATE stock_counts SET status = 'review', submitted_at = @now WHERE org_id = @org AND id = @id", { now: nowOf(c), id: count.id });
+    const moved = t.run("UPDATE stock_counts SET status = 'review', submitted_at = @now WHERE org_id = @org AND id = @id AND status = 'open'", { now: nowOf(c), id: count.id });
+    if (!moved.changes) throw new ApiProblem(409, 'conflict', 'count is not open');
     const shopName = shopNameOf(t, count.shopId);
     notifyMembers(cfgOf(c).db, org.id, {
       perm: 'stock.count.approve', shopId: count.shopId, key: 'countReady', exceptUserId: c.get('user').id,
@@ -397,14 +402,20 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
   });
 
   app.post('/v1/orgs/:org/counts/:id/apply', async (c) => {
+    // read the body before looking at the status, so nothing async sits between the check and the write
+    const body = z.object({ uncountedPolicy: UncountedPolicy.optional() }).parse(await c.req.json().catch(() => ({})));
     const count = loadCount(c, c.req.param('id'));
     need(c, 'stock.count.approve', count.shopId);
     if (count.status !== 'review' && count.status !== 'open') throw new ApiProblem(409, 'conflict', 'count is already closed');
-    const body = z.object({ uncountedPolicy: UncountedPolicy.optional() }).parse(await c.req.json().catch(() => ({})));
     if (count.kind === 'full' && !body.uncountedPolicy) throw badRequest('full counts need an uncounted policy', { uncountedPolicy: 'required' });
     const ctx = ledgerCtx(c);
     const { t } = ctx;
     cfgOf(c).db.transaction(() => {
+      const claimed = t.run(
+        "UPDATE stock_counts SET status = 'applied', applied_by = @u, applied_at = @now, uncounted_policy = @p WHERE org_id = @org AND id = @id AND status IN ('open', 'review')",
+        { u: ctx.userId, now: ctx.now, p: count.kind === 'full' ? body.uncountedPolicy : null, id: count.id },
+      );
+      if (!claimed.changes) throw new ApiProblem(409, 'conflict', 'count is already closed');
       for (const l of count.lines) {
         if (l.difference === 0) continue;
         const out = recordMovement(ctx, { id: uuidv7(ctx.now), shopId: count.shopId, variantId: l.variantId, qtyDelta: l.difference, kind: 'count', refType: 'count', refId: count.id, occurredAt: ctx.now }, { internal: true });
@@ -421,10 +432,6 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
           recordMovement(ctx, { id: uuidv7(ctx.now), shopId: count.shopId, variantId: r.variant_id, qtyDelta: -r.on_hand, kind: 'count', refType: 'count', refId: count.id, occurredAt: ctx.now }, { internal: true });
         }
       }
-      t.run(
-        "UPDATE stock_counts SET status = 'applied', applied_by = @u, applied_at = @now, uncounted_policy = @p WHERE org_id = @org AND id = @id",
-        { u: ctx.userId, now: ctx.now, p: count.kind === 'full' ? body.uncountedPolicy : null, id: count.id },
-      );
       audit(t, { id: ctx.userId }, 'stock.count_applied', { type: 'stock_count', id: count.id }, null, { lines: count.lines.length, policy: body.uncountedPolicy ?? null }, ctx.now);
     })();
     return c.json(loadCount(c, count.id));
@@ -433,7 +440,8 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
   app.post('/v1/orgs/:org/counts/:id/cancel', (c) => {
     const count = loadCount(c, c.req.param('id'));
     if (count.status === 'applied' || count.status === 'cancelled') throw new ApiProblem(409, 'conflict', 'count is already closed');
-    orgOf(c).t.run("UPDATE stock_counts SET status = 'cancelled' WHERE org_id = @org AND id = @id", { id: count.id });
+    const moved = orgOf(c).t.run("UPDATE stock_counts SET status = 'cancelled' WHERE org_id = @org AND id = @id AND status IN ('open', 'review')", { id: count.id });
+    if (!moved.changes) throw new ApiProblem(409, 'conflict', 'count is already closed');
     return c.json(loadCount(c, count.id));
   });
 
@@ -486,6 +494,8 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
     if (tr.status !== 'draft') throw new ApiProblem(409, 'conflict', 'transfer is not a draft');
     const ctx = ledgerCtx(c);
     cfgOf(c).db.transaction(() => {
+      const claimed = ctx.t.run("UPDATE transfers SET status = 'sent', sent_by = @u, sent_at = @now WHERE org_id = @org AND id = @id AND status = 'draft'", { u: ctx.userId, now: ctx.now, id: tr.id });
+      if (!claimed.changes) throw new ApiProblem(409, 'conflict', 'transfer is not a draft');
       for (const l of tr.lines) {
         const out = recordMovement(ctx, { id: uuidv7(ctx.now), shopId: tr.fromShopId, variantId: l.variantId, qtyDelta: -l.qtySent, kind: 'transfer_out', refType: 'transfer', refId: tr.id, occurredAt: ctx.now }, { internal: true });
         if (out.status === 'rejected') throw new ApiProblem(409, out.code, `line ${l.variantId}`);
@@ -495,7 +505,6 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
           { s: tr.toShopId, v: l.variantId, q: l.qtySent },
         );
       }
-      ctx.t.run("UPDATE transfers SET status = 'sent', sent_by = @u, sent_at = @now WHERE org_id = @org AND id = @id", { u: ctx.userId, now: ctx.now, id: tr.id });
     })();
     const total = tr.lines.reduce((a, l) => a + l.qtySent, 0);
     const to = shopNameOf(ctx.t, tr.toShopId);
@@ -509,13 +518,15 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
 
   // what really arrived. the difference is lost in transit, no phantom stock anywhere.
   app.post('/v1/orgs/:org/transfers/:id/receive', async (c) => {
+    const body = z.object({ lines: z.array(z.object({ variantId: z.string().max(64), qtyReceived: z.number().int().min(0) })).max(500).default([]) }).parse(await c.req.json());
     const tr = loadTransfer(c, c.req.param('id'));
     need(c, 'stock.transfer.receive', tr.toShopId);
     if (tr.status !== 'sent') throw new ApiProblem(409, 'conflict', 'transfer is not on the way');
-    const body = z.object({ lines: z.array(z.object({ variantId: z.string(), qtyReceived: z.number().int().min(0) })).default([]) }).parse(await c.req.json());
     const got = new Map(body.lines.map((l) => [l.variantId, l.qtyReceived]));
     const ctx = ledgerCtx(c);
     cfgOf(c).db.transaction(() => {
+      const claimed = ctx.t.run("UPDATE transfers SET status = 'received', received_by = @u, received_at = @now WHERE org_id = @org AND id = @id AND status = 'sent'", { u: ctx.userId, now: ctx.now, id: tr.id });
+      if (!claimed.changes) throw new ApiProblem(409, 'conflict', 'transfer is not on the way');
       for (const l of tr.lines) {
         const received = Math.min(got.get(l.variantId) ?? l.qtySent, l.qtySent);
         ctx.t.run('UPDATE transfer_lines SET qty_received = @r WHERE org_id = @org AND transfer_id = @id AND variant_id = @v', { r: received, id: tr.id, v: l.variantId });
@@ -527,7 +538,6 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
           audit(ctx.t, { id: ctx.userId }, 'stock.transfer_shortage', { type: 'transfer', id: tr.id }, null, { variantId: l.variantId, lost: l.qtySent - received }, ctx.now);
         }
       }
-      ctx.t.run("UPDATE transfers SET status = 'received', received_by = @u, received_at = @now WHERE org_id = @org AND id = @id", { u: ctx.userId, now: ctx.now, id: tr.id });
     })();
     return c.json(loadTransfer(c, tr.id));
   });
@@ -536,7 +546,8 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
     const tr = loadTransfer(c, c.req.param('id'));
     need(c, 'stock.transfer.send', tr.fromShopId);
     if (tr.status !== 'draft') throw new ApiProblem(409, 'conflict', 'only drafts can be cancelled');
-    orgOf(c).t.run("UPDATE transfers SET status = 'cancelled' WHERE org_id = @org AND id = @id", { id: tr.id });
+    const moved = orgOf(c).t.run("UPDATE transfers SET status = 'cancelled' WHERE org_id = @org AND id = @id AND status = 'draft'", { id: tr.id });
+    if (!moved.changes) throw new ApiProblem(409, 'conflict', 'only drafts can be cancelled');
     return c.json(loadTransfer(c, tr.id));
   });
 
@@ -573,7 +584,7 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
       tombstones: {
         products: full ? [] : t.all<{ id: string }>('SELECT id FROM products WHERE org_id = @org AND archived_at > @since', { since }).map((r) => r.id),
         variants: full ? [] : t.all<{ id: string }>('SELECT id FROM product_variants WHERE org_id = @org AND archived_at > @since', { since }).map((r) => r.id),
-        barcodes: [],
+        barcodes: full ? [] : t.all<{ entity_id: string }>("SELECT entity_id FROM deleted_rows WHERE org_id = @org AND entity = 'barcode' AND deleted_at > @since", { since }).map((r) => r.entity_id),
       },
     };
     return c.json(result);
