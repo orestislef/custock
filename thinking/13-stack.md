@@ -27,7 +27,7 @@ What we build it with, piece by piece, and why. The reasoning for TypeScript ove
 | `expo-router` with native tabs | navigation | file based routes, deep links for free. native tabs means the real platform tab bar, so on ios 26 we get liquid glass without faking it |
 | `react-native-reanimated` 4 | animation | runs on the UI thread, springs that feel native, layout animations for lists, the rolling stock numbers |
 | `react-native-gesture-handler` | gestures | swipe actions on list rows, drag to dismiss sheets |
-| `react-native-vision-camera` with its code scanner | barcode and QR scanning | uses ML Kit on android and the apple vision stack on ios. fast enough for continuous scanning |
+| `expo-camera` barcode scanning | barcode and QR scanning | **changed when building:** covers every code type we need (EAN, UPC, ITF, Code 128, QR, DataMatrix) with no extra native setup. `react-native-vision-camera` stays the option if continuous scanning ever needs more speed |
 | `expo-haptics` | the tick on each scan | short haptics that match the system meanings, see [10](10-design.md) |
 | `expo-sqlite` + `drizzle-orm` | offline cache and outbox | local copy of catalog and stock, queued movements. same ORM as the server |
 | `@react-native-firebase/messaging` | FCM | data messages for silent refresh, notification messages for customers |

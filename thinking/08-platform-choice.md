@@ -28,7 +28,7 @@ Before picking tools, the list of things that are hard here:
 |---|---|---|---|---|
 | native look on iOS | drawn by flutter, imitates cupertino. liquid glass only via packages | same | **real native tab bars, sheets, menus**. liquid glass comes from the system | best |
 | animations | excellent (impeller) | excellent on phone | excellent (reanimated 4, skia) | excellent |
-| scanning | mobile_scanner, good | same | vision-camera code scanner, very good | best |
+| scanning | mobile_scanner, good | same | expo-camera barcode scanning, good, no extra native setup | best |
 | offline db | drift, very good | same | expo-sqlite + drizzle, good | good |
 | public web pages | flutter web is heavy (canvas, slow first load, no SEO). needs a second stack anyway | React | **Next.js, same language** | needs a web stack |
 | admin dashboard | flutter web works but does not feel like the web | React | **React, same language** | web stack |
@@ -43,7 +43,7 @@ Before picking tools, the list of things that are hard here:
 **decided (pending review): TypeScript everywhere.**
 
 - **phone app:** Expo (React Native, new architecture). expo-router with native tabs, Reanimated 4,
-  gesture handler, react-native-vision-camera for scanning, expo-haptics, expo-sqlite + Drizzle for
+  gesture handler, expo-camera for scanning, expo-haptics, expo-sqlite + Drizzle for
   offline, FCM for push, expo-secure-store, i18next.
 - **web:** Next.js. customer pages (join, product, catalog, offers, unsubscribe) server rendered and
   tiny, plus the admin dashboard in the same app.
