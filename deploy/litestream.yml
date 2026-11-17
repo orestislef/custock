@@ -1,0 +1,14 @@
+# continuous backup of the sqlite database to an S3 compatible bucket (Cloudflare R2).
+# credentials come from LITESTREAM_ACCESS_KEY_ID and LITESTREAM_SECRET_ACCESS_KEY.
+dbs:
+  - path: /data/custock.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: custock/db
+        endpoint: ${LITESTREAM_ENDPOINT}
+        region: auto
+        force-path-style: true
+        sync-interval: 10s
+        snapshot-interval: 24h
+        retention: 720h

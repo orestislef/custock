@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/.expo
+**/dist
+apps/api/data
+apps/mobile/ios
+apps/mobile/android
+thinking
+.git
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/.env
+**/.env.*

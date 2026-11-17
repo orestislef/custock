@@ -1,0 +1,38 @@
+# systemd unit, for running the api without docker.
+# install: copy to /etc/systemd/system/, then: systemctl daemon-reload && systemctl enable --now custock-api
+# expects the repo in /opt/custock (pnpm install done), the env file in /etc/custock/api.env and
+# data in /var/lib/custock, all owned by the custock user.
+
+[Unit]
+Description=Custock API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=custock
+Group=custock
+WorkingDirectory=/opt/custock
+EnvironmentFile=/etc/custock/api.env
+Environment=NODE_ENV=production
+Environment=CUSTOCK_DB=/var/lib/custock/custock.db
+Environment=CUSTOCK_UPLOAD_DIR=/var/lib/custock/uploads
+ExecStart=/usr/bin/node --import tsx apps/api/src/main.ts
+Restart=on-failure
+RestartSec=5
+
+# hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/var/lib/custock
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
