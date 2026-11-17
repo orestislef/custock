@@ -90,7 +90,10 @@
     "backInStockToast_one": "Back in stock. {{count}} customer was told.",
     "backInStockToast_other": "Back in stock. {{count}} customers were told.",
     "lowStockToast": "Running low in {{shop}}. The managers got a notification.",
-    "transferTip": "Some of this is on the way from another shop. It counts once it is received."
+    "transferTip": "Some of this is on the way from another shop. It counts once it is received.",
+    "archive": "Archive product",
+    "archiveConfirm": "Archiving hides it from lists and scans. Its history stays and you can still find it in reports.",
+    "archived": "Product archived"
   },
   "catalog": {
     "title": "Catalog",
@@ -137,7 +140,10 @@
     "permsCount_one": "{{count}} permission here",
     "permsCount_other": "{{count}} permissions here",
     "noOrgTitle": "No business yet",
-    "noOrgBody": "You are not a member of any business. Ask for an invite."
+    "noOrgBody": "You are not a member of any business. Ask for an invite.",
+    "skip": "Skip to content",
+    "offlineTitle": "Cannot reach the server",
+    "offlineBody": "Your session is fine. Check the connection and try again."
   },
   "nav": {
     "home": "Home",
@@ -148,7 +154,9 @@
     "team": "Team",
     "joinLinks": "QR codes",
     "settings": "Settings",
-    "more": "More"
+    "more": "More",
+    "audit": "Audit log",
+    "outbox": "Dev outbox"
   },
   "dash": {
     "morning": "Good morning, {{name}}",
@@ -218,7 +226,10 @@
       "barcode": "Barcode (optional)",
       "price": "Price with VAT",
       "foot": "Leave the barcode empty and we make our own label code."
-    }
+    },
+    "attach": "Add to product",
+    "attachTo": "Which product is this code for?",
+    "attached": "Code added to the product"
   },
   "stockSheet": {
     "receiveTitle": "Receive stock",
@@ -262,7 +273,11 @@
     "emailOn": "Email on",
     "emailOff": "Email off",
     "pushOn": "Push on",
-    "pushOff": "Push off"
+    "pushOff": "Push off",
+    "add": "Add customer",
+    "addLead": "Hand the phone over so they type their own details. They get a confirmation email, nothing else until they confirm.",
+    "addConsent": "Asked and agreed at the counter",
+    "added": "{{name}} added. A confirmation email is on its way."
   },
   "customer": {
     "since": "Customer since {{date}}",
@@ -313,7 +328,12 @@
       "opened": "Opened",
       "clicked": "Clicked",
       "skipped": "Skipped"
-    }
+    },
+    "privacy": "Privacy",
+    "erase": "Erase this customer",
+    "eraseConfirm": "Erase {{name}} for good",
+    "eraseFoot": "For a GDPR request. Personal details are wiped, counts in reports stay.",
+    "erased": "Customer erased"
   },
   "posts": {
     "title": "Posts",
@@ -370,7 +390,8 @@
     "published_other": "Published. On its way to {{count}} people.",
     "scheduled": "Scheduled",
     "submitted": "Sent for approval. The approver got a notification.",
-    "savedDraft": "Draft saved"
+    "savedDraft": "Draft saved",
+    "written": "written"
   },
   "post": {
     "approve": "Approve and publish",
@@ -390,7 +411,10 @@
     "details": "Details",
     "author": "Written by",
     "sentAt": "Sent",
-    "scheduledAt": "Goes out"
+    "scheduledAt": "Goes out",
+    "deleteConfirm": "Delete this post?",
+    "deleteSent": "Delete it? Pushes and emails already sent cannot be taken back.",
+    "deleted": "Post deleted"
   },
   "team": {
     "title": "Team",
@@ -424,7 +448,23 @@
     "send": "Send invite",
     "invited": "Invite sent to {{email}}",
     "invitedSub": "They get an email in their language with a link to join.",
-    "devLink": "Dev link"
+    "devLink": "Dev link",
+    "pending": "Invites waiting",
+    "pendingFoot": "Invites expire after 7 days.",
+    "expires": "expires {{when}}",
+    "revoke": "Revoke",
+    "revoked": "Invite revoked",
+    "suspend": "Suspend",
+    "suspendSub": "They cannot sign in to this business. Everything they did stays.",
+    "reactivate": "Make active again",
+    "remove": "Remove from the business",
+    "removeConfirm": "Remove {{name}} for good",
+    "removeSub": "Their history stays as a former member.",
+    "done": {
+      "active": "{{name}} is active again",
+      "suspended": "{{name}} is suspended",
+      "removed": "{{name}} was removed"
+    }
   },
   "roles": {
     "title": "Roles",
@@ -547,9 +587,229 @@
     "for": "For",
     "labelPh": "Label, for example window poster",
     "labelFoot": "Only your team sees the label.",
-    "created": "QR code ready"
+    "created": "QR code ready",
+    "on": "Active",
+    "off": "Off",
+    "activeFor": "{{label}} active"
   },
   "poster": {
     "line": "Scan for news and offers from {{org}}"
+  },
+  "stockTabs": {
+    "label": "Stock views",
+    "products": "Products",
+    "counts": "Counts",
+    "transfers": "Transfers"
+  },
+  "scan": {
+    "open": "Scan with the camera",
+    "title": "Scan a barcode",
+    "hint": "Hold the code inside the frame. A usb scanner also works, it types into the field.",
+    "noCamera": "No camera access. Type the code, or allow the camera in the browser settings."
+  },
+  "productForm": {
+    "edit": "Edit product",
+    "back": "Product",
+    "brand": "Brand",
+    "description": "Description",
+    "noCategory": "No category",
+    "barcode": "Barcode",
+    "barcodePh": "Scan or type a barcode",
+    "ownCode": "Make our own label code",
+    "barcodeFoot": "Leave it empty and add one later, or make our own code for products without one.",
+    "barcodeAddFoot_one": "This product has {{count}} barcode. A new one is added, the old ones keep working.",
+    "barcodeAddFoot_other": "This product has {{count}} barcodes. A new one is added, the old ones keep working.",
+    "unit": "Sold by",
+    "uom": {
+      "piece": "Piece",
+      "kg": "Kilo",
+      "l": "Litre",
+      "m": "Metre"
+    },
+    "unitFoot": "Kilo, litre and metre are counted to three decimals.",
+    "variants": "Variants",
+    "optionName": "Option, e.g. size",
+    "optionValues": "Values, e.g. S, M, L",
+    "addOption": "Add an option",
+    "variantsFoot": "Sizes, colours or flavours. Each variant gets its own stock and barcode.",
+    "variantsCount_one": "{{count}} variant will be created.",
+    "variantsCount_other": "{{count}} variants will be created.",
+    "photos": "Photos",
+    "photoPh": "Photo link (https)",
+    "photoFoot": "Paste a link for now. Uploading from the phone comes with the app.",
+    "priceFoot": "With VAT, as on the shelf.",
+    "vatFoot": "Rates for {{country}}.",
+    "track": "Track stock",
+    "trackFoot": "Off for services and things nobody counts.",
+    "create": "Create product",
+    "saved": "Product saved"
+  },
+  "shopSettings": {
+    "open": "Settings for {{shop}}",
+    "price": "Price in this shop",
+    "priceSub": "Base price {{price}}",
+    "priceFoot": "Leave empty to use the base price.",
+    "reorder": "Reorder point",
+    "reorderSub": "On hand now {{now}}",
+    "reorderFoot": "When stock drops to this, the managers get one notification.",
+    "none": "None"
+  },
+  "counts": {
+    "title": "Stock counts",
+    "start": "Start a count",
+    "startButton": "Start counting",
+    "emptyTitle": "No counts yet",
+    "emptyBody": "Count a shelf, a category or the whole shop. Several people can count at once.",
+    "open": "In progress",
+    "openFoot": "Counts in review wait for someone who can approve them.",
+    "done": "Finished",
+    "kindLabel": "What to count",
+    "kind": {
+      "full": "Whole shop",
+      "partial": "Part of the shop"
+    },
+    "kindFoot": {
+      "full": "At the end you decide what happens to products nobody counted.",
+      "partial": "Only what you scan is changed."
+    },
+    "anyCategory": "Anything I scan",
+    "status": {
+      "open": "Counting",
+      "review": "Waiting for review",
+      "applied": "Applied",
+      "cancelled": "Cancelled"
+    },
+    "lines_one": "{{count}} line",
+    "lines_other": "{{count}} lines",
+    "started": "started {{when}}",
+    "scanPh": "Scan or type a barcode, then Enter",
+    "addProduct": "Add product",
+    "unknownCode": "{{code}} is not in the catalog",
+    "counted": "Counted",
+    "differences": "Differences",
+    "blindFoot": "Expected numbers stay hidden while counting, so nobody counts towards them.",
+    "valueFoot": "Total difference at cost {{value}}.",
+    "expected": "expected {{n}}",
+    "countedN": "counted {{n}}",
+    "setQty": "Counted quantity of {{name}}",
+    "noLines": "Nothing counted yet",
+    "submit": "Send for review",
+    "submitted": "Sent for review",
+    "cancel": "Cancel count",
+    "cancelled": "Count cancelled",
+    "uncountedQ": "Products nobody counted",
+    "leave": "Leave them",
+    "zero": "Set to zero",
+    "uncountedFoot": {
+      "ignore": "Their stock stays as it is.",
+      "set_zero": "Their stock becomes zero. Use this only if the whole shop was counted."
+    },
+    "apply": "Apply differences",
+    "applied": "Differences applied to stock",
+    "waitingApproval": "Someone with count approval applies this."
+  },
+  "transfers": {
+    "title": "Transfers",
+    "new": "New transfer",
+    "emptyTitle": "No transfers",
+    "emptyBody": "Send stock from one shop to another. It shows as on the way until it is received.",
+    "group": {
+      "incoming": "On the way to you",
+      "outgoing": "On the way",
+      "drafts": "Drafts",
+      "done": "Finished"
+    },
+    "incomingFoot": "Count what arrived and confirm. Anything missing is recorded as lost in transit.",
+    "status": {
+      "draft": "Draft",
+      "sent": "On the way",
+      "received": "Received",
+      "cancelled": "Cancelled"
+    },
+    "items_one": "{{count}} item",
+    "items_other": "{{count}} items",
+    "otherShop": "Another shop",
+    "from": "From",
+    "to": "To",
+    "lines": "Items",
+    "saveDraft": "Save draft",
+    "draftFoot": "Nothing moves until you send it.",
+    "send": "Send",
+    "sent": "Sent. The receiving shop got a notification.",
+    "cancel": "Cancel transfer",
+    "cancelled": "Transfer cancelled",
+    "receive": "Confirm what arrived",
+    "received": "Received. Stock is updated.",
+    "receiveFoot": "Change the number if less arrived than was sent.",
+    "gotFor": "Arrived of {{name}}",
+    "shortWarn": "{{n}} missing will be recorded as lost in transit.",
+    "sentN": "sent {{n}}",
+    "sentGot": "sent {{sent}}, arrived {{got}}",
+    "lost": "{{n}} lost",
+    "lostFoot": "Lost items count as shrinkage in reports.",
+    "onlyReceiving": "Only the receiving shop can confirm this."
+  },
+  "audit": {
+    "title": "Audit log",
+    "lead": "Who changed what, newest first.",
+    "emptyTitle": "Nothing logged yet",
+    "more": "Show more",
+    "end": "That is everything.",
+    "system": "System",
+    "before": "before",
+    "after": "after",
+    "action": {
+      "role.assigned": "gave a role",
+      "role.removed": "removed a role",
+      "role.created": "created a role",
+      "role.updated": "changed a role",
+      "product.created": "added a product",
+      "product.updated": "edited a product",
+      "product.archived": "archived a product",
+      "product.price_changed": "changed a price",
+      "customers.exported": "exported customers",
+      "customer.erased": "erased a customer",
+      "post.published": "published a post",
+      "post.scheduled": "scheduled a post",
+      "post.deleted": "deleted a post",
+      "count.applied": "applied a stock count",
+      "member.suspended": "suspended a member",
+      "member.removed": "removed a member",
+      "member.active": "reactivated a member",
+      "invite.sent": "sent an invite",
+      "settings.changed": "changed settings",
+      "barcode.detached": "removed a barcode",
+      "customer.added": "added a customer",
+      "customer.erased_by_self": "deleted their own data",
+      "invite.accepted": "accepted an invite",
+      "invite.revoked": "revoked an invite",
+      "member.deleted_account": "deleted their account",
+      "member.rejoined_by_invite": "rejoined by invite",
+      "org.settings_changed": "changed business settings",
+      "post.cancelled": "cancelled a post",
+      "post.edited_after_send": "edited a sent post",
+      "post.submitted": "sent a post for approval",
+      "product.shop_price_changed": "changed a shop price",
+      "role.unassigned": "removed a role",
+      "shop.updated": "changed shop details",
+      "stock.count_applied": "applied a stock count",
+      "stock.movement_on_archived": "moved stock of an archived product",
+      "stock.negative_accepted_offline": "synced an offline sale below zero",
+      "stock.transfer_shortage": "recorded a transfer shortage"
+    }
+  },
+  "outbox": {
+    "title": "Dev outbox",
+    "lead": "Emails and pushes that would have gone out. Development only, nothing leaves this machine.",
+    "tip": "Publish a post or receive a product people wait for, then come back here to see each message per customer, in their language.",
+    "channel": "Channel",
+    "refresh": "Refresh",
+    "run": "Run jobs now",
+    "ran_one": "Ran {{count}} job",
+    "ran_other": "Ran {{count}} jobs",
+    "emptyTitle": "Nothing sent yet",
+    "emptyBody": "Messages show up here as soon as something fans out.",
+    "offTitle": "Not available",
+    "offBody": "The outbox only exists when the api runs in development mode."
   }
 }
