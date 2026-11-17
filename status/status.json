@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-17T19:45:00+02:00",
-  "overall": 45,
+  "updated": "2026-11-17T20:30:00+02:00",
+  "overall": 55,
   "areas": [
     {
       "key": "thinking",
@@ -14,7 +14,7 @@
       "name": "Clickable demo (GitHub Pages)",
       "percent": 95,
       "state": "building",
-      "note": "Live with every planned flow: roles and delegation, team and role editor, scanning, back in stock, counts, transfers, reports with charts, posts and push, lock screen, customer join flow, feed, offers, catalog and profile. English, Greek and Russian. Works on phones."
+      "note": "Live with every planned flow: roles and delegation, team and role editor, scanning, back in stock, counts, transfers, reports with charts, posts and push, lock screen, customer join flow, feed, offers, catalog and profile. English, Greek and Russian. Works on phones. Applying an Apple design review now."
     },
     {
       "key": "setup",
@@ -40,9 +40,9 @@
     {
       "key": "web",
       "name": "Web (customer pages and admin)",
-      "percent": 3,
+      "percent": 60,
       "state": "building",
-      "note": "Next.js: join page, shelf product page, public catalog, admin dashboard, stock, customers, posts, team, reports."
+      "note": "Next.js 16. Customer pages: QR join, shelf product, public catalog, offers, unsubscribe. Admin: dashboard, stock with greeklish search, product with stock per shop, customers, posts composer with the audience breakdown, team, role editor, reports with charts, customer page settings, printable QR posters. Works against the real API. Next: counts, transfers, product editing, audit log, all writes."
     },
     {
       "key": "mobile",
@@ -80,6 +80,10 @@
     {
       "at": "2026-11-17T19:45:00+02:00",
       "text": "Backend stage 1 done: core rules, database with seed data, read API, 103 tests passing."
+    },
+    {
+      "at": "2026-11-17T20:30:00+02:00",
+      "text": "Web app first version done and wired to the real API. Apple design review of the demo done, 45 fixes being applied."
     }
   ]
 }
