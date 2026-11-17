@@ -11,6 +11,8 @@ export interface Config {
   publicWebUrl: string;
   corsOrigins: string[];
   now?: () => number;
+  // turn off the in memory rate limits (tests move the clock and log in a lot)
+  rateLimit?: boolean;
 }
 
 export interface AuthUser {

@@ -4,6 +4,7 @@ import { serve } from '@hono/node-server';
 import { existsSync } from 'node:fs';
 import { DEFAULT_DB_PATH, migrate, openDb, seed } from '@custock/db';
 import { createApp } from './app';
+import { startWorker } from './worker';
 
 const dbPath = process.env.CUSTOCK_DB ?? DEFAULT_DB_PATH;
 const fresh = !existsSync(dbPath);
@@ -29,11 +30,16 @@ if (!dev && !process.env.CUSTOCK_JWT_SECRET) {
   process.exit(1);
 }
 
+const jwtSecret = process.env.CUSTOCK_JWT_SECRET ?? 'dev-only-secret-change-me-before-anything-real';
+const publicWebUrl = process.env.CUSTOCK_PUBLIC_WEB_URL ?? 'http://localhost:3000';
+const stopWorker = process.env.CUSTOCK_WORKER === '0' ? () => {} : startWorker({ cfg: { db, jwtSecret, publicWebUrl }, log: (l) => console.log(l) });
+
 const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(`custock api on http://localhost:${info.port} (${dev ? 'dev' : 'production'}, db ${dbPath})`);
 });
 
 const stop = () => {
+  stopWorker();
   server.close();
   db.close();
   process.exit(0);

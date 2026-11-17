@@ -7,6 +7,7 @@ import { ApiProblem } from './problem';
 export function rateLimit(opts: { windowMs: number; max: number; prefix: string }): MiddlewareHandler<AppEnv> {
   const hits = new Map<string, { count: number; reset: number }>();
   return async (c, next) => {
+    if (c.get('cfg').rateLimit === false) return next();
     const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'local';
     const key = `${opts.prefix}:${ip}:${c.req.path}`;
     const t = Date.now();

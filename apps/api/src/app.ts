@@ -14,6 +14,11 @@ import { postRoutes } from './routes/posts';
 import { publicRoutes } from './routes/public';
 import { reportRoutes } from './routes/reports';
 import { teamRoutes } from './routes/team';
+import { stockWriteRoutes } from './routes/stock-writes';
+import { postWriteRoutes } from './routes/post-writes';
+import { teamWriteRoutes } from './routes/team-writes';
+import { peopleWriteRoutes } from './routes/people-writes';
+import { devRoutes } from './routes/dev';
 
 export function createApp(cfg: Config) {
   const app = new Hono<AppEnv>();
@@ -51,6 +56,11 @@ export function createApp(cfg: Config) {
   reportRoutes(app);
   customerAppRoutes(app);
   publicRoutes(app);
+  stockWriteRoutes(app);
+  postWriteRoutes(app);
+  teamWriteRoutes(app);
+  peopleWriteRoutes(app);
+  devRoutes(app);
 
   app.notFound((c) => c.json(new ApiProblem(404, 'not_found', `${c.req.method} ${c.req.path}`).toJSON(), 404));
 
