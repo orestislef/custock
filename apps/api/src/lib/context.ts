@@ -6,6 +6,7 @@ import { pickLocale, type AppLocale } from '@custock/i18n';
 import type { Db } from '@custock/db';
 import type { AppEnv, AuthUser, Config, OrgContext, OrgRow } from '../types';
 import { verifyAccess } from './auth';
+import { verifyExternal } from './external-auth';
 import { forbidden, notFound, unauthorized } from './problem';
 import { Tenant, platform } from './tenant';
 
@@ -27,6 +28,7 @@ async function loadUser(c: Context<AppEnv>): Promise<AuthUser | null> {
   const header = c.req.header('Authorization');
   if (!header?.startsWith('Bearer ')) return null;
   const cfg = cfgOf(c);
+  if (cfg.auth?.mode === 'jwks') return verifyExternal(cfg.db, cfg.auth, header.slice(7), nowOf(c));
   const { userId, sessionId } = await verifyAccess(cfg, header.slice(7));
   const db = platform(cfg.db);
   const session = db.get<{ revoked_at: number | null; user_id: string }>('SELECT revoked_at, user_id FROM sessions WHERE id = @id', { id: sessionId });
@@ -57,9 +59,28 @@ export const optionalAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
 };
 
 export const localeMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
-  c.set('locale', pickLocale(c.req.header('Accept-Language')?.split(',')[0], 'el'));
+  const header = c.req.header('Accept-Language')?.split(',')[0]?.trim();
+  c.set('locale', pickLocale(header, 'el'));
+  c.set('localeFromHeader', !!header && ['en', 'el', 'ru'].includes(header.toLowerCase().split(/[-_]/)[0]!));
   await next();
 };
+
+// the language to show names in: what the request asked for, else the signed in person's
+// language, else the business default
+export function readerLocale(c: Context<AppEnv>, orgDefault: AppLocale): AppLocale {
+  if (c.get('localeFromHeader')) return c.get('locale');
+  const user = c.get('user');
+  if (user) return user.locale;
+  return orgDefault;
+}
+
+// sql for a product name in the reader's language. alias is the products table alias.
+export const productNameSql = (alias: string, param = '@loc') =>
+  `coalesce((SELECT ptr.name FROM product_translations ptr WHERE ptr.product_id = ${alias}.id AND ptr.locale = ${param}), ${alias}.name)`;
+
+// the same for a category
+export const categoryNameSql = (alias: string, param = '@loc') =>
+  `coalesce((SELECT ctr.name FROM category_translations ctr WHERE ctr.category_id = ${alias}.id AND ctr.locale = ${param}), ${alias}.name)`;
 
 export function loadTopology(db: Db, orgId: string): { topology: Topology; shopNames: Record<string, string>; groupNames: Record<string, string> } {
   const t = new Tenant(db, orgId);

@@ -32,6 +32,11 @@ function linkCustomers(db: ReturnType<typeof platform>, userId: string, email: s
 
 export function authRoutes(app: Hono<AppEnv>) {
   const limited = rateLimit({ windowMs: 60_000, max: 20, prefix: 'auth' });
+  // with the real login server in charge, our own login endpoints do not exist
+  app.use('/v1/auth/*', async (c, next) => {
+    if (cfgOf(c).auth?.mode === 'jwks' && c.req.path !== '/v1/auth/logout') throw new ApiProblem(404, 'not_found', 'sign in through the login server');
+    await next();
+  });
 
   app.post('/v1/auth/login', limited, async (c) => {
     const input = LoginInput.parse(await c.req.json());
@@ -126,7 +131,7 @@ export function authRoutes(app: Hono<AppEnv>) {
   });
 
   app.post('/v1/auth/logout', requireAuth, (c) => {
-    revokeFamily(cfgOf(c), c.get('user').sessionId);
+    if (c.get('user').sessionId) revokeFamily(cfgOf(c), c.get('user').sessionId);
     return c.body(null, 204);
   });
 }
