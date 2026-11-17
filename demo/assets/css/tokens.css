@@ -1,0 +1,103 @@
+/* custock demo, design tokens.
+   light and dark are both chosen on purpose, contrast checked (see thinking/10-design).
+   the real app follows the system appearance. the demo has a toggle only to show both.
+   copy is sentence case in all three languages, on purpose: greek and russian use sentence
+   case, so english does too, and the three stay consistent. */
+
+:root {
+  color-scheme: light;
+  --stage: #E7E7E9;          /* calm neutral behind the phone */
+  --stage-ink: #1D1D1F;
+  --inspector: #F6F6F7;      /* control panel, like a macos inspector */
+
+  --bg: #F3F3F0;             /* shelf, the grouped background */
+  --surface: #FFFFFF;        /* list sections, cards */
+  --elevated: #FFFFFF;
+  --ink: #16171B;            /* 17.9:1 on surface */
+  --secondary: #5E6068;      /* 6.27:1 on surface, 5.64:1 on shelf */
+  --tertiary: #8A8C93;       /* decoration only */
+  --separator: rgba(60, 60, 67, 0.18);
+  --fill: rgba(118, 118, 128, 0.12);       /* ios quaternary fill, search field */
+  --fill-strong: rgba(118, 118, 128, 0.2);
+  --thumb: #FFFFFF;          /* segmented control thumb */
+
+  --accent: #B0234F;         /* pomegranate, the app tint. white on it 6.56:1 */
+  --accent-ink: #FFFFFF;
+  --accent-tint: rgba(176, 35, 79, 0.1);
+  --accent-text: #B0234F;    /* 6.56:1 on surface */
+
+  --few: #7A4A00;  --few-tint: #FFF1D6;    /* 6.70:1 */
+  --out: #55575E;  --out-tint: #ECECE8;    /* 6.09:1 */
+  --error: #C42B2B; --error-tint: #FDE7E7; --error-text: #A11B1B;
+  --success: #1E7A44; --success-tint: #E3F3E8;
+  --info: #2F5BC8;  --info-tint: #E6ECFA;
+
+  /* icon tiles in lists, quiet tints */
+  --tile-1: #B0234F; --tile-2: #2F5BC8; --tile-3: #1E7A44; --tile-4: #8A5A00; --tile-5: #5E6068; --tile-6: #6250d6;
+
+  /* charts: one data hue, apart from the accent and status colors (validated with the dataviz script) */
+  --data-1: #6250d6;
+  --data-1-soft: #a99ff0;
+  --grid: rgba(60, 60, 67, 0.1);
+
+  --glass: rgba(250, 250, 250, 0.72);
+  --glass-strong: rgba(250, 250, 250, 0.86);
+  --glass-border: rgba(0, 0, 0, 0.07);
+  --scrim: rgba(0, 0, 0, 0.32);
+  --float-shadow: 0 8px 28px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --toast-bg: rgba(30, 30, 32, 0.94);
+  --toast-ink: #F5F5F7;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --font-display: "Commissioner", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --r-list: 12px;
+  --r-card: 18px;
+  --r-sheet: 30px;
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --stage: #0A0A0B;
+  --stage-ink: #F5F5F7;
+  --inspector: #161618;
+
+  --bg: #0F0F12;
+  --surface: #1A1A1F;
+  --elevated: #232329;
+  --ink: #F2F1EE;            /* 15.35:1 on surface */
+  --secondary: #A3A3AD;      /* 6.93:1 on surface */
+  --tertiary: #6E6E78;
+  --separator: rgba(84, 84, 88, 0.6);
+  --fill: rgba(118, 118, 128, 0.24);
+  --fill-strong: rgba(118, 118, 128, 0.32);
+  --thumb: #636366;
+
+  --accent: #FF6B8E;
+  --accent-ink: #1A0A10;     /* 7.07:1 on accent */
+  --accent-tint: rgba(255, 107, 142, 0.16);
+  --accent-text: #FF6B8E;    /* 6.39:1 on surface */
+
+  --few: #F5C76B;  --few-tint: #33270F;    /* 9.22:1 */
+  --out: #B4B4BC;  --out-tint: #2A2A30;    /* 6.92:1 */
+  --error: #FF7A70; --error-tint: #3A1414; --error-text: #FF7A70;
+  --success: #5BD08A; --success-tint: #12291C;
+  --info: #8AA8FF;  --info-tint: #18213A;
+
+  --tile-1: #C42A58; --tile-2: #3B63D0; --tile-3: #23864C; --tile-4: #9A6A10; --tile-5: #55575E; --tile-6: #6A5AE0;
+
+  --data-1: #9085e9;
+  --data-1-soft: #5a4cc4;
+  --grid: rgba(255, 255, 255, 0.08);
+
+  --glass: rgba(28, 28, 32, 0.72);
+  --glass-strong: rgba(28, 28, 32, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --scrim: rgba(0, 0, 0, 0.55);
+  --float-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+  --toast-bg: rgba(242, 241, 238, 0.95);
+  --toast-ink: #16171B;
+}
