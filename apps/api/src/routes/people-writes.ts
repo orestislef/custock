@@ -14,7 +14,7 @@ import { randomToken, sha256, type Db } from '@custock/db';
 import { pickLocale, translator } from '@custock/i18n';
 import type { AppEnv, Config, OrgRow } from '../types';
 import { audit } from '../lib/audit';
-import { cfgOf, need, nowOf, orgOf, ORG_COLUMNS, requireAuth } from '../lib/context';
+import { cfgOf, need, nowOf, orgOf, ORG_COLUMNS, readerLocale, requireAuth } from '../lib/context';
 import { idempotent } from '../lib/idempotency';
 import { ApiProblem, badRequest, forbidden, notFound } from '../lib/problem';
 import { clientIp, throttle } from '../lib/ratelimit';
@@ -533,7 +533,7 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
           WHERE a.org_id = @org AND a.customer_id IN (SELECT value FROM json_each(@c)) AND a.status != 'cancelled' ORDER BY a.created_at DESC`,
         { c: f.customerIds },
       );
-      const tr = new Map(t.all<{ product_id: string; name: string }>('SELECT tr.product_id, tr.name FROM product_translations tr JOIN products p ON p.id = tr.product_id WHERE p.org_id = @org AND tr.locale = @l', { l: c.get('locale') }).map((x) => [x.product_id, x.name]));
+      const tr = new Map(t.all<{ product_id: string; name: string }>('SELECT tr.product_id, tr.name FROM product_translations tr JOIN products p ON p.id = tr.product_id WHERE p.org_id = @org AND tr.locale = @l', { l: readerLocale(c, f.org.default_locale) }).map((x) => [x.product_id, x.name]));
       for (const r of rows) {
         out.push({
           id: r.id, orgId: f.org.id, orgName: f.org.name, variantId: r.variant_id, productId: r.product_id, productName: tr.get(r.product_id) ?? r.name,
@@ -586,7 +586,7 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
       const ids = new Tenant(db, f.org.id)
         .all<{ product_id: string }>('SELECT product_id FROM customer_favorites WHERE org_id = @org AND customer_id IN (SELECT value FROM json_each(@c)) ORDER BY created_at DESC', { c: f.customerIds })
         .map((r) => r.product_id);
-      return storefrontProducts(db, f.org, ids, { locale: c.get('locale'), viewerCustomerIds: f.customerIds, now: nowOf(c) });
+      return storefrontProducts(db, f.org, ids, { locale: readerLocale(c, f.org.default_locale), viewerCustomerIds: f.customerIds, now: nowOf(c) });
     });
     return c.json(out);
   });

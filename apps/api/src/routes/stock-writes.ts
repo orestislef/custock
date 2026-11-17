@@ -8,13 +8,14 @@ import {
 } from '@custock/core';
 import type { AppEnv } from '../types';
 import { audit, nextStamp } from '../lib/audit';
-import { cfgOf, has, need, nowOf, orgOf, shopsFor } from '../lib/context';
+import { cfgOf, has, need, nowOf, orgOf, productNameSql, readerLocale, shopsFor } from '../lib/context';
 import { idempotent } from '../lib/idempotency';
 import { notifyMembers } from '../lib/notify';
 import { ApiProblem, badRequest, forbidden, notFound } from '../lib/problem';
 import { parseJson, type Tenant } from '../lib/tenant';
 import { loadLevels, loadProducts, variantLabel } from '../services/catalog';
 import { currentLevel, recordMovement, shopNameOf, type LedgerCtx } from '../services/ledger';
+import { applyImages, applyVariants, attachBarcode } from '../services/product-writes';
 
 function ledgerCtx(c: Context<AppEnv>): LedgerCtx {
   const o = orgOf(c);
@@ -42,27 +43,8 @@ function productSearchKey(t: Tenant, productId: string, name: string): string {
 }
 
 function attach(c: Context<AppEnv>, variantId: string, raw: string, packQty = 1, symbology?: string | null) {
-  const { t } = orgOf(c);
-  const n = normalizeBarcode(raw, symbology);
-  const taken = t.get<{ variant_id: string; name: string }>(
-    `SELECT b.variant_id, p.name FROM barcodes b JOIN product_variants v ON v.id = b.variant_id JOIN products p ON p.id = v.product_id
-      WHERE b.org_id = @org AND b.code_norm = @n`,
-    { n: n.codeNorm },
-  );
-  if (taken) {
-    if (taken.variant_id === variantId) return;
-    throw new ApiProblem(409, 'barcode_taken', taken.name);
-  }
-  const now = nowOf(c);
-  t.run(
-    'INSERT INTO barcodes (id, org_id, variant_id, code, code_norm, symbology, pack_qty, created_by, created_at) VALUES (@id, @org, @v, @code, @n, @sym, @pack, @u, @now)',
-    { id: uuidv7(now), v: variantId, code: n.code, n: n.codeNorm, sym: symbology ?? (n.kind === 'gtin' ? 'ean13' : n.kind), pack: packQty, u: c.get('user').id, now },
-  );
-  t.run(
-    'UPDATE unknown_scans SET resolved_at = @now, resolved_variant_id = @v WHERE org_id = @org AND code_norm = @n AND resolved_at IS NULL',
-    { now, v: variantId, n: n.codeNorm },
-  );
-  t.run('UPDATE products SET updated_at = @now WHERE org_id = @org AND id = (SELECT product_id FROM product_variants WHERE id = @v)', { now, v: variantId });
+  attachBarcode(c, variantId, raw, packQty, symbology);
+  orgOf(c).t.run('UPDATE products SET updated_at = @now WHERE org_id = @org AND id = (SELECT product_id FROM product_variants WHERE id = @v)', { now: nowOf(c), v: variantId });
 }
 
 function setBasePrice(c: Context<AppEnv>, variantId: string, price: number) {
@@ -91,10 +73,10 @@ function loadCount(c: Context<AppEnv>, id: string): StockCount {
   need(c, 'stock.count', row.shop_id);
   const showCost = has(c, 'products.cost.view');
   const lines = t.all<{ variant_id: string; product_id: string; name: string; options: string | null; counted_qty: number; expected_qty: number; counted_by: string; counted_by_name: string | null; counted_at: number; cost: number | null; uom: string }>(
-    `SELECT l.variant_id, v.product_id, p.name, v.options, l.counted_qty, l.expected_qty, l.counted_by, u.display_name AS counted_by_name, l.counted_at, v.cost_minor AS cost, p.uom
+    `SELECT l.variant_id, v.product_id, ${productNameSql('p')} AS name, v.options, l.counted_qty, l.expected_qty, l.counted_by, u.display_name AS counted_by_name, l.counted_at, v.cost_minor AS cost, p.uom
        FROM stock_count_lines l JOIN product_variants v ON v.id = l.variant_id JOIN products p ON p.id = v.product_id LEFT JOIN users u ON u.id = l.counted_by
       WHERE l.org_id = @org AND l.count_id = @id ORDER BY p.name`,
-    { id },
+    { id, loc: readerLocale(c, orgOf(c).org.default_locale) },
   );
   return {
     id: row.id, shopId: row.shop_id, kind: row.kind, filter: parseJson(row.filter, null), status: row.status, startedBy: row.started_by,
@@ -102,7 +84,7 @@ function loadCount(c: Context<AppEnv>, id: string): StockCount {
     lines: lines.map((l) => {
       const diff = l.counted_qty - l.expected_qty;
       return {
-        variantId: l.variant_id, productId: l.product_id, name: variantLabel(l.name, l.options, c.get('locale')), countedQty: l.counted_qty,
+        variantId: l.variant_id, productId: l.product_id, name: variantLabel(l.name, l.options, readerLocale(c, orgOf(c).org.default_locale)), countedQty: l.counted_qty,
         expectedQty: l.expected_qty, difference: diff,
         differenceCostMinor: showCost && l.cost != null ? Math.round((l.uom === 'piece' ? diff : diff / 1000) * l.cost) : null,
         countedBy: l.counted_by, countedByName: l.counted_by_name, countedAt: l.counted_at,
@@ -121,16 +103,16 @@ function loadTransfer(c: Context<AppEnv>, id: string): Transfer {
   const mine = access.shops.map((s) => s.shopId);
   if (!mine.includes(row.from_shop_id) && !mine.includes(row.to_shop_id)) throw notFound('transfer');
   const lines = t.all<{ variant_id: string; name: string; options: string | null; qty_sent: number; qty_received: number | null }>(
-    `SELECT l.variant_id, p.name, v.options, l.qty_sent, l.qty_received FROM transfer_lines l
+    `SELECT l.variant_id, ${productNameSql('p')} AS name, v.options, l.qty_sent, l.qty_received FROM transfer_lines l
        JOIN product_variants v ON v.id = l.variant_id JOIN products p ON p.id = v.product_id
       WHERE l.org_id = @org AND l.transfer_id = @id ORDER BY p.name`,
-    { id },
+    { id, loc: readerLocale(c, orgOf(c).org.default_locale) },
   );
   return {
     id: row.id, fromShopId: row.from_shop_id, toShopId: row.to_shop_id, status: row.status, note: row.note, createdBy: row.created_by,
     createdAt: row.created_at, sentAt: row.sent_at, receivedAt: row.received_at,
     lines: lines.map((l) => ({
-      variantId: l.variant_id, name: variantLabel(l.name, l.options, c.get('locale')), qtySent: l.qty_sent, qtyReceived: l.qty_received,
+      variantId: l.variant_id, name: variantLabel(l.name, l.options, readerLocale(c, orgOf(c).org.default_locale)), qtySent: l.qty_sent, qtyReceived: l.qty_received,
       lost: l.qty_received == null ? 0 : Math.max(0, l.qty_sent - l.qty_received),
     })),
   };
@@ -155,15 +137,20 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
            VALUES (@id, @org, @cat, @name, @desc, @brand, @uom, @vat, @track, @key, @u, @now, @now)`,
           { id: pid, cat: input.categoryId ?? null, name: input.name, desc: input.description ?? null, brand: input.brand ?? null, uom: input.uom, vat: input.taxRateBp, track: input.trackStock, key: searchKey(input.name, input.brand), u: user, now },
         );
-        const cost = has(c, 'products.cost.edit') ? input.costMinor ?? null : null;
-        t.run(
-          'INSERT INTO product_variants (id, org_id, product_id, price_minor, cost_minor, is_default, sort, created_at, updated_at) VALUES (@id, @org, @p, @price, @cost, 1, 0, @now, @now)',
-          { id: vid, p: pid, price: input.priceMinor ?? null, cost, now },
-        );
-        if (input.priceMinor != null) {
-          t.run("INSERT INTO price_history (id, org_id, variant_id, shop_id, price_minor, source, valid_from, changed_by) VALUES (@id, @org, @v, NULL, @p, 'base', @now, @u)", { id: uuidv7(now), v: vid, p: input.priceMinor, now, u: user });
+        if (input.variants) {
+          applyVariants(c, pid, input.variants, true);
+        } else {
+          const cost = has(c, 'products.cost.edit') ? input.costMinor ?? null : null;
+          t.run(
+            'INSERT INTO product_variants (id, org_id, product_id, price_minor, cost_minor, is_default, sort, created_at, updated_at) VALUES (@id, @org, @p, @price, @cost, 1, 0, @now, @now)',
+            { id: vid, p: pid, price: input.priceMinor ?? null, cost, now },
+          );
+          if (input.priceMinor != null) {
+            t.run("INSERT INTO price_history (id, org_id, variant_id, shop_id, price_minor, source, valid_from, changed_by) VALUES (@id, @org, @v, NULL, @p, 'base', @now, @u)", { id: uuidv7(now), v: vid, p: input.priceMinor, now, u: user });
+          }
+          if (input.barcode) attach(c, vid, input.barcode);
         }
-        if (input.barcode) attach(c, vid, input.barcode);
+        if (input.imageUrls) applyImages(c, pid, input.imageUrls);
         audit(t, { id: user }, 'product.created', { type: 'product', id: pid }, null, { name: input.name }, now);
       })();
       const [p] = loadProducts(t, [pid], { withCost: has(c, 'products.cost.view'), levelShops: [] });
@@ -201,6 +188,8 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
       if (patch.priceMinor != null) setBasePrice(c, def.id, patch.priceMinor);
       if (patch.costMinor != null) t.run('UPDATE product_variants SET cost_minor = @c, updated_at = @now WHERE org_id = @org AND id = @v', { c: patch.costMinor, now, v: def.id });
       if (patch.barcode) attach(c, def.id, patch.barcode);
+      if (patch.variants) applyVariants(c, id, patch.variants, false);
+      if (patch.imageUrls) applyImages(c, id, patch.imageUrls);
       t.run('UPDATE products SET updated_at = @now WHERE org_id = @org AND id = @id', { now, id });
       audit(t, { id: c.get('user').id }, 'product.updated', { type: 'product', id }, { name: row.name }, patch, now);
     })();

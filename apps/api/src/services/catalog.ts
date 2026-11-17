@@ -4,11 +4,25 @@ import type { Product, StockLevel, Uom } from '@custock/core';
 import type { Tenant } from '../lib/tenant';
 import { parseJson } from '../lib/tenant';
 
+// where files stored by the api itself are served from (dev uploads). set from the config.
+let fileBase = 'http://localhost:8787';
+export function setFileBase(base: string | undefined) {
+  if (base) fileBase = base.replace(/\/$/, '');
+}
+
 export function fileUrl(storageKey: string | null | undefined): string | null {
   if (!storageKey) return null;
   if (/^https?:\/\//.test(storageKey)) return storageKey;
   // object storage keys get the public bucket url once storage is wired
-  return `/files/${storageKey}`;
+  return `${fileBase}/files/${storageKey}`;
+}
+
+// the storage key behind one of our own upload urls, or null
+export function uploadKeyFromUrl(url: string): string | null {
+  const prefix = `${fileBase}/files/`;
+  if (!url.startsWith(prefix)) return null;
+  const key = url.slice(prefix.length);
+  return /^uploads\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp)$/.test(key) ? key : null;
 }
 
 interface ProductRow {
@@ -40,7 +54,10 @@ export interface LoadOpts {
   withCost: boolean;
   // shops whose stock levels to include, empty for none
   levelShops: string[];
+  // the reader's language for displayName and categoryName
   locale?: string;
+  // customer facing: name itself in the reader's language (staff keep the default name to edit)
+  localizeName?: boolean;
 }
 
 export type ProductWithLevels = Product & { levels: StockLevel[] };
@@ -48,11 +65,12 @@ export type ProductWithLevels = Product & { levels: StockLevel[] };
 export function loadProducts(t: Tenant, ids: string[], opts: LoadOpts): ProductWithLevels[] {
   if (!ids.length) return [];
   const products = t.all<ProductRow>(
-    `SELECT p.id, p.category_id, c.name AS category_name, p.name, p.description, p.brand, p.uom, p.tax_rate_bp,
+    `SELECT p.id, p.category_id,
+            coalesce((SELECT ctr.name FROM category_translations ctr WHERE ctr.category_id = c.id AND ctr.locale = @loc), c.name) AS category_name, p.name, p.description, p.brand, p.uom, p.tax_rate_bp,
             p.track_stock, p.customer_visible, p.customer_stock_hidden, p.archived_at
        FROM products p LEFT JOIN categories c ON c.id = p.category_id AND c.org_id = p.org_id
       WHERE p.org_id = @org AND p.id IN (SELECT value FROM json_each(@ids))`,
-    { ids },
+    { ids, loc: opts.locale ?? '' },
   );
   const variants = t.all<VariantRow>(
     `SELECT id, product_id, sku, options, price_minor, cost_minor, is_default FROM product_variants
@@ -102,8 +120,9 @@ export function loadProducts(t: Tenant, ids: string[], opts: LoadOpts): ProductW
         orgId: t.orgId,
         categoryId: p.category_id,
         categoryName: p.category_name,
-        name: localized?.name ?? p.name,
-        description: localized?.description ?? p.description,
+        name: opts.localizeName ? localized?.name ?? p.name : p.name,
+        displayName: localized?.name ?? p.name,
+        description: opts.localizeName ? localized?.description ?? p.description : p.description,
         brand: p.brand,
         uom: p.uom,
         taxRateBp: p.tax_rate_bp,

@@ -4,7 +4,7 @@
 import type { Hono } from 'hono';
 import type { AppEnv } from '../types';
 import { audit } from '../lib/audit';
-import { cfgOf, need, nowOf, orgOf, shopsFor } from '../lib/context';
+import { cfgOf, need, nowOf, orgOf, productNameSql, readerLocale, shopsFor } from '../lib/context';
 import { notFound } from '../lib/problem';
 import { parseJson } from '../lib/tenant';
 import { variantLabel } from '../services/catalog';
@@ -30,20 +30,20 @@ export function stockExtraRoutes(app: Hono<AppEnv>) {
     if (!shops.length) need(c, 'stock.adjust');
     const { t } = orgOf(c);
     const rows = t.all<{ entity_id: string; after_json: string | null; shop_id: string; variant_id: string; qty_delta: number; name: string; options: string | null; created_by_name: string | null; recorded_at: number }>(
-      `SELECT a.entity_id, a.after_json, m.shop_id, m.variant_id, m.qty_delta, p.name, v.options, u.display_name AS created_by_name, m.recorded_at
+      `SELECT a.entity_id, a.after_json, m.shop_id, m.variant_id, m.qty_delta, ${productNameSql('p')} AS name, v.options, u.display_name AS created_by_name, m.recorded_at
          FROM audit_log a JOIN stock_movements m ON m.id = a.entity_id
          JOIN product_variants v ON v.id = m.variant_id JOIN products p ON p.id = v.product_id
          LEFT JOIN users u ON u.id = m.created_by
         WHERE a.org_id = @org AND m.org_id = @org AND a.action = 'stock.negative_accepted_offline'
           AND m.shop_id IN (SELECT value FROM json_each(@shops)) ORDER BY m.recorded_at DESC LIMIT 200`,
-      { shops },
+      { shops, loc: readerLocale(c, orgOf(c).org.default_locale) },
     );
     return c.json(
       rows.map((r) => ({
         movementId: r.entity_id,
         shopId: r.shop_id,
         variantId: r.variant_id,
-        name: variantLabel(r.name, r.options, c.get('locale')),
+        name: variantLabel(r.name, r.options, readerLocale(c, orgOf(c).org.default_locale)),
         qtyDelta: r.qty_delta,
         onHandAfter: parseJson<{ onHand?: number }>(r.after_json, {}).onHand ?? 0,
         createdByName: r.created_by_name,

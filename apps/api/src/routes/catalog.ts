@@ -2,12 +2,13 @@
 
 import type { Hono } from 'hono';
 import { z } from 'zod';
-import { normalizeBarcode, searchSql, uuidv7, type Movement, type ScanResult } from '@custock/core';
+import { normalizeBarcode, uuidv7, type Movement, type ScanResult } from '@custock/core';
 import type { AppEnv } from '../types';
-import { has, need, nowOf, orgOf, shopsFor } from '../lib/context';
+import { cfgOf, has, need, nowOf, orgOf, productNameSql, readerLocale, shopsFor } from '../lib/context';
 import { notFound } from '../lib/problem';
 import { clampLimit, decodeCursor, page } from '../lib/tenant';
-import { loadProducts } from '../services/catalog';
+import { loadProducts, variantLabel } from '../services/catalog';
+import { searchClause } from '../services/search';
 
 export function catalogRoutes(app: Hono<AppEnv>) {
   app.get('/v1/orgs/:org/products', (c) => {
@@ -25,7 +26,7 @@ export function catalogRoutes(app: Hono<AppEnv>) {
       named.cat = q.categoryId;
     }
     if (q.q) {
-      const s = searchSql('p.search_key', q.q);
+      const s = searchClause(cfgOf(c).db, 'products', 'p.search_key', 'p.rowid', q.q);
       where.push(s.sql);
       positional = s.params;
     }
@@ -50,7 +51,7 @@ export function catalogRoutes(app: Hono<AppEnv>) {
     const ids = t
       .all<{ id: string }>(`SELECT p.id FROM products p WHERE ${where.join(' AND ')} ORDER BY p.name LIMIT @lim OFFSET @off`, { ...named, lim: limit + 1, off: offset }, positional)
       .map((r) => r.id);
-    const items = loadProducts(t, ids, { withCost: has(c, 'products.cost.view'), levelShops: stockShops });
+    const items = loadProducts(t, ids, { withCost: has(c, 'products.cost.view'), levelShops: stockShops, locale: readerLocale(c, orgOf(c).org.default_locale) });
     return c.json(page(items, offset, limit));
   });
 
@@ -58,7 +59,7 @@ export function catalogRoutes(app: Hono<AppEnv>) {
     need(c, 'products.view');
     const { t } = orgOf(c);
     const stockShops = has(c, 'stock.view') ? shopsFor(c, 'stock.view') : [];
-    const [p] = loadProducts(t, [c.req.param('id')], { withCost: has(c, 'products.cost.view'), levelShops: stockShops });
+    const [p] = loadProducts(t, [c.req.param('id')], { withCost: has(c, 'products.cost.view'), levelShops: stockShops, locale: readerLocale(c, orgOf(c).org.default_locale) });
     if (!p) throw notFound('product');
     const stamp = t.get<{ updated_at: number }>('SELECT updated_at FROM products WHERE org_id = @org AND id = @id', { id: p.id });
     if (stamp) c.header('ETag', `W/"p-${stamp.updated_at}"`);
@@ -94,7 +95,7 @@ export function catalogRoutes(app: Hono<AppEnv>) {
       return c.json(res);
     }
     const stockShops = has(c, 'stock.view') ? shopsFor(c, 'stock.view') : [];
-    const [product] = loadProducts(t, [hit.product_id], { withCost: has(c, 'products.cost.view'), levelShops: stockShops });
+    const [product] = loadProducts(t, [hit.product_id], { withCost: has(c, 'products.cost.view'), levelShops: stockShops, locale: readerLocale(c, orgOf(c).org.default_locale) });
     const res: ScanResult = {
       codeNorm: n.codeNorm, kind: n.kind, valid: n.valid, match: hit.archived ? 'archived' : 'variant', packQty: hit.pack_qty,
       product: product ?? null, variantId: hit.variant_id,
@@ -124,14 +125,17 @@ export function catalogRoutes(app: Hono<AppEnv>) {
     const { t } = orgOf(c);
     const limit = clampLimit(q.limit);
     const offset = decodeCursor(q.cursor);
+    const loc = readerLocale(c, orgOf(c).org.default_locale);
     const rows = t.all<Record<string, string | number | null> & { recorded_at: number }>(
       `SELECT m.id, m.org_id, m.shop_id, m.variant_id, m.qty_delta, m.kind, m.reason, m.note, m.unit_price_minor, m.unit_cost_minor,
-              m.batch_id, m.ref_type, m.ref_id, m.occurred_at, m.recorded_at, m.created_by, u.display_name AS created_by_name
+              m.batch_id, m.ref_type, m.ref_id, m.occurred_at, m.recorded_at, m.created_by, u.display_name AS created_by_name,
+              ${productNameSql('p')} AS product_name, v.options AS variant_options
          FROM stock_movements m LEFT JOIN users u ON u.id = m.created_by
+         LEFT JOIN product_variants v ON v.id = m.variant_id LEFT JOIN products p ON p.id = v.product_id
         WHERE m.org_id = @org AND m.shop_id IN (SELECT value FROM json_each(@shops))
           AND (@variant IS NULL OR m.variant_id = @variant)
         ORDER BY m.recorded_at DESC, m.id DESC LIMIT @lim OFFSET @off`,
-      { shops, variant: q.variantId ?? null, lim: limit + 1, off: offset },
+      { shops, variant: q.variantId ?? null, lim: limit + 1, off: offset, loc },
     );
     const showCost = has(c, 'products.cost.view');
     const items: Movement[] = rows.map((r) => ({
@@ -151,6 +155,7 @@ export function catalogRoutes(app: Hono<AppEnv>) {
       occurredAt: Number(r.occurred_at),
       createdBy: String(r.created_by),
       createdByName: (r.created_by_name as string | null) ?? null,
+      productName: r.product_name ? variantLabel(String(r.product_name), (r.variant_options as string | null) ?? null, loc) : null,
       recordedAt: Number(r.recorded_at),
     }));
     return c.json(page(items, offset, limit));

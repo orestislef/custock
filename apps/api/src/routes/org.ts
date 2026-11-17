@@ -4,7 +4,7 @@ import type { Hono } from 'hono';
 import type { MeContext, OrgSettings, Shop } from '@custock/core';
 import type { Db } from '@custock/db';
 import type { AppEnv, OrgRow } from '../types';
-import { buildContextFor, cfgOf, orgOf, requireAuth } from '../lib/context';
+import { buildContextFor, categoryNameSql, cfgOf, orgOf, readerLocale, requireAuth } from '../lib/context';
 import { platform, Tenant } from '../lib/tenant';
 import { fileUrl } from '../services/catalog';
 
@@ -116,7 +116,8 @@ export function orgRoutes(app: Hono<AppEnv>) {
     const { t } = orgOf(c);
     return c.json(
       t.all<{ id: string; parent_id: string | null; name: string }>(
-        'SELECT id, parent_id, name FROM categories WHERE org_id = @org AND archived_at IS NULL ORDER BY sort, name',
+        `SELECT c.id, c.parent_id, ${categoryNameSql('c')} AS name FROM categories c WHERE c.org_id = @org AND c.archived_at IS NULL ORDER BY c.sort, c.name`,
+        { loc: readerLocale(c, orgOf(c).org.default_locale) },
       ).map((r) => ({ id: r.id, parentId: r.parent_id, name: r.name })),
     );
   });
