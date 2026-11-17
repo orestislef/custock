@@ -16,15 +16,45 @@
     "backInStock": {
       "subject": "{{product}} is back at {{shop}}",
       "body": "Good news, {{product}} is back in stock at {{shop}}. You asked us to tell you."
+    },
+    "changeCode": {
+      "subject": "Your code to change your email: {{code}}",
+      "body": "Enter {{code}} in the app to confirm this is your new email. It works for 15 minutes."
+    },
+    "emailChanged": {
+      "subject": "Your Custock email was changed",
+      "body": "The email on your account is now {{email}}. If this was not you, write to us right away."
     }
   },
   "push": {
-    "backInStock": { "title": "{{shop}}", "body": "{{product}} is back in stock." },
-    "lowStock": { "title": "Low stock at {{shop}}", "body": "{{product}}: {{count}} left." },
-    "transferSent": { "title": "On the way to {{shop}}", "body_one": "{{count}} item is on the way from {{from}}.", "body_other": "{{count}} items are on the way from {{from}}." },
-    "approvalNeeded": { "title": "A post is waiting for you", "body": "{{author}} sent \"{{title}}\" for approval." },
-    "countReady": { "title": "Stock count ready for review", "body": "{{shop}}: {{count}} lines to check." },
-    "inviteAccepted": { "title": "{{name}} joined {{org}}", "body": "They accepted your invite." },
-    "welcome": { "title": "{{shop}}", "body": "Welcome. You will hear about new arrivals and offers here." }
+    "backInStock": {
+      "title": "{{shop}}",
+      "body": "{{product}} is back in stock."
+    },
+    "lowStock": {
+      "title": "Low stock at {{shop}}",
+      "body": "{{product}}: {{count}} left."
+    },
+    "transferSent": {
+      "title": "On the way to {{shop}}",
+      "body_one": "{{count}} item is on the way from {{from}}.",
+      "body_other": "{{count}} items are on the way from {{from}}."
+    },
+    "approvalNeeded": {
+      "title": "A post is waiting for you",
+      "body": "{{author}} sent \"{{title}}\" for approval."
+    },
+    "countReady": {
+      "title": "Stock count ready for review",
+      "body": "{{shop}}: {{count}} lines to check."
+    },
+    "inviteAccepted": {
+      "title": "{{name}} joined {{org}}",
+      "body": "They accepted your invite."
+    },
+    "welcome": {
+      "title": "{{shop}}",
+      "body": "Welcome. You will hear about new arrivals and offers here."
+    }
   }
 }

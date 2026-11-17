@@ -16,15 +16,45 @@
     "backInStock": {
       "subject": "Το {{product}} είναι ξανά διαθέσιμο στο {{shop}}",
       "body": "Καλά νέα, το {{product}} είναι ξανά διαθέσιμο στο {{shop}}. Μας ζητήσατε να σας ενημερώσουμε."
+    },
+    "changeCode": {
+      "subject": "Κωδικός για αλλαγή email: {{code}}",
+      "body": "Γράψτε τον κωδικό {{code}} στην εφαρμογή για να επιβεβαιώσετε το νέο σας email. Ισχύει για 15 λεπτά."
+    },
+    "emailChanged": {
+      "subject": "Το email σας στο Custock άλλαξε",
+      "body": "Το email του λογαριασμού σας είναι πλέον {{email}}. Αν δεν το κάνατε εσείς, γράψτε μας αμέσως."
     }
   },
   "push": {
-    "backInStock": { "title": "{{shop}}", "body": "Το {{product}} είναι ξανά διαθέσιμο." },
-    "lowStock": { "title": "Χαμηλό απόθεμα στο {{shop}}", "body": "{{product}}: έμειναν {{count}}." },
-    "transferSent": { "title": "Καθ' οδόν προς {{shop}}", "body_one": "{{count}} είδος έρχεται από {{from}}.", "body_other": "{{count}} είδη έρχονται από {{from}}." },
-    "approvalNeeded": { "title": "Μια ανάρτηση περιμένει έγκριση", "body": "Ο/Η {{author}} έστειλε το «{{title}}» για έγκριση." },
-    "countReady": { "title": "Απογραφή για έλεγχο", "body": "{{shop}}: {{count}} γραμμές για έλεγχο." },
-    "inviteAccepted": { "title": "Ο/Η {{name}} μπήκε στο {{org}}", "body": "Αποδέχτηκε την πρόσκλησή σας." },
-    "welcome": { "title": "{{shop}}", "body": "Καλώς ήρθατε. Εδώ θα μαθαίνετε για νέες αφίξεις και προσφορές." }
+    "backInStock": {
+      "title": "{{shop}}",
+      "body": "Το {{product}} είναι ξανά διαθέσιμο."
+    },
+    "lowStock": {
+      "title": "Χαμηλό απόθεμα στο {{shop}}",
+      "body": "{{product}}: έμειναν {{count}}."
+    },
+    "transferSent": {
+      "title": "Καθ' οδόν προς {{shop}}",
+      "body_one": "{{count}} είδος έρχεται από {{from}}.",
+      "body_other": "{{count}} είδη έρχονται από {{from}}."
+    },
+    "approvalNeeded": {
+      "title": "Μια ανάρτηση περιμένει έγκριση",
+      "body": "Ο/Η {{author}} έστειλε το «{{title}}» για έγκριση."
+    },
+    "countReady": {
+      "title": "Απογραφή για έλεγχο",
+      "body": "{{shop}}: {{count}} γραμμές για έλεγχο."
+    },
+    "inviteAccepted": {
+      "title": "Ο/Η {{name}} μπήκε στο {{org}}",
+      "body": "Αποδέχτηκε την πρόσκλησή σας."
+    },
+    "welcome": {
+      "title": "{{shop}}",
+      "body": "Καλώς ήρθατε. Εδώ θα μαθαίνετε για νέες αφίξεις και προσφορές."
+    }
   }
 }

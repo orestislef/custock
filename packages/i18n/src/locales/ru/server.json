@@ -16,15 +16,47 @@
     "backInStock": {
       "subject": "{{product}} снова в {{shop}}",
       "body": "Хорошие новости: {{product}} снова в наличии в {{shop}}. Вы просили сообщить."
+    },
+    "changeCode": {
+      "subject": "Код для смены email: {{code}}",
+      "body": "Введите код {{code}} в приложении, чтобы подтвердить новый email. Он действует 15 минут."
+    },
+    "emailChanged": {
+      "subject": "Ваш email в Custock изменён",
+      "body": "Теперь на вашем аккаунте указан {{email}}. Если это были не вы, сразу напишите нам."
     }
   },
   "push": {
-    "backInStock": { "title": "{{shop}}", "body": "{{product}} снова в наличии." },
-    "lowStock": { "title": "Мало на складе в {{shop}}", "body": "{{product}}: осталось {{count}}." },
-    "transferSent": { "title": "В пути в {{shop}}", "body_one": "{{count}} товар едет из {{from}}.", "body_few": "{{count}} товара едут из {{from}}.", "body_many": "{{count}} товаров едут из {{from}}.", "body_other": "{{count}} товара едут из {{from}}." },
-    "approvalNeeded": { "title": "Публикация ждёт одобрения", "body": "{{author}} отправил(а) «{{title}}» на одобрение." },
-    "countReady": { "title": "Инвентаризация ждёт проверки", "body": "{{shop}}: строк для проверки: {{count}}." },
-    "inviteAccepted": { "title": "{{name}} присоединился(ась) к {{org}}", "body": "Приглашение принято." },
-    "welcome": { "title": "{{shop}}", "body": "Добро пожаловать. Здесь вы будете узнавать о новинках и акциях." }
+    "backInStock": {
+      "title": "{{shop}}",
+      "body": "{{product}} снова в наличии."
+    },
+    "lowStock": {
+      "title": "Мало на складе в {{shop}}",
+      "body": "{{product}}: осталось {{count}}."
+    },
+    "transferSent": {
+      "title": "В пути в {{shop}}",
+      "body_one": "{{count}} товар едет из {{from}}.",
+      "body_few": "{{count}} товара едут из {{from}}.",
+      "body_many": "{{count}} товаров едут из {{from}}.",
+      "body_other": "{{count}} товара едут из {{from}}."
+    },
+    "approvalNeeded": {
+      "title": "Публикация ждёт одобрения",
+      "body": "{{author}} отправил(а) «{{title}}» на одобрение."
+    },
+    "countReady": {
+      "title": "Инвентаризация ждёт проверки",
+      "body": "{{shop}}: строк для проверки: {{count}}."
+    },
+    "inviteAccepted": {
+      "title": "{{name}} присоединился(ась) к {{org}}",
+      "body": "Приглашение принято."
+    },
+    "welcome": {
+      "title": "{{shop}}",
+      "body": "Добро пожаловать. Здесь вы будете узнавать о новинках и акциях."
+    }
   }
 }
