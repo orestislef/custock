@@ -51,7 +51,8 @@ let browserApi: CustockApi | null = null;
 
 function getApi(): CustockApi {
   browserApi ??= createBrowserApi({
-    getLocale: () => session.locale,
+    // the server renders <html lang> from the language cookie, so it is right before any effect runs
+    getLocale: () => (typeof document !== 'undefined' && document.documentElement.lang) || session.locale,
     getPermsVersion: (orgId) => session.versions.get(orgId) ?? null,
     onUnauthorized: () => { saveTokens(null); session.onUnauthorized(); },
     onPermsStale: () => session.onStale(),

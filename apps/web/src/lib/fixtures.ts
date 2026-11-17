@@ -108,8 +108,10 @@ const people: Person[] = [
   { userId: 'u-eleni', membershipId: 'm-eleni', name: 'Eleni Papadopoulou', email: 'eleni@example.com', locale: 'el', assignments: [{ id: 'a1', roleId: 'role-owner', scopeType: 'org', scopeId: ORG }] },
   { userId: 'u-nikos', membershipId: 'm-nikos', name: 'Nikos Georgiou', email: 'nikos@example.com', locale: 'el', assignments: [{ id: 'a2', roleId: 'role-admin', scopeType: 'org', scopeId: ORG }] },
   { userId: 'u-maria', membershipId: 'm-maria', name: 'Maria Ioannou', email: 'maria@example.com', locale: 'el', assignments: [{ id: 'a3', roleId: 'role-manager', scopeType: 'shop', scopeId: 'shop-kifisia' }, { id: 'a4', roleId: 'role-staff', scopeType: 'shop', scopeId: 'shop-marousi' }] },
-  { userId: 'u-dimitris', membershipId: 'm-dimitris', name: 'Dimitris Karras', email: 'dimitris@example.com', locale: 'el', assignments: [{ id: 'a5', roleId: 'role-staff', scopeType: 'shop', scopeId: 'shop-kifisia' }] },
-  { userId: 'u-sofia', membershipId: 'm-sofia', name: 'Sofia Lambrou', email: 'sofia@example.com', locale: 'en', assignments: [{ id: 'a6', roleId: 'role-viewer', scopeType: 'org', scopeId: ORG }] },
+  { userId: 'u-giorgos', membershipId: 'm-giorgos', name: 'Giorgos Antoniou', email: 'giorgos@example.com', locale: 'el', assignments: [{ id: 'a7', roleId: 'role-manager', scopeType: 'shop', scopeId: 'shop-glyfada' }] },
+  { userId: 'u-dimitris', membershipId: 'm-dimitris', name: 'Dimitris Kostas', email: 'dimitris@example.com', locale: 'el', assignments: [{ id: 'a5', roleId: 'role-staff', scopeType: 'shop', scopeId: 'shop-kifisia' }] },
+  { userId: 'u-katerina', membershipId: 'm-katerina', name: 'Katerina Vlachou', email: 'katerina@example.com', locale: 'el', assignments: [{ id: 'a8', roleId: 'role-staff', scopeType: 'shop', scopeId: 'shop-marousi' }] },
+  { userId: 'u-sofia', membershipId: 'm-sofia', name: 'Sofia Alexiou', email: 'sofia@example.com', locale: 'en', assignments: [{ id: 'a6', roleId: 'role-viewer', scopeType: 'org', scopeId: ORG }] },
 ];
 
 const customerUser = { userId: 'u-anna', email: 'anna@example.com', name: 'Anna Petrova', locale: 'ru' as Locale };
@@ -233,7 +235,7 @@ function seedMovement(daysAgo: number, shopId: string, variantId: string, qtyDel
   const at = NOW - daysAgo * DAY - Math.floor(Math.random() * 6) * 3_600_000;
   movements.push({ id: uid(), orgId: ORG, shopId, variantId, qtyDelta, kind, occurredAt: at, recordedAt: at, createdBy: by.userId, createdByName: by.name, ...extra });
 }
-const [eleni, nikos, maria, dimitris] = people as [Person, Person, Person, Person, Person];
+const [eleni, nikos, maria, , dimitris] = people as [Person, Person, Person, Person, Person];
 for (let d = 13; d >= 0; d--) {
   for (const v of ['v-oil-0', 'v-coffee-0', 'v-soap-0', 'v-pistachio-0', 'v-tea-0', 'v-loukoumi-0']) {
     const n = 1 + ((d * 7 + v.length) % 4);
@@ -379,7 +381,7 @@ const auditLog: AuditEntry[] = [
 ];
 const outbox: DevOutboxItem[] = [];
 const invites: Invite[] = [
-  { id: 'inv-1', email: 'katerina@example.com', roleId: 'role-staff', roleName: 'staff', scopeType: 'shop', scopeId: 'shop-marousi', invitedBy: 'u-nikos', createdAt: NOW - DAY, expiresAt: NOW + 6 * DAY },
+  { id: 'inv-1', email: 'petros@example.com', roleId: 'role-staff', roleName: 'staff', scopeType: 'shop', scopeId: 'shop-marousi', invitedBy: 'u-nikos', createdAt: NOW - DAY, expiresAt: NOW + 6 * DAY },
 ];
 
 function logAudit(by: Person | null, action: string, entityType: string, entityId: string, before: unknown = null, after: unknown = null) {
@@ -560,15 +562,14 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       const id = `p-${uid().slice(0, 8)}`;
       const code = input.barcode ?? ean13(`20${String(2000 + barcodeSeq++).padStart(10, '0')}`);
       // the sample data already takes variants and photo urls, the shapes the form sends
-      const extra = input as ProductInput & { variants?: { options: Record<string, string>; priceMinor: number | null }[]; imageUrls?: string[] };
-      const specs = extra.variants?.length ? extra.variants : [{ options: null as unknown as Record<string, string>, priceMinor: input.priceMinor ?? null }];
+      const specs = input.variants?.length ? input.variants : [{ options: null, priceMinor: input.priceMinor ?? null }];
       const row: ProductRow = {
         id, orgId: ORG, categoryId: input.categoryId ?? null, categoryName: catName(input.categoryId ?? null), name: input.name, description: input.description ?? null,
         brand: input.brand ?? null, uom: input.uom, taxRateBp: input.taxRateBp, trackStock: input.trackStock, customerVisible: true, customerStockHidden: false,
-        images: (extra.imageUrls ?? []).map((url) => ({ id: uid(), url, width: null, height: null })),
+        images: (input.imageUrls ?? []).map((url) => ({ id: uid(), url, width: null, height: null })),
         variants: specs.map((v, j) => {
           const vcode = j === 0 ? code : ean13(`20${String(2000 + barcodeSeq++).padStart(10, '0')}`);
-          return { id: `v-${id}-${j}`, productId: id, sku: null, options: v.options, priceMinor: v.priceMinor ?? input.priceMinor ?? null, costMinor: input.costMinor ?? null, isDefault: j === 0, barcodes: [{ id: uid(), code: vcode, codeNorm: vcode.padStart(14, '0'), symbology: 'ean13', packQty: 1 }] };
+          return { id: `v-${id}-${j}`, productId: id, sku: null, options: v.options ?? null, priceMinor: v.priceMinor ?? input.priceMinor ?? null, costMinor: input.costMinor ?? null, isDefault: j === 0, barcodes: [{ id: uid(), code: vcode, codeNorm: vcode.padStart(14, '0'), symbology: 'ean13', packQty: 1 }] };
         }),
         archivedAt: null, key: searchKey(input.name, input.brand), shopPrices: {},
       };
@@ -590,6 +591,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       if (patch.taxRateBp) p.taxRateBp = patch.taxRateBp;
       if (patch.trackStock !== undefined) p.trackStock = patch.trackStock;
       if (patch.costMinor !== undefined && canDo('products.cost.edit')) p.variants[0]!.costMinor = patch.costMinor ?? null;
+      if (patch.imageUrls) p.images = patch.imageUrls.map((url) => ({ id: uid(), url, width: null, height: null }));
       if (patch.barcode) { const code = patch.barcode.trim(); p.variants[0]!.barcodes.push({ id: uid(), code, codeNorm: code.padStart(14, '0'), symbology: 'ean13', packQty: 1 }); }
       if (patch.priceMinor !== undefined) p.variants[0]!.priceMinor = patch.priceMinor ?? null;
       return productOut(p);
