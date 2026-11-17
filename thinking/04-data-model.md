@@ -1,6 +1,6 @@
 # 04. data model
 
-The shape of the data. The full draft sql is in [db/schema.sql](db/schema.sql) (sqlite, 46 tables,
+The shape of the data. The full draft sql is in [db/schema.sql](db/schema.sql) (sqlite, 50 tables,
 loads clean). This file explains it.
 
 ## conventions
