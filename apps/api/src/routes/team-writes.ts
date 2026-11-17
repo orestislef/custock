@@ -22,6 +22,16 @@ import { loadShops, orgSettings } from './org';
 
 const INVITE_TTL = 7 * 86_400_000;
 
+// asks the runtime, so aliases like Europe/Nicosia pass and made up names do not
+export function isTimezone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: tz });
+    return tz.length <= 64;
+  } catch {
+    return false;
+  }
+}
+
 function actorOf(c: Context<AppEnv>) {
   return { userId: c.get('user').id, assignments: orgOf(c).assignments };
 }
@@ -122,7 +132,10 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
 
   app.post('/v1/orgs/:org/invites/:id/revoke', (c) => {
     need(c, 'members.invite');
-    const { t } = orgOf(c);
+    const { t, assignments, topology } = orgOf(c);
+    const inv = t.get<{ scope_type: 'org' | 'group' | 'shop'; scope_id: string }>('SELECT scope_type, scope_id FROM invites WHERE org_id = @org AND id = @id', { id: c.req.param('id') });
+    if (!inv) throw notFound('invite');
+    if (!effectiveAtScope(assignments, topology, { scopeType: inv.scope_type, scopeId: inv.scope_id }).perms.has('members.invite')) throw forbidden('members.invite at the invite scope', 'scope');
     const res = t.run('UPDATE invites SET revoked_at = @now WHERE org_id = @org AND id = @id AND accepted_at IS NULL AND revoked_at IS NULL', { now: nowOf(c), id: c.req.param('id') });
     if (!res.changes) throw notFound('invite');
     audit(t, { id: c.get('user').id }, 'invite.revoked', { type: 'invite', id: c.req.param('id') }, null, null, nowOf(c));
@@ -143,12 +156,20 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
     if ((user.email ?? '').toLowerCase() !== inv.email) throw forbidden('different email', 'invite_email_mismatch');
     const t = new Tenant(db, inv.org_id);
     db.transaction(() => {
+      const claimed = t.run(
+        'UPDATE invites SET accepted_at = @now, accepted_by = @u WHERE org_id = @org AND id = @id AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at >= @now',
+        { now, u: user.id, id: inv.id },
+      );
+      if (!claimed.changes) throw new ApiProblem(410, 'invite_expired');
       let m = t.get<{ id: string; status: string }>('SELECT id, status FROM memberships WHERE org_id = @org AND user_id = @u', { u: user.id });
       if (!m) {
         m = { id: uuidv7(now), status: 'active' };
         t.run("INSERT INTO memberships (id, org_id, user_id, status, perms_version, joined_at) VALUES (@id, @org, @u, 'active', 1, @now)", { id: m.id, u: user.id, now });
       } else if (m.status !== 'active') {
+        // a suspended or removed member does not get their old roles back through an invite
+        t.run('DELETE FROM role_assignments WHERE org_id = @org AND membership_id = @m', { m: m.id });
         t.run("UPDATE memberships SET status = 'active', removed_at = NULL WHERE org_id = @org AND id = @id", { id: m.id });
+        audit(t, { id: user.id }, 'member.rejoined_by_invite', { type: 'membership', id: m.id }, { status: m.status }, { status: 'active' }, now);
       }
       t.run(
         `INSERT OR IGNORE INTO role_assignments (id, org_id, membership_id, role_id, scope_type, scope_id, granted_by, created_at)
@@ -156,7 +177,6 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
         { id: uuidv7(now), m: m.id, r: inv.role_id, st: inv.scope_type, sid: inv.scope_id, by: inv.invited_by, now },
       );
       bumpPerms(t, [m.id]);
-      t.run('UPDATE invites SET accepted_at = @now, accepted_by = @u WHERE id = @id AND org_id = @org', { now, u: user.id, id: inv.id });
       audit(t, { id: user.id }, 'invite.accepted', { type: 'invite', id: inv.id }, null, null, now);
     })();
     const orgName = t.get<{ name: string }>('SELECT name FROM organizations WHERE id = @org')!.name;
@@ -177,6 +197,8 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
     const role = roleById(c, input.roleId);
     const check = canGrantRole({ actor: actorOf(c), topology: orgOf(c).topology, role, scope: input, targetUserId: target.userId, via: 'members.manage' });
     if (!check.ok) throw refuse(check.code);
+    const manage = canManageMember({ actor: actorOf(c), topology: orgOf(c).topology, target, scope: input });
+    if (!manage.ok) throw refuse(manage.code);
     const { t, org } = orgOf(c);
     const now = nowOf(c);
     cfgOf(c).db.transaction(() => {
@@ -217,10 +239,11 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
     const { status } = z.object({ status: z.enum(['active', 'suspended', 'removed']) }).parse(await c.req.json());
     const target = memberAssignments(c, c.req.param('m'));
     const { org, t } = orgOf(c);
-    // judged at the widest scope the target holds
-    const scope = target.assignments.find((a) => a.scopeType === 'org') ?? target.assignments.find((a) => a.scopeType === 'group') ?? target.assignments[0] ?? { scopeType: 'org' as const, scopeId: org.id };
-    const check = canManageMember({ actor: actorOf(c), topology: orgOf(c).topology, target, scope });
-    if (!check.ok) throw refuse(check.code);
+    const scopes = target.assignments.length ? target.assignments : [{ scopeType: 'org' as const, scopeId: org.id }];
+    for (const scope of scopes) {
+      const check = canManageMember({ actor: actorOf(c), topology: orgOf(c).topology, target, scope });
+      if (!check.ok) throw refuse(check.code);
+    }
     if (status !== 'active' && target.assignments.some((a) => a.templateKey === 'owner')) {
       const owners = checkOwnersAfter(ownerUserIds(c, undefined, c.req.param('m')));
       if (!owners.ok) throw refuse(owners.code);
@@ -279,7 +302,7 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
         name: z.string().min(1).max(120),
         brandColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable(),
         defaultLocale: z.enum(['en', 'el', 'ru']),
-        timezone: z.string().min(3),
+        timezone: z.string().refine(isTimezone, 'unknown timezone'),
         allowNegativeStock: z.boolean(),
         postsNeedApproval: z.boolean(),
         pushDailyCap: z.number().int().min(0).max(20),
@@ -317,7 +340,7 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
     const patch = z
       .object({
         name: z.string().min(1).max(80), city: z.string().nullable(), address: z.string().nullable(), phone: z.string().nullable(),
-        timezone: z.string().nullable(), customerVisible: z.boolean(), customerStock: z.enum(['off', 'availability', 'exact']).nullable(),
+        timezone: z.string().refine(isTimezone, 'unknown timezone').nullable(), customerVisible: z.boolean(), customerStock: z.enum(['off', 'availability', 'exact']).nullable(),
       })
       .partial()
       .parse(await c.req.json());
