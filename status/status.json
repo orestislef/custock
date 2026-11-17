@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-17T22:10:00+02:00",
-  "overall": 72,
+  "updated": "2026-11-17T23:00:00+02:00",
+  "overall": 76,
   "areas": [
     {
       "key": "thinking",
@@ -33,9 +33,9 @@
     {
       "key": "backend",
       "name": "Backend (permissions engine, database, API)",
-      "percent": 85,
+      "percent": 92,
       "state": "building",
-      "note": "Every read and write endpoint, ledger, counts, transfers, posts sending, invites, audit log, job worker, 142 tests. An independent security review found 31 issues (1 critical: dev mode on by default). All being fixed now, each with a regression test."
+      "note": "All endpoints, ledger, counts, transfers, posts sending, invites, audit log, job worker. Independent security review: all 31 findings fixed with regression tests (dev features behind a flag, per email login limits, consent only on the customer click, team rules at every scope, status changes run once). 186 tests passing. Now: deploy setup, external login adapter, search speed on a big data set."
     },
     {
       "key": "web",
@@ -100,6 +100,10 @@
     {
       "at": "2026-11-17T22:10:00+02:00",
       "text": "Security review of the backend done: 31 findings, all being fixed with regression tests."
+    },
+    {
+      "at": "2026-11-17T23:00:00+02:00",
+      "text": "All 31 security findings fixed, 186 backend tests passing. Deploy setup and performance work started."
     }
   ],
   "screens": [
