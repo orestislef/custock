@@ -29,8 +29,9 @@ async function loadUser(c: Context<AppEnv>): Promise<AuthUser | null> {
   const cfg = cfgOf(c);
   const { userId, sessionId } = await verifyAccess(cfg, header.slice(7));
   const db = platform(cfg.db);
-  const session = db.get<{ revoked_at: number | null }>('SELECT revoked_at FROM sessions WHERE id = @id', { id: sessionId });
-  if (!session || session.revoked_at) throw unauthorized('session revoked');
+  const session = db.get<{ revoked_at: number | null; user_id: string }>('SELECT revoked_at, user_id FROM sessions WHERE id = @id', { id: sessionId });
+  // the session must belong to the user the token names
+  if (!session || session.revoked_at || session.user_id !== userId) throw unauthorized('session revoked');
   const user = db.get<UserRow>('SELECT id, email, display_name, locale, deleted_at FROM users WHERE id = @id', { id: userId });
   if (!user || user.deleted_at) throw unauthorized('user gone');
   return { id: user.id, sessionId, email: user.email, displayName: user.display_name, locale: user.locale };

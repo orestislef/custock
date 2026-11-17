@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { bodyLimit } from 'hono/body-limit';
 import { ZodError } from 'zod';
 import { uuidv7 } from '@custock/core';
 import type { AppEnv, Config } from './types';
@@ -19,6 +20,7 @@ import { postWriteRoutes } from './routes/post-writes';
 import { teamWriteRoutes } from './routes/team-writes';
 import { peopleWriteRoutes } from './routes/people-writes';
 import { devRoutes } from './routes/dev';
+import { stockExtraRoutes } from './routes/stock-extra';
 
 export function createApp(cfg: Config) {
   const app = new Hono<AppEnv>();
@@ -39,6 +41,7 @@ export function createApp(cfg: Config) {
       credentials: true,
     }),
   );
+  app.use('*', bodyLimit({ maxSize: 1024 * 1024, onError: (c) => c.json(new ApiProblem(413 as 400, 'validation', 'body too large').toJSON(), 413) }));
   app.use('*', localeMiddleware);
 
   app.get('/health', (c) => c.json({ ok: true, name: 'custock-api' }));
@@ -61,6 +64,7 @@ export function createApp(cfg: Config) {
   teamWriteRoutes(app);
   peopleWriteRoutes(app);
   devRoutes(app);
+  stockExtraRoutes(app);
 
   app.notFound((c) => c.json(new ApiProblem(404, 'not_found', `${c.req.method} ${c.req.path}`).toJSON(), 404));
 
@@ -71,8 +75,9 @@ export function createApp(cfg: Config) {
       return c.json(new ApiProblem(400, 'validation', 'invalid input', fields).toJSON(), 400);
     }
     if (err instanceof SyntaxError) return c.json(new ApiProblem(400, 'validation', 'invalid json').toJSON(), 400);
+    // details stay in the server log, the body says nothing about internals
     console.error(`[${c.get('requestId')}]`, err);
-    return c.json(new ApiProblem(500, 'internal', cfg.dev ? String(err) : undefined).toJSON(), 500);
+    return c.json(new ApiProblem(500, 'internal').toJSON(), 500);
   });
 
   return app;

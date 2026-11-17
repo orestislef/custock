@@ -59,6 +59,13 @@ export async function rotate(cfg: Config, refreshToken: string, userAgent?: stri
     throw unauthorized('refresh token reused, session family revoked');
   }
   if (row.expires_at < now(cfg)) throw unauthorized('refresh token expired');
+  // claim the old token first. if someone else already spent it, this is reuse.
+  const marker = `pending:${uuidv7(now(cfg))}`;
+  const claimed = db.run('UPDATE sessions SET replaced_by = @m WHERE id = @id AND replaced_by IS NULL AND revoked_at IS NULL', { m: marker, id: row.id });
+  if (!claimed.changes) {
+    db.run('UPDATE sessions SET revoked_at = coalesce(revoked_at, @now) WHERE family_id = @f', { now: now(cfg), f: row.family_id });
+    throw unauthorized('refresh token reused, session family revoked');
+  }
   const next = await issueTokens(cfg, row.user_id, { familyId: row.family_id, userAgent });
   db.run('UPDATE sessions SET replaced_by = @next WHERE id = @id', { next: next.sessionId, id: row.id });
   return { accessToken: next.accessToken, refreshToken: next.refreshToken, expiresAt: next.expiresAt };
@@ -72,7 +79,7 @@ export function revokeFamily(cfg: Config, sessionId: string) {
 
 export async function verifyAccess(cfg: Config, token: string): Promise<{ userId: string; sessionId: string }> {
   try {
-    const { payload } = await jwtVerify(token, key(cfg), { issuer: 'custock-dev', currentDate: new Date(now(cfg)) });
+    const { payload } = await jwtVerify(token, key(cfg), { issuer: 'custock-dev', algorithms: ['HS256'], currentDate: new Date(now(cfg)) });
     if (!payload.sub || typeof payload.sid !== 'string') throw new Error('bad claims');
     return { userId: payload.sub, sessionId: payload.sid };
   } catch {

@@ -2,14 +2,16 @@
 
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 
-const N = 16384;
+// 2^15. older hashes keep the N they were made with
+const N = 32768;
 const R = 8;
 const P = 1;
 const KEYLEN = 32;
+const MAXMEM = 128 * N * R * 2;
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16);
-  const hash = scryptSync(password, salt, KEYLEN, { N, r: R, p: P });
+  const hash = scryptSync(password, salt, KEYLEN, { N, r: R, p: P, maxmem: MAXMEM });
   return `scrypt$${N}$${R}$${P}$${salt.toString('base64')}$${hash.toString('base64')}`;
 }
 
@@ -18,7 +20,9 @@ export function verifyPassword(password: string, stored: string | null | undefin
   const [algo, n, r, p, saltB64, hashB64] = stored.split('$');
   if (algo !== 'scrypt' || !saltB64 || !hashB64) return false;
   const expected = Buffer.from(hashB64, 'base64');
-  const actual = scryptSync(password, Buffer.from(saltB64, 'base64'), expected.length, { N: Number(n), r: Number(r), p: Number(p) });
+  const nn = Number(n);
+  const rr = Number(r);
+  const actual = scryptSync(password, Buffer.from(saltB64, 'base64'), expected.length, { N: nn, r: rr, p: Number(p), maxmem: 128 * nn * rr * 2 });
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
@@ -29,4 +33,11 @@ export function sha256(text: string): string {
 
 export function randomToken(bytes = 32): string {
   return randomBytes(bytes).toString('base64url');
+}
+
+// spends the same time as a real check, so unknown emails do not answer faster
+let dummy: string | null = null;
+export function burnPasswordCheck(password: string): void {
+  dummy ??= hashPassword('not-a-real-password');
+  verifyPassword(password, dummy);
 }

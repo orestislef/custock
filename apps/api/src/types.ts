@@ -11,8 +11,14 @@ export interface Config {
   publicWebUrl: string;
   corsOrigins: string[];
   now?: () => number;
-  // turn off the in memory rate limits (tests move the clock and log in a lot)
+  // turn off the per ip rate limits (tests move the clock and log in a lot). per email limits stay on.
   rateLimit?: boolean;
+  // unsubscribe links are signed with their own key. derived from jwtSecret when not set.
+  unsubSecret?: string;
+  // behind our own reverse proxy: the rightmost X-Forwarded-For hop is the client
+  trustedProxy?: boolean;
+  // bot check secret for join pages. without it and outside dev, public signups are refused.
+  turnstileSecret?: string;
 }
 
 export interface AuthUser {
