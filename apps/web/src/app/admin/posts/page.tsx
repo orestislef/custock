@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useState } from 'react';
+import { Suspense, useCallback, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { PostStatus } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
-import { Empty, Segmented } from '@/components/ui/kit';
-import { Photo } from '@/components/ui/client-kit';
+import { Chips, Empty } from '@/components/ui/kit';
+import { Photo, isMac, useShortcuts } from '@/components/ui/client-kit';
 import { IconMegaphone, IconPlus } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { postText } from '@/lib/names';
@@ -29,15 +29,18 @@ function Posts() {
   const router = useRouter();
   const [f, setF] = useState<F>((params.get('status') as F) ?? 'all');
   const list = useAsync(() => api.posts(org.orgId, f === 'all' ? undefined : { status: f }), [f]);
+  const canCreate = can('posts.create', null);
+  useShortcuts({ create: useCallback(() => { if (canCreate) router.push('/admin/posts/new'); }, [canCreate, router]) });
   const items = list.data?.items ?? [];
 
   return (
     <Page
       title={t('posts.title')}
-      actions={can('posts.create', null) ? <Link href="/admin/posts/new" className="btn btn-primary"><IconPlus size={18} />{t('posts.new')}</Link> : null}
+      actions={can('posts.create', null) ? <Link href="/admin/posts/new" className="btn btn-primary" title={`${t('posts.new')} (${isMac() ? '⌘' : 'Ctrl+'}N)`}><IconPlus size={18} />{t('posts.new')}</Link> : null}
+      phoneAction={can('posts.create', null) ? <Link href="/admin/posts/new" className="icon-btn" style={{ background: 'var(--c-accent-tint)' }} aria-label={t('posts.new')}><IconPlus size={22} /></Link> : undefined}
     >
       <div className="mb-5 overflow-x-auto">
-        <Segmented label={t('posts.filter')} value={f} onChange={(v) => { setF(v); router.replace(v === 'all' ? '/admin/posts' : `/admin/posts?status=${v}`); }}
+        <Chips label={t('posts.filter')} value={f} onChange={(v) => { setF(v); router.replace(v === 'all' ? '/admin/posts' : `/admin/posts?status=${v}`); }}
           options={(['all', 'draft', 'pending_approval', 'scheduled', 'sent'] as F[]).map((v) => ({ value: v, label: v === 'all' ? t('posts.all') : t(`common:postStatus.${v}`) }))} />
       </div>
 
@@ -58,7 +61,7 @@ function Posts() {
                   </div>
                   <div className="p-4">
                     <div className="flex items-center gap-2 flex-wrap mb-2">
-                      <span className="badge badge-accent">{t(`common:postKind.${p.kind}`)}</span>
+                      <span className="eyebrow flex-1">{t(`common:postKind.${p.kind}`)}</span>
                       <span className={`badge ${statusBadge(p.status)}`}>{t(`common:postStatus.${p.status}`)}</span>
                     </div>
                     <p className="t-headline m-0 line-clamp-2">{text.title}</p>

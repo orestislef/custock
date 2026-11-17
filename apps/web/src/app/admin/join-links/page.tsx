@@ -6,9 +6,9 @@ import type { JoinLink, ScopeType } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { Empty, Switch, Why } from '@/components/ui/kit';
-import { Sheet, Tip, useToast } from '@/components/ui/client-kit';
+import { Picker, Sheet, Tip, useToast } from '@/components/ui/client-kit';
 import { Qr } from '@/components/ui/qr';
-import { IconLink, IconPlus, IconPrint } from '@/components/ui/icons';
+import { IconCopy, IconLink, IconPlus, IconPrint } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { number, percent } from '@/lib/format';
 
@@ -35,7 +35,12 @@ export default function JoinLinksPage() {
               <Qr value={`${origin}${l.url}`} size={104} label={t('links.qrFor', { label: l.label ?? scopeName(l) })} />
               <div className="min-w-0 flex-1 flex flex-col">
                 <p className="t-headline m-0 truncate">{l.label ?? t('links.noLabel')}</p>
-                <p className="t-foot t-2 m-0 mt-0.5 truncate">{scopeName(l)} · <Link href={l.url}>{l.url}</Link></p>
+                <p className="t-foot t-2 m-0 mt-0.5 truncate">{scopeName(l)}</p>
+                <p className="m-0 mt-1 flex items-center gap-1">
+                  <Link href={l.url} className="t-sub tnum">{l.url}</Link>
+                  <button type="button" className="icon-btn" style={{ width: 36, height: 36, color: 'var(--c-ink-2)' }} aria-label={t('links.copy', { url: l.url })} title={t('links.copy', { url: l.url })}
+                    onClick={() => void navigator.clipboard.writeText(`${origin}${l.url}`).then(() => toast(t('links.copied')))}><IconCopy size={18} /></button>
+                </p>
                 <p className="t-sub m-0 mt-3 tnum">
                   {t('links.stats', { opens: number(l.opens, locale), signups: number(l.signups, locale) })}
                 </p>
@@ -66,12 +71,14 @@ function NewLink({ open, onClose, onCreated }: { open: boolean; onClose: () => v
     ...(org.orgPerms.includes('joinlinks.manage') ? [{ type: 'org' as const, id: org.orgId, name: t('common:scope.org') }] : []),
     ...shops.filter((s) => can('joinlinks.manage', s.id)).map((s) => ({ type: 'shop' as const, id: s.id, name: s.name })),
   ];
-  const [i, setI] = useState(0);
+  const [i, setI] = useState('0');
   const [label, setLabel] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   async function create() {
-    const o = options[i];
+    const o = options[Number(i)];
     if (!o) return;
+    setError(null);
     try {
       await api.createJoinLink(org.orgId, { scopeType: o.type, scopeId: o.id, label: label.trim() || undefined });
       toast(t('links.created'));
@@ -79,22 +86,20 @@ function NewLink({ open, onClose, onCreated }: { open: boolean; onClose: () => v
       onClose();
       onCreated();
     } catch (e) {
-      toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
+      setError(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
     }
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={t('links.new')} footer={<button type="button" className="btn btn-primary btn-large" onClick={() => void create()}>{t('common:action.add')}</button>}>
-      <div className="list mb-2">
-        <label className="row">
+    <Sheet open={open} onClose={onClose} title={t('links.new')} error={error} footer={<button type="button" className="btn btn-primary btn-large" onClick={() => void create()}>{t('common:action.add')}</button>}>
+      <ul className="list mb-2" role="list">
+        <li className="row">
           <span className="row-main row-title">{t('links.for')}</span>
-          <select className="t-body bg-transparent border-0 outline-none text-right" style={{ color: 'var(--c-ink-2)' }} value={i} onChange={(e) => setI(Number(e.target.value))}>
-            {options.map((o, k) => <option key={o.id} value={k}>{o.name}</option>)}
-          </select>
-        </label>
-        <div className="row-sep relative"><input className="field" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t('links.labelPh')} aria-label={t('links.labelPh')} /></div>
-      </div>
-      <p className="group-foot px-0">{t('links.labelFoot')}</p>
+          <Picker variant="plain" label={t('links.for')} value={i} onChange={setI} options={options.map((o, k) => ({ value: String(k), label: o.name }))} />
+        </li>
+        <li><label className="block row-sep relative"><span className="field-label">{t('links.labelPh')}</span><input className="field pt-1" value={label} onChange={(e) => setLabel(e.target.value)} /></label></li>
+      </ul>
+      <p className="inset-group-foot px-0">{t('links.labelFoot')}</p>
     </Sheet>
   );
 }

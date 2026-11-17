@@ -40,7 +40,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       <Link href="/admin/posts" className="inline-flex items-center min-h-[44px] -ml-2 t-body"><IconChevronLeft size={24} />{t('posts.title')}</Link>
       {p.coverUrl ? <div className="card mt-2 mb-5" style={{ aspectRatio: '16 / 9' }}><Photo src={p.coverUrl} alt={text.title} className="w-full h-full" rounded={0} /></div> : null}
       <div className="flex items-center gap-2 flex-wrap mb-2">
-        <span className="badge badge-accent">{t(`common:postKind.${p.kind}`)}</span>
+        <span className="eyebrow">{t(`common:postKind.${p.kind}`)}</span>
         <span className="badge badge-gray">{t(`common:postStatus.${p.status}`)}</span>
         {langs.length > 1 ? <Segmented label={t('composer.language')} value={cur} onChange={setTab} options={langs.map((l) => ({ value: l, label: l.toUpperCase() }))} /> : null}
       </div>

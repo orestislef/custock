@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AudiencePreview, Channel, Locale, PostKind, PostInput, Product, ScopeType } from '@custock/core';
-import { LOCALES } from '@custock/i18n';
+import { LOCALES, LOCALE_NAMES } from '@custock/i18n';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
-import { Group, Row, Segmented, Switch, Why } from '@/components/ui/kit';
+import { Chips, Group, Row, Segmented, Switch, Why } from '@/components/ui/kit';
 import { Photo, useToast } from '@/components/ui/client-kit';
 import { ProductPicker } from '@/components/admin/product-picker';
 import { IconBell, IconMail, IconPlus, IconClose, IconInfo } from '@/components/ui/icons';
@@ -40,6 +40,7 @@ export default function ComposerPage() {
   const [picker, setPicker] = useState(false);
   const [preview, setPreview] = useState<AudiencePreview | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const channels: Channel[] = ['feed', ...(push ? ['push' as const] : []), ...(email ? ['email' as const] : [])];
   const audience = useMemo(() => ({ scopes, tags: [], interests: [], locales: [], savedAnyLinked: false, joinedWithinDays: null }), [scopes]);
@@ -83,7 +84,7 @@ export default function ComposerPage() {
       }
       router.push(`/admin/posts/${post.id}`);
     } catch (e) {
-      toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
+      setError(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
       setBusy(false);
     }
   }
@@ -98,15 +99,15 @@ export default function ComposerPage() {
     <Page title={t('composer.title')}>
       <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_380px] gap-x-8">
         <div>
-          <section className="group">
-            <h2 className="group-head">{t('composer.kind')}</h2>
-            <div className="overflow-x-auto"><Segmented label={t('composer.kind')} value={kind} onChange={setKind} options={KINDS.map((k) => ({ value: k, label: t(`common:postKind.${k}`) }))} /></div>
+          <section className="inset-group">
+            <h2 className="inset-group-head">{t('composer.kind')}</h2>
+            <Chips label={t('composer.kind')} value={kind} onChange={setKind} options={KINDS.map((k) => ({ value: k, label: t(`common:postKind.${k}`) }))} />
           </section>
 
-          <section className="group">
+          <section className="inset-group">
             <div className="flex items-center gap-3 mb-2 px-1 flex-wrap">
-              <Segmented label={t('composer.language')} doneLabel={t('composer.written')} value={tab} onChange={setTab} options={LOCALES.map((l) => ({ value: l, label: l.toUpperCase(), done: Boolean(texts[l]?.title) }))} />
-              {scopes.length && preview?.byLocale?.[tab] ? <span className="t-foot t-2">{t('composer.readers', { count: preview.byLocale[tab], lang: tab.toUpperCase() })}</span> : null}
+              <Segmented label={t('composer.language')} doneLabel={t('composer.written')} value={tab} onChange={setTab} options={LOCALES.map((l) => ({ value: l, label: LOCALE_NAMES[l], done: Boolean(texts[l]?.title) }))} />
+              {scopes.length && preview?.byLocale?.[tab] ? <span className="t-foot t-2">{t('composer.readersOf', { count: preview.byLocale[tab], lang: LOCALE_NAMES[tab] })}</span> : null}
             </div>
             <div className="list">
               <input className="field t-headline" placeholder={t('composer.titlePh')} aria-label={t('composer.titlePh')} value={cur.title}
@@ -116,11 +117,11 @@ export default function ComposerPage() {
                   onChange={(e) => setTexts((x) => ({ ...x, [tab]: { ...cur, body: e.target.value } }))} />
               </div>
             </div>
-            <p className="group-foot">{tab === org.defaultLocale ? t('composer.defaultLangFoot') : t('composer.otherLangFoot')}</p>
+            <p className="inset-group-foot">{tab === org.defaultLocale ? t('composer.defaultLangFoot') : t('composer.otherLangFoot')}</p>
           </section>
 
-          <section className="group">
-            <h2 className="group-head">{t('composer.products')}</h2>
+          <section className="inset-group">
+            <h2 className="inset-group-head">{t('composer.products')}</h2>
             <div className="list">
               {lines.map((l, i) => {
                 const v = l.product.variants.find((x) => x.id === l.variantId);
@@ -146,11 +147,11 @@ export default function ComposerPage() {
                 <IconPlus size={20} /><span className="row-main row-title">{t('composer.addProduct')}</span>
               </button>
             </div>
-            {kind === 'offer' ? <p className="group-foot">{t('composer.wasNote')}</p> : null}
+            {kind === 'offer' ? <p className="inset-group-foot">{t('composer.wasNote')}</p> : null}
           </section>
 
           {kind === 'offer' ? (
-            <section className="group">
+            <section className="inset-group">
               <div className="list">
                 <label className="row">
                   <span className="row-main row-title">{t('composer.until')}</span>
@@ -182,8 +183,8 @@ export default function ComposerPage() {
               trailing={<Switch checked={email} onChange={setEmail} disabled={!can('posts.channel.email', null)} label={t('common:channel.email')} />} />
           </Group>
 
-          <section className="group">
-            <h2 className="group-head">{t('composer.when')}</h2>
+          <section className="inset-group">
+            <h2 className="inset-group-head">{t('composer.when')}</h2>
             <div className="px-1 mb-2"><Segmented label={t('composer.when')} value={when} onChange={setWhen} options={[{ value: 'now', label: t('composer.now') }, { value: 'later', label: t('composer.later') }]} /></div>
             {when === 'later' ? (
               <div className="list"><input type="datetime-local" className="field" value={at} onChange={(e) => setAt(e.target.value)} aria-label={t('composer.later')} /></div>
@@ -193,9 +194,11 @@ export default function ComposerPage() {
           <AudienceExplainer preview={scopes.length ? preview : null} push={push} email={email} />
 
           <div className="flex flex-col gap-2 mt-4 mb-8">
+            {error ? <p className="sheet-error" role="alert">{error}</p> : null}
             <button type="button" className="btn btn-primary btn-large" disabled={!valid || busy} onClick={() => void save(true)}>
               {mayPublish ? (when === 'later' ? t('composer.schedule') : t('composer.publish')) : t('composer.submit')}
             </button>
+            {!valid ? <p className="why-line m-0">{!def?.title?.trim() ? t('composer.needTitle', { lang: LOCALE_NAMES[org.defaultLocale] }) : !scopes.length ? t('composer.needAudience') : t('composer.needTime')}</p> : null}
             <button type="button" className="btn btn-gray btn-large" disabled={!def?.title?.trim() || busy} onClick={() => void save(false)}>{t('composer.saveDraft')}</button>
             {!mayPublish && scopes.length ? <p className="t-foot t-2 m-0 mt-1 text-center">{t(settings?.postsNeedApproval ? 'composer.approvalOrg' : 'composer.approvalRole')}</p> : null}
             {push ? <p className="t-foot t-2 m-0 text-center">{t('composer.cantRecall')}</p> : null}
@@ -227,7 +230,7 @@ function AudienceExplainer({ preview, push, email }: { preview: AudiencePreview 
       <p className="t-sub t-2 m-0 mt-1">{preview.byScope.filter((s) => s.count > 0).map((s) => t('composer.follow', { count: s.count, n: n(s.count), name: s.name })).join(', ')}</p>
       {push ? (
         <div className="flex gap-2 mt-3">
-          <IconBell size={18} className="flex-none mt-0.5" style={{ color: 'var(--c-accent)' }} />
+          <IconBell size={18} className="flex-none mt-0.5" style={{ color: 'var(--c-ink-2)' }} />
           <p className="t-sub m-0">
             {t('composer.pushTo', { n: n(preview.push.count) })}
             {preview.push.turnedOff || preview.push.noApp ? <span className="t-2"> {t('composer.pushNot', { off: n(preview.push.turnedOff), noApp: n(preview.push.noApp) })}</span> : null}
@@ -237,7 +240,7 @@ function AudienceExplainer({ preview, push, email }: { preview: AudiencePreview 
       ) : null}
       {email ? (
         <div className="flex gap-2 mt-3">
-          <IconMail size={18} className="flex-none mt-0.5" style={{ color: 'var(--c-accent)' }} />
+          <IconMail size={18} className="flex-none mt-0.5" style={{ color: 'var(--c-ink-2)' }} />
           <p className="t-sub m-0">
             {t('composer.emailTo', { n: n(preview.email.count) })}
             {preview.email.unconfirmed ? <span className="t-2"> {t('composer.emailUnconfirmed', { n: n(preview.email.unconfirmed) })}</span> : null}
