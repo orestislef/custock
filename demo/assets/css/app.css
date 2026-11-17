@@ -689,3 +689,20 @@ details.tableview summary::-webkit-details-marker { display: none; }
 .demo-pill.ping { animation: ping .6s var(--ease-out); }
 @keyframes ping { 40% { scale: 1.1; } }
 .reduce-motion .demo-pill.ping { animation: none; }
+
+/* stage 2 */
+/* chips keep the 34pt capsule but get a 44pt hit area */
+.chip { position: relative; }
+.chip::before { content: ""; position: absolute; left: -2px; right: -2px; top: -5px; bottom: -5px; }
+.chips { padding-top: 5px; padding-bottom: 5px; margin-top: -3px; }
+.cell[aria-disabled="true"] { cursor: default; }
+/* chart marks, one data hue */
+.chart-card .bar { fill: var(--data-1); transition: opacity .15s; }
+.chart-card .bar.soft { fill: var(--data-1-soft); }
+.chart-card .gridl { stroke: var(--grid); stroke-width: 1; }
+.chart-card .hitbar { outline: none; }
+/* lock screen groups */
+.lock .l-group + .l-group { margin-top: 4px; }
+.lock .notif + .notif { margin-top: 8px; }
+.browser .chip, .sheet .chip { background: var(--fill); }
+.browser .chip[aria-pressed="true"], .sheet .chip[aria-pressed="true"] { background: var(--accent); }
