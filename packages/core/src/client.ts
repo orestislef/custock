@@ -220,5 +220,10 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
 
     unsubscribePage: (token) => get(`/v1/public/subscription/${enc(token)}`),
     unsubscribe: (token, everything) => post(`/v1/public/subscription/${enc(token)}`, { everything: !!everything }),
+
+    requestEmailChange: (newEmail) => post('/v1/me/email', { email: newEmail }),
+    confirmEmailChange: (newEmail, code) => post('/v1/me/email/verify', { email: newEmail, code }),
+    detachBarcode: (orgId, variantId, barcodeId) => del(`${org(orgId)}/variants/${enc(variantId)}/barcodes/${enc(barcodeId)}`),
+    negativeReview: (orgId, shopId) => get(`${org(orgId)}/review/negative`, { shopId }),
   };
 }

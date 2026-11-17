@@ -7,7 +7,7 @@ import type {
   GrantableRole, InviteInput, JoinInput, JoinLink, JoinPage, Locale, MeContext, Member,
   Movement, MovementBatchResult, MovementInput, OrgSettings, Post, PostInput, Product,
   ProductInput, PublicProduct, Role, ScanResult, SeriesPoint, Shop, ShopGroup, StockLevel,
-  Tokens, ScopeType,
+  Tokens, ScopeType, Uom,
   AddCustomerInput, AuditEntry, DevOutboxItem, Invite, ShopVariantSettingsInput, StockAlertItem, StockCount,
   StockCountLine, SyncResult, Transfer, TransferInput, UncountedPolicy, UnsubscribePage,
 } from './contract';
@@ -92,7 +92,8 @@ export interface CustockApi {
   // reports
   dashboard(orgId: string, shopId?: string): Promise<DashboardCards>;
   salesSeries(orgId: string, shopId?: string, days?: number): Promise<SeriesPoint[]>;
-  topSellers(orgId: string, shopId?: string, days?: number): Promise<{ variantId: string; name: string; qty: number; valueMinor: number | null }[]>;
+  // qty is in base units: pieces, or grams/ml/mm when uom is kg/l/m
+  topSellers(orgId: string, shopId?: string, days?: number): Promise<{ variantId: string; name: string; qty: number; uom: Uom; valueMinor: number | null }[]>;
   mostWanted(orgId: string, shopId?: string): Promise<{ variantId: string; name: string; waiting: number; onHand: number }[]>;
   joinLinkStats(orgId: string): Promise<{ joinLinkId: string; label: string | null; opens: number; signups: number; confirmed: number }[]>;
   shrinkage(orgId: string, shopId?: string, days?: number): Promise<{ reason: string; qty: number; valueMinor: number | null }[]>;
@@ -175,4 +176,13 @@ export interface CustockApi {
   // public, from the email link
   unsubscribePage(token: string): Promise<UnsubscribePage>;
   unsubscribe(token: string, everything?: boolean): Promise<void>;
+
+  // ---------------------------------------------------------------- security review additions
+
+  // account email change: a code goes to the new address, the old one gets a notice once it is done
+  requestEmailChange(newEmail: string): Promise<{ sent: true; devCode?: string }>;
+  confirmEmailChange(newEmail: string, code: string): Promise<void>;
+  detachBarcode(orgId: string, variantId: string, barcodeId: string): Promise<void>;
+  // movements accepted offline that pushed stock below zero in strict mode
+  negativeReview(orgId: string, shopId?: string): Promise<{ movementId: string; shopId: string; variantId: string; name: string; qtyDelta: number; onHandAfter: number; createdByName: string | null; recordedAt: number }[]>;
 }

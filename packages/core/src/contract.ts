@@ -60,9 +60,9 @@ export type Problem = z.infer<typeof Problem>;
 
 // ---------------------------------------------------------------- auth and context
 
-export const LoginInput = z.object({ email: z.string().email(), password: z.string().min(1) });
-export const OtpRequestInput = z.object({ email: z.string().email(), locale: Locale.optional() });
-export const OtpVerifyInput = z.object({ email: z.string().email(), code: z.string().length(6) });
+export const LoginInput = z.object({ email: z.string().email().max(254), password: z.string().min(1).max(200) });
+export const OtpRequestInput = z.object({ email: z.string().email().max(254), locale: Locale.optional() });
+export const OtpVerifyInput = z.object({ email: z.string().email().max(254), code: z.string().length(6) });
 
 export const Tokens = z.object({
   accessToken: z.string(),
@@ -102,7 +102,7 @@ export const MeContext = z.object({
     locale: Locale,
   }),
   orgs: z.array(OrgAccess),
-  following: z.array(z.object({ orgId: z.string(), orgName: z.string(), customerId: z.string() })),
+  following: z.array(z.object({ orgId: z.string(), orgName: z.string(), orgSlug: z.string(), customerId: z.string() })),
 });
 export type MeContext = z.infer<typeof MeContext>;
 
@@ -198,16 +198,16 @@ export const Category = z.object({ id: z.string(), parentId: z.string().nullable
 export type Category = z.infer<typeof Category>;
 
 export const ProductInput = z.object({
-  name: z.string().min(1),
-  description: z.string().nullable().optional(),
-  brand: z.string().nullable().optional(),
+  name: z.string().min(1).max(200),
+  description: z.string().max(5000).nullable().optional(),
+  brand: z.string().max(120).nullable().optional(),
   categoryId: z.string().nullable().optional(),
   uom: Uom.default('piece'),
   taxRateBp: z.number().int().default(2400),
   trackStock: z.boolean().default(true),
   priceMinor: z.number().int().nullable().optional(),
   costMinor: z.number().int().nullable().optional(),
-  barcode: z.string().optional(),
+  barcode: z.string().max(200).optional(),
 });
 export type ProductInput = z.infer<typeof ProductInput>;
 
@@ -225,7 +225,7 @@ export const StockLevel = z.object({
 export type StockLevel = z.infer<typeof StockLevel>;
 
 export const MovementInput = z.object({
-  id: z.string(), // uuid v7 made on the device, idempotency key
+  id: z.string().min(8).max(64), // uuid v7 made on the device, idempotency key
   shopId: z.string(),
   variantId: z.string(),
   qtyDelta: z.number().int().refine((n) => n !== 0, 'zero'),
@@ -331,13 +331,13 @@ export type JoinLink = z.infer<typeof JoinLink>;
 
 // ---------------------------------------------------------------- posts
 
-export const PostText = z.object({ title: z.string().min(1), body: z.string() });
+export const PostText = z.object({ title: z.string().min(1).max(200), body: z.string().max(5000) });
 
 export const Audience = z.object({
-  scopes: z.array(z.object({ scopeType: ScopeType, scopeId: z.string() })).min(1),
-  tags: z.array(z.string()).default([]),
-  interests: z.array(z.string()).default([]),
-  locales: z.array(Locale).default([]),
+  scopes: z.array(z.object({ scopeType: ScopeType, scopeId: z.string().max(64) })).min(1).max(50),
+  tags: z.array(z.string().max(40)).max(50).default([]),
+  interests: z.array(z.string().max(64)).max(50).default([]),
+  locales: z.array(Locale).max(3).default([]),
   savedAnyLinked: z.boolean().default(false),
   joinedWithinDays: z.number().int().nullable().default(null),
 });
@@ -349,8 +349,8 @@ export const PostInput = z.object({
   translations: z.partialRecord(Locale, PostText), // only the default language is required
   channels: z.array(Channel).min(1),
   audience: Audience,
-  products: z.array(z.object({ variantId: z.string(), offerPriceMinor: z.number().int().nullable().default(null) })).default([]),
-  coverUrl: z.string().nullable().default(null),
+  products: z.array(z.object({ variantId: z.string().max(64), offerPriceMinor: z.number().int().min(0).nullable().default(null) })).max(100).default([]),
+  coverUrl: z.string().max(2000).nullable().default(null),
   scheduledAt: z.number().nullable().default(null),
   validFrom: z.number().nullable().default(null),
   validUntil: z.number().nullable().default(null),
@@ -425,7 +425,7 @@ export const Member = z.object({
 export type Member = z.infer<typeof Member>;
 
 export const InviteInput = z.object({
-  email: z.string().email(),
+  email: z.string().email().max(254),
   roleId: z.string(),
   scopeType: ScopeType,
   scopeId: z.string(),
@@ -487,13 +487,13 @@ export type JoinPage = z.infer<typeof JoinPage>;
 
 export const JoinInput = z.object({
   name: z.string().min(1).max(120),
-  email: z.string().email(),
+  email: z.string().email().max(254),
   locale: Locale,
   emailNews: z.boolean(),
   push: z.boolean(),
   over15: z.literal(true),
-  interests: z.array(z.string()).default([]),
-  turnstileToken: z.string().optional(),
+  interests: z.array(z.string().max(64)).max(20).default([]),
+  turnstileToken: z.string().max(2048).optional(),
 });
 export type JoinInput = z.infer<typeof JoinInput>;
 
@@ -591,19 +591,19 @@ export const TransferInput = z.object({
   fromShopId: z.string(),
   toShopId: z.string(),
   note: z.string().max(500).optional(),
-  lines: z.array(z.object({ variantId: z.string(), qty: z.number().int().positive() })).min(1),
+  lines: z.array(z.object({ variantId: z.string().max(64), qty: z.number().int().positive() })).min(1).max(500),
 });
 export type TransferInput = z.infer<typeof TransferInput>;
 
 export const AddCustomerInput = z.object({
   name: z.string().min(1).max(120),
-  email: z.string().email().optional(),
+  email: z.string().email().max(254).optional(),
   phone: z.string().max(30).optional(),
   locale: Locale.default('el'),
-  shopId: z.string(),
+  shopId: z.string().max(64),
   emailNews: z.boolean().default(false),
   push: z.boolean().default(false),
-  tags: z.array(z.string()).default([]),
+  tags: z.array(z.string().min(1).max(40)).max(30).default([]),
 });
 export type AddCustomerInput = z.infer<typeof AddCustomerInput>;
 
