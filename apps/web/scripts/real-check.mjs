@@ -8,11 +8,11 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const out = process.argv[2] ?? 'screenshots/real';
+const out = process.argv[2] ?? 'screenshots/tmp/real';
 const base = process.env.WEB_URL ?? 'http://localhost:3000';
 mkdirSync(out, { recursive: true });
 
-const people = (process.env.PEOPLE ?? 'Maria Ioannou,Eleni Papadopoulou,Dimitris Karras,Sofia Lambrou').split(',');
+const people = (process.env.PEOPLE ?? 'Maria Ioannou,Eleni Papadopoulou,Dimitris Kostas,Sofia Alexiou').split(',');
 const sections = (process.env.SECTIONS ?? '/admin,/admin/stock,/admin/stock/new,/admin/stock/counts,/admin/stock/transfers,/admin/customers,/admin/posts,/admin/posts/new,/admin/reports,/admin/team,/admin/team/roles,/admin/settings,/admin/join-links,/admin/audit,/admin/dev-outbox').split(',');
 
 const browser = await chromium.launch();
@@ -39,7 +39,7 @@ for (const person of people) {
   }
   // open the first product and the first customer
   await page.goto(`${base}/admin/stock`, { waitUntil: 'networkidle' });
-  const firstProduct = page.locator('main .list a[href^="/admin/stock/"]').first();
+  const firstProduct = page.locator('main :is(.list, .table) a[href^="/admin/stock/"]').first();
   if (await firstProduct.count()) {
     await firstProduct.click();
     await page.waitForLoadState('networkidle');

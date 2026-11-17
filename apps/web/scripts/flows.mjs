@@ -9,7 +9,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const out = process.argv[2] ?? 'screenshots/flows';
+const out = process.argv[2] ?? 'screenshots/tmp/flows';
 const base = process.env.WEB_URL ?? 'http://localhost:3000';
 mkdirSync(out, { recursive: true });
 
@@ -46,7 +46,7 @@ await step('create a product', async () => {
   const name = `Flow test olive paste ${Date.now() % 100000}`;
   await page.locator('input.field').first().fill(name);
   await page.getByLabel('Price with VAT').fill('4,50');
-  await page.getByRole('button', { name: 'Make our own label code' }).click();
+  await page.getByRole('button', { name: 'Make a shop barcode' }).click();
   await page.waitForTimeout(400);
   await page.getByRole('button', { name: 'Create product' }).click();
   await page.waitForURL(/\/admin\/stock\/[^/]+$/, { timeout: 15000 });
@@ -56,7 +56,7 @@ await step('create a product', async () => {
 
 await step('receive stock people wait for', async () => {
   await page.goto(`${base}/admin/stock?filter=waiting`, { waitUntil: 'networkidle' });
-  await page.locator('main .list a[href^="/admin/stock/"]').first().click();
+  await page.locator('main :is(.list, .table) a[href^="/admin/stock/"]').first().click();
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: 'Receive' }).first().click();
   const sheet = page.getByRole('dialog');
