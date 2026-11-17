@@ -13,9 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="Custock">
   <meta name="format-detection" content="telephone=no">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='9' fill='%23B0234F'/%3E%3Ccircle cx='16' cy='20' r='8' fill='none' stroke='%23fff' stroke-width='3.2'/%3E%3Ccircle cx='24' cy='20' r='8' fill='none' stroke='%23fff' stroke-opacity='.62' stroke-width='3.2'/%3E%3C/svg%3E">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Commissioner:wght@500;600;700&display=swap">
+  <link rel="preload" href="assets/fonts/commissioner-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/css/tokens.css">
   <link rel="stylesheet" href="assets/css/app.css">
 </head>
@@ -43,12 +41,13 @@
     </main>
   </div>
   <div class="panel-scrim" id="panel-scrim"></div>
-  <button class="demo-pill" id="demo-pill" data-act="panel-open" aria-label="Open demo controls"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Demo</button>
+  <button class="demo-pill" id="demo-pill" data-act="panel-open" aria-label="Open demo controls"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span class="pill-t">Demo</span></button>
 
   <script src="assets/js/images.js"></script>
   <script src="assets/js/text.js"></script>
   <script src="assets/js/i18n.js"></script>
   <script src="assets/js/i18n2.js"></script>
+  <script src="assets/js/i18n3.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/app.js"></script>
 </body>
