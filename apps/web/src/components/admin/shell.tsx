@@ -8,35 +8,44 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAdmin } from './admin-context';
 import { Avatar } from '@/components/ui/kit';
-import { LocaleSwitch, Sheet } from '@/components/ui/client-kit';
+import { LocaleSwitch, Picker, Sheet } from '@/components/ui/client-kit';
 import {
-  IconBox, IconChart, IconChevronDown, IconGear, IconHome, IconLink, IconLogout, IconMegaphone, IconMore, IconPeople, IconShield, IconShop, IconHistory, IconMail,
+  IconBox, IconChart, IconChevronLeft, IconChevronRight, IconGear, IconHome, IconLink, IconLogout, IconMegaphone, IconMore, IconPeople, IconShield, IconShop, IconHistory, IconMail,
 } from '@/components/ui/icons';
 
 // dev tools stay visible unless the build turns them off
 const devTools = process.env.NEXT_PUBLIC_DEV_TOOLS !== '0';
 
-type NavItem = { href: string; key: string; icon: (p: { filled?: boolean; size?: number }) => ReactNode; show: boolean };
+type Section = 'main' | 'business' | 'dev';
+type NavItem = { href: string; key: string; icon: (p: { filled?: boolean; size?: number }) => ReactNode; show: boolean; section: Section; children?: { href: string; key: string; show: boolean }[] };
 
 export function useNav(): NavItem[] {
   const { can, org } = useAdmin();
   const anyShop = (perm: string) => org.orgPerms.includes(perm) || org.shops.some((s) => s.perms.includes(perm)) || org.anyPerms.includes(perm);
-  return [
-    { href: '/admin', key: 'home', icon: IconHome, show: true },
-    { href: '/admin/stock', key: 'stock', icon: IconBox, show: anyShop('stock.view') || anyShop('products.view') },
-    { href: '/admin/customers', key: 'customers', icon: IconPeople, show: anyShop('customers.view') },
-    { href: '/admin/posts', key: 'posts', icon: IconMegaphone, show: anyShop('posts.view') },
-    { href: '/admin/reports', key: 'reports', icon: IconChart, show: anyShop('reports.view') },
-    { href: '/admin/team', key: 'team', icon: IconShield, show: anyShop('members.view') },
-    { href: '/admin/join-links', key: 'joinLinks', icon: IconLink, show: anyShop('joinlinks.manage') },
-    { href: '/admin/settings', key: 'settings', icon: IconGear, show: can('org.settings.manage') || anyShop('shop.settings.manage') },
-    { href: '/admin/audit', key: 'audit', icon: IconHistory, show: can('org.audit.view') },
-    { href: '/admin/dev-outbox', key: 'outbox', icon: IconMail, show: devTools && org.orgPerms.includes('org.settings.manage') },
-  ].filter((i) => i.show);
+  const items: NavItem[] = [
+    { href: '/admin', key: 'home', icon: IconHome, show: true, section: 'main' },
+    {
+      href: '/admin/stock', key: 'stock', icon: IconBox, show: anyShop('stock.view') || anyShop('products.view'), section: 'main',
+      children: [
+        { href: '/admin/stock/counts', key: 'counts', show: anyShop('stock.count') || anyShop('stock.count.approve') },
+        { href: '/admin/stock/transfers', key: 'transfers', show: anyShop('stock.transfer.send') || anyShop('stock.transfer.receive') },
+      ],
+    },
+    { href: '/admin/customers', key: 'customers', icon: IconPeople, show: anyShop('customers.view'), section: 'main' },
+    { href: '/admin/posts', key: 'posts', icon: IconMegaphone, show: anyShop('posts.view'), section: 'main' },
+    { href: '/admin/reports', key: 'reports', icon: IconChart, show: anyShop('reports.view'), section: 'main' },
+    { href: '/admin/team', key: 'team', icon: IconShield, show: anyShop('members.view'), section: 'business' },
+    { href: '/admin/join-links', key: 'joinLinks', icon: IconLink, show: anyShop('joinlinks.manage'), section: 'business' },
+    { href: '/admin/settings', key: 'settings', icon: IconGear, show: can('org.settings.manage') || anyShop('shop.settings.manage'), section: 'business' },
+    { href: '/admin/audit', key: 'audit', icon: IconHistory, show: can('org.audit.view'), section: 'business' },
+    { href: '/admin/dev-outbox', key: 'outbox', icon: IconMail, show: devTools && org.orgPerms.includes('org.settings.manage'), section: 'dev' },
+  ];
+  return items.filter((i) => i.show);
 }
 
-function isActive(pathname: string, href: string) {
-  return href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
+function isActive(pathname: string, href: string, exact = false) {
+  if (href === '/admin' || exact) return pathname === href;
+  return pathname.startsWith(href);
 }
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -49,33 +58,59 @@ export function Shell({ children }: { children: ReactNode }) {
   // phone tabs: the first four sections, the rest under More
   const tabs = nav.slice(0, nav.length > 5 ? 4 : 5);
   const rest = nav.slice(tabs.length);
+  const stockChildActive = /\/admin\/stock\/(counts|transfers)/.test(pathname);
+
+  const link = (item: NavItem) => {
+    const Icon = item.icon;
+    const active = item.key === 'stock' ? isActive(pathname, item.href) && !stockChildActive : isActive(pathname, item.href);
+    return (
+      <li key={item.href}>
+        <Link href={item.href} aria-current={active ? 'page' : undefined} className="nav-link flex items-center gap-3 px-3 min-h-[40px] rounded-[10px] t-body">
+          <Icon size={20} filled={active} />
+          {t(`nav.${item.key}`)}
+        </Link>
+        {item.children?.some((c) => c.show) && isActive(pathname, item.href) ? (
+          <ul className="list-none p-0 m-0 mt-0.5 flex flex-col gap-0.5">
+            {item.children.filter((c) => c.show).map((c) => (
+              <li key={c.href}>
+                <Link href={c.href} aria-current={isActive(pathname, c.href) ? 'page' : undefined} className="nav-link flex items-center pl-11 pr-3 min-h-[36px] rounded-[10px] t-sub">
+                  {t(`stockTabs.${c.key}`)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </li>
+    );
+  };
+
+  const main = nav.filter((i) => i.section === 'main');
+  const business = nav.filter((i) => i.section === 'business');
+  const dev = nav.filter((i) => i.section === 'dev');
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[260px_1fr]">
       <a href="#main" className="skip-link t-sub">{t('admin.skip')}</a>
       {/* sidebar */}
-      <aside className="hidden md:flex flex-col sticky top-0 h-dvh px-3 pt-5 pb-4" style={{ background: 'var(--c-shelf)', borderRight: '0.5px solid var(--c-line)' }}>
+      <aside className="hidden md:flex flex-col sticky top-0 h-dvh px-3 pt-5 pb-4 overflow-y-auto" style={{ background: 'var(--c-shelf)', borderRight: '0.5px solid var(--c-line)' }}>
         <div className="px-3 mb-5">
-          <p className="t-cap t-2 m-0 uppercase-none">{t('admin.business')}</p>
+          <p className="t-cap t-2 m-0">{t('admin.business')}</p>
           <p className="t-title3 t-display m-0">{org.name}</p>
         </div>
-        <nav aria-label={t('admin.nav')} className="flex flex-col gap-0.5">
-          {nav.map((item) => {
-            const active = isActive(pathname, item.href);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? 'page' : undefined}
-                className="nav-link flex items-center gap-3 px-3 min-h-[40px] rounded-[10px] t-body"
-                style={{ color: active ? 'var(--c-accent)' : 'var(--c-ink)', background: active ? 'var(--c-accent-tint)' : 'transparent', fontWeight: active ? 600 : 400 }}
-              >
-                <Icon size={20} filled={active} />
-                {t(`nav.${item.key}`)}
-              </Link>
-            );
-          })}
+        <nav aria-label={t('admin.nav')}>
+          <ul className="list-none p-0 m-0 flex flex-col gap-0.5">{main.map(link)}</ul>
+          {business.length ? (
+            <>
+              <h2 className="t-foot t-2 m-0 mt-6 mb-1 px-3" style={{ fontWeight: 600 }}>{t('admin.businessSection')}</h2>
+              <ul className="list-none p-0 m-0 flex flex-col gap-0.5">{business.map(link)}</ul>
+            </>
+          ) : null}
+          {dev.length ? (
+            <>
+              <hr className="my-4 mx-3 border-0" style={{ borderTop: '0.5px solid var(--c-line)' }} />
+              <ul className="list-none p-0 m-0 flex flex-col gap-0.5">{dev.map(link)}</ul>
+            </>
+          ) : null}
         </nav>
         <div className="flex-1" />
         <button type="button" className="nav-link flex items-center gap-3 px-3 min-h-[52px] rounded-[10px] text-left border-0 bg-transparent cursor-pointer" onClick={() => setUserOpen(true)}>
@@ -93,6 +128,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-2 h-[52px] px-4 md:px-8" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
             <span className="md:hidden t-headline">{org.name}</span>
             <span id="bar-title" className="t-headline flex-1 text-center md:text-left truncate opacity-0 transition-opacity" aria-hidden="true" />
+            <span id="bar-action" className="md:hidden" />
             <ShopSwitcher shops={shops} shopId={shopId} onChange={setShopId} canAll={org.shops.length > 1} />
             <button type="button" className="md:hidden icon-btn" aria-label={t('admin.account')} onClick={() => setUserOpen(true)}>
               <Avatar name={me.user.displayName} size={30} />
@@ -100,12 +136,12 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main id="main" tabIndex={-1} className="outline-none flex-1 px-4 md:px-8 pb-[calc(110px+env(safe-area-inset-bottom))] md:pb-12 w-full max-w-[1100px]">{children}</main>
+        <main id="main" tabIndex={-1} className="outline-none flex-1 px-4 md:px-8 pb-[calc(110px+env(safe-area-inset-bottom))] md:pb-12 w-full max-w-[1200px]">{children}</main>
       </div>
 
       {/* phone tab bar, floating glass */}
-      <nav aria-label={t('admin.nav')} className="md:hidden fixed z-30 left-3 right-3 flex justify-around rounded-[28px] px-1"
-        style={{ bottom: 'calc(10px + env(safe-area-inset-bottom))', height: 62, background: 'var(--c-bar-surface)', WebkitBackdropFilter: 'saturate(180%) blur(24px)', backdropFilter: 'saturate(180%) blur(24px)', boxShadow: '0 8px 30px rgba(0,0,0,0.12), 0 0 0 0.5px var(--c-line)' }}>
+      <nav aria-label={t('admin.nav')} className="glass md:hidden fixed z-30 left-3 right-3 flex justify-around rounded-[28px] px-1"
+        style={{ bottom: 'calc(10px + env(safe-area-inset-bottom))', height: 62, boxShadow: '0 8px 30px rgba(0,0,0,0.12), 0 0 0 0.5px var(--c-line)' }}>
         {tabs.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
@@ -127,17 +163,20 @@ export function Shell({ children }: { children: ReactNode }) {
       </nav>
 
       <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title={t('nav.more')}>
-        <div className="list mb-2">
+        <ul className="list mb-2" role="list">
           {rest.map((item) => {
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} className="row has-icon" onClick={() => setMoreOpen(false)}>
-                <span className="icon-tile"><Icon size={18} /></span>
-                <span className="row-main row-title">{t(`nav.${item.key}`)}</span>
-              </Link>
+              <li key={item.href}>
+                <Link href={item.href} className="row has-icon" onClick={() => setMoreOpen(false)}>
+                  <span className="icon-tile"><Icon size={18} /></span>
+                  <span className="row-main row-title">{t(`nav.${item.key}`)}</span>
+                  <IconChevronRight size={16} className="chev" />
+                </Link>
+              </li>
             );
           })}
-        </div>
+        </ul>
       </Sheet>
 
       <Sheet open={userOpen} onClose={() => setUserOpen(false)} title={t('admin.account')}>
@@ -148,23 +187,25 @@ export function Shell({ children }: { children: ReactNode }) {
             <p className="t-sub t-2 m-0 truncate">{me.user.email}</p>
           </div>
         </div>
-        <div className="list mb-4">
+        <ul className="list mb-4" role="list">
           {org.shops.map((s) => (
-            <div key={s.shopId} className="row">
+            <li key={s.shopId} className="row">
               <span className="row-main">
                 <span className="row-title block">{s.name}</span>
                 <span className="row-sub block">{t('admin.permsCount', { count: s.perms.length })}</span>
               </span>
-            </div>
+            </li>
           ))}
-        </div>
-        <div className="list mb-2">
-          <div className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch compact /></div>
-          <button type="button" className="row" onClick={() => void logout()} style={{ color: 'var(--c-error)' }}>
-            <IconLogout size={20} />
-            <span className="row-main row-title">{t('common:action.signOut')}</span>
-          </button>
-        </div>
+        </ul>
+        <ul className="list mb-2" role="list">
+          <li className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></li>
+          <li>
+            <button type="button" className="row" onClick={() => void logout()} style={{ color: 'var(--c-error)' }}>
+              <IconLogout size={20} />
+              <span className="row-main row-title">{t('common:action.signOut')}</span>
+            </button>
+          </li>
+        </ul>
       </Sheet>
     </div>
   );
@@ -176,25 +217,21 @@ function ShopSwitcher({ shops, shopId, onChange, canAll }: { shops: { id: string
     return shops[0] ? <span className="t-sub t-2 inline-flex items-center gap-1"><IconShop size={16} />{shops[0].name}</span> : null;
   }
   return (
-    <label className="relative inline-flex items-center gap-1.5 h-[34px] pl-3 pr-2 rounded-full cursor-pointer" style={{ background: 'var(--c-fill)' }}>
-      <IconShop size={16} />
-      <span className="sr-only">{t('admin.shop')}</span>
-      <select
-        className="appearance-none bg-transparent border-0 outline-none t-sub cursor-pointer pr-4"
-        style={{ color: 'var(--c-ink)', fontWeight: 500 }}
-        value={shopId ?? 'all'}
-        onChange={(e) => onChange(e.target.value === 'all' ? null : e.target.value)}
-      >
-        {canAll ? <option value="all">{t('common:scope.allShops')}</option> : null}
-        {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </select>
-      <IconChevronDown size={14} className="absolute right-2 pointer-events-none" />
-    </label>
+    <Picker
+      label={t('admin.shop')}
+      icon={<IconShop size={16} />}
+      value={shopId ?? 'all'}
+      onChange={(v) => onChange(v === 'all' ? null : v)}
+      options={[...(canAll ? [{ value: 'all', label: t('common:scope.allShops') }] : []), ...shops.map((s) => ({ value: s.id, label: s.name }))]}
+    />
   );
 }
 
-// a page with an ios large title that hands over to the small title in the toolbar on scroll
-export function Page({ title, subtitle, actions, children }: { title: string; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode }) {
+// a page with an ios large title that hands over to the small title in the toolbar on scroll.
+// the back link sits above the title. on phones the primary action becomes a + in the toolbar.
+export function Page({ title, subtitle, actions, back, phoneAction, children }: {
+  title: string; subtitle?: ReactNode; actions?: ReactNode; back?: { href: string; label: string }; phoneAction?: ReactNode; children: ReactNode;
+}) {
   const ref = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     const barTitle = document.getElementById('bar-title');
@@ -211,12 +248,14 @@ export function Page({ title, subtitle, actions, children }: { title: string; su
   }, [title]);
   return (
     <div className="page-in">
-      <div className="flex items-end gap-3 pt-2 pb-5 flex-wrap">
+      {back ? <Link href={back.href} className="inline-flex items-center min-h-[44px] -ml-2 mt-1 t-body"><IconChevronLeft size={24} />{back.label}</Link> : null}
+      <div className={`flex items-end gap-3 ${back ? 'pt-0' : 'pt-2'} pb-5 flex-wrap`}>
         <div className="flex-1 min-w-[200px]">
           <h1 ref={ref} className="t-large m-0">{title}</h1>
           {subtitle ? <p className="t-sub t-2 m-0 mt-1">{subtitle}</p> : null}
         </div>
-        {actions ? <div className="flex items-center gap-2 flex-wrap">{actions}</div> : null}
+        {actions ? <div className={`${phoneAction ? 'hidden md:flex' : 'flex'} items-center gap-2 flex-wrap`}>{actions}</div> : null}
+        {phoneAction ? <div className="md:hidden">{phoneAction}</div> : null}
       </div>
       {children}
     </div>

@@ -3,7 +3,7 @@
 import { useAdmin, useShopFilter } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { BarList, ChartCard, ColumnChart, DataTable, FunnelBars, Legend } from '@/components/admin/charts';
-import { Why } from '@/components/ui/kit';
+import { Group, Row, Why } from '@/components/ui/kit';
 import { useAsync } from '@/lib/use-async';
 import { date, money, number, qtyNumber } from '@/lib/format';
 import type { Uom } from '@custock/core';
@@ -22,12 +22,14 @@ export default function ReportsPage() {
   const catalog = useAsync(() => (allowed ? api.products(org.orgId, { limit: 500 }) : Promise.resolve(null)), [allowed]);
   const uomOf = (variantId: string, row?: { uom?: Uom }): Uom => row?.uom ?? catalog.data?.items.find((p) => p.variants.some((v) => v.id === variantId))?.uom ?? 'piece';
   const units = (variantId: string, qty: number, row?: { uom?: Uom }) => { const u = uomOf(variantId, row); return u === 'piece' ? number(qty, locale) : `${qtyNumber(qty, u, locale)} ${t(`common:uom.${u}`)}`; };
+  const cards = useAsync(() => (allowed && moneyOk ? api.dashboard(org.orgId, shopId) : Promise.resolve(null)), [shopId, allowed]);
   const shrink = useAsync(() => (allowed ? api.shrinkage(org.orgId, shopId, 30) : none([])), [shopId, allowed]);
 
   if (!allowed) return <Page title={t('reports.title')}><Why>{t('common:error.forbidden')}</Why></Page>;
 
   const eur = (n: number) => money(n, org.currency, locale);
-  const eurAxis = (n: number) => new Intl.NumberFormat(locale === 'el' ? 'el-GR' : locale === 'ru' ? 'ru-RU' : 'en-GB', { style: 'currency', currency: org.currency, notation: 'compact', maximumFractionDigits: 1 }).format(n / 100);
+  // the same currency style as every other amount, whole units on the axis
+  const eurAxis = (n: number) => new Intl.NumberFormat(locale === 'el' ? 'el-GR' : locale === 'ru' ? 'ru-RU' : 'en-GB', { style: 'currency', currency: org.currency, maximumFractionDigits: 0 }).format(n / 100);
   const days = (sales.data ?? []).map((p) => {
     const ms = new Date(`${p.day}T12:00:00Z`).getTime();
     return { key: p.day, label: date(ms, locale, { day: 'numeric' }), long: date(ms, locale, { weekday: 'long', day: 'numeric', month: 'long' }), value: p.value };
@@ -38,7 +40,13 @@ export default function ReportsPage() {
   return (
     <Page title={t('reports.title')} subtitle={t('reports.subtitle')}>
       {!moneyOk ? <p className="mb-4"><Why>{t('reports.moneyHidden')}</Why></p> : null}
-      <div className="grid grid-cols-[minmax(0,1fr)] xl:grid-cols-2 gap-x-4">
+      {moneyOk && cards.data ? (
+        <Group>
+          <Row title={t('dash.stockValue')} value={<span className="t-headline" style={{ color: 'var(--c-ink)' }}>{eur(cards.data.stockValueCostMinor ?? 0)}</span>} />
+          <Row title={t('dash.salesToday')} value={<span className="t-headline" style={{ color: 'var(--c-ink)' }}>{eur(cards.data.salesTodayMinor ?? 0)}</span>} />
+        </Group>
+      ) : null}
+      <div className="grid grid-cols-[minmax(0,1fr)] xl:grid-cols-2 gap-x-4 items-start">
         {moneyOk ? (
           <ChartCard title={t('reports.sales')} subtitle={t('reports.salesSub', { total: eur(total) })}
             table={<DataTable head={[t('reports.day'), t('reports.value')]} rows={days.map((d) => [d.long, eur(d.value)])} />}>

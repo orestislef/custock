@@ -103,7 +103,7 @@ export function ColumnChart({ data, format, formatAxis, label }: { data: { key: 
               <rect x={left + i * slot} y={top} width={slot} height={plotH} fill="transparent"
                 tabIndex={0} aria-label={`${d.long}: ${format(d.value)}`}
                 onPointerEnter={() => setHover(i)} onFocus={() => setHover(i)} onBlur={() => setHover(null)} style={{ outline: 'none', cursor: 'default' }} />
-              <path d={vbar(x, top + plotH, bw, h)} fill="var(--chart-1)" opacity={hover == null || hover === i ? 1 : 0.55} style={{ transition: 'opacity 120ms' }} pointerEvents="none" />
+              <path d={vbar(x, top + plotH, bw, h)} fill={i === maxIdx ? 'var(--chart-1)' : 'var(--c-mark)'} opacity={hover == null || hover === i ? 1 : 0.55} style={{ transition: 'opacity 120ms' }} pointerEvents="none" />
               {showLabel ? <text x={x + bw / 2} y={top + plotH - h - 6} textAnchor="middle" fontSize={11} fill="var(--c-ink)" className="tnum" fontWeight={600} pointerEvents="none">{formatAxis(d.value)}</text> : null}
               {(W < 480 ? i % 2 === (data.length - 1) % 2 : true) ? <text x={x + bw / 2} y={Hh - 8} textAnchor="middle" fontSize={11} fill="var(--c-ink-2)" pointerEvents="none">{d.label}</text> : null}
             </g>
@@ -120,13 +120,14 @@ export function ColumnChart({ data, format, formatAxis, label }: { data: { key: 
 
 // -------------------------------------------------------------- horizontal bars, one series
 
+// one neutral series, the leading bar alone carries the accent
 export function BarList({ data, format, label, empty }: { data: { key: string; label: string; value: number; note?: string }[]; format: (n: number) => string; label: string; empty?: string }) {
   const id = useId();
   const max = Math.max(...data.map((d) => d.value), 1);
   if (!data.length) return <p className="t-sub t-2 m-0 py-6 text-center">{empty}</p>;
   return (
     <ul className="list-none p-0 m-0 flex flex-col gap-3" aria-label={label}>
-      {data.map((d) => {
+      {data.map((d, i) => {
         const pct = Math.max(0.02, d.value / max);
         return (
           <li key={d.key} className="group/bar" tabIndex={0} aria-label={`${d.label}: ${format(d.value)}`} aria-describedby={d.note ? `${id}-${d.key}` : undefined}>
@@ -136,7 +137,7 @@ export function BarList({ data, format, label, empty }: { data: { key: string; l
             </div>
             <div className="flex items-center gap-2">
               <span className="flex-1" aria-hidden="true">
-                <span className="block transition-opacity group-hover/bar:opacity-80 group-focus/bar:opacity-80" style={{ width: `${pct * 100}%`, height: H_BAR, background: 'var(--chart-1)', borderRadius: '0 4px 4px 0' }} />
+                <span className="block transition-opacity group-hover/bar:opacity-80 group-focus/bar:opacity-80" style={{ width: `${pct * 100}%`, height: H_BAR, background: i === 0 ? 'var(--chart-1)' : 'var(--c-mark)', borderRadius: '0 4px 4px 0' }} />
               </span>
               <span className="t-sub tnum text-right" style={{ minWidth: 64, fontWeight: 600 }}>{format(d.value)}</span>
             </div>
