@@ -27,7 +27,7 @@ async function call(method: string, path: string, who?: string, body?: unknown, 
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...headers,
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: body !== undefined ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
   });
   const text = await res.text();
   return { status: res.status, body: (text ? JSON.parse(text) : null) as Json, headers: res.headers };
@@ -142,10 +142,17 @@ describe('the ledger', () => {
     db.prepare('UPDATE organizations SET allow_negative_stock = 0 WHERE id = ?').run(s.orgId);
     const blocked = await move('dimitris', mv(s.shops.kifisia, candle, -1, 'sale'));
     expect(blocked.body.rejected[0].code).toBe('negative_stock_blocked');
-    const offline = await move('dimitris', mv(s.shops.kifisia, candle, -1, 'sale', { occurredAt: clock - 30 * 60_000 }));
-    expect(offline.body.accepted).toHaveLength(1);
-    expect(q("SELECT count(*) n FROM audit_log WHERE action = 'stock.negative_accepted_offline'").n).toBe(1);
+    // offline is not a way around strict mode for staff who cannot adjust stock (L1)
+    const staffOffline = await move('dimitris', mv(s.shops.kifisia, candle, -1, 'sale', { occurredAt: clock - 30 * 60_000 }));
+    expect(staffOffline.body.rejected[0].code).toBe('negative_stock_blocked');
+    const offline = mv(s.shops.kifisia, candle, -1, 'sale', { occurredAt: clock - 30 * 60_000 });
+    const ok = await move('maria', offline);
     db.prepare('UPDATE organizations SET allow_negative_stock = 1 WHERE id = ?').run(s.orgId);
+    expect(ok.body.accepted).toHaveLength(1);
+    expect(q("SELECT count(*) n FROM audit_log WHERE action = 'stock.negative_accepted_offline'").n).toBe(1);
+    const review = await call('GET', `${org()}/review/negative`, 'maria');
+    expect(review.body.map((x: { movementId: string }) => x.movementId)).toEqual([offline.id]);
+    expect((await call('GET', `${org()}/review/negative`, 'dimitris')).status).toBe(403);
   });
   it('undo is a reversal, once, by someone allowed', async () => {
     const soap = s.variants['p-olive-soap']!;
@@ -358,14 +365,16 @@ describe('joining and consent', () => {
     expect(r.status).toBe(410);
     expect(r.body.code).toBe('join_link_disabled');
   });
-  it('staff add a customer at the counter, the same email twice is the same person', async () => {
+  it('staff add a customer at the counter, someone already known is a 409 with no data (M2)', async () => {
     const a = await call('POST', `${org()}/customers`, 'dimitris', { name: 'Ρένα', email: 'rena@example.com', shopId: s.shops.kifisia, emailNews: true });
     expect(a.status).toBe(201);
     expect(a.body.devConfirmLink).toContain('/confirm/');
     expect(a.body.contactMasked).toBe(true);
     const b = await call('POST', `${org()}/customers`, 'dimitris', { name: 'Ρένα Κ.', email: 'rena@example.com', shopId: s.shops.kifisia });
-    expect(b.status).toBe(200);
-    expect(b.body.id).toBe(a.body.id);
+    expect(b.status).toBe(409);
+    expect(b.body.id).toBeUndefined();
+    expect(b.body.name).toBeUndefined();
+    expect(q("SELECT count(*) n FROM customers WHERE email = 'rena@example.com'").n).toBe(1);
     expect((await call('POST', `${org()}/customers`, 'dimitris', { name: 'Elsewhere', email: 'x@example.com', shopId: s.shops.marousi })).status).toBe(403);
   });
   it('erase wipes the person and keeps the counts', async () => {
@@ -426,12 +435,16 @@ describe('posts', () => {
     expect(JSON.parse(email.payload).listUnsubscribe).toContain('/unsubscribe/');
   });
   it('an unsubscribe link works without login', async () => {
-    const email = q("SELECT customer_id, payload FROM dev_outbox WHERE channel = 'email' AND json_extract(payload, '$.listUnsubscribe') IS NOT NULL LIMIT 1");
+    const email = q("SELECT customer_id, payload FROM dev_outbox WHERE channel = 'email' AND json_extract(payload, '$.listUnsubscribe') IS NOT NULL AND customer_id NOT IN (SELECT id FROM customers WHERE email = 'anna@example.com') LIMIT 1");
     const token = JSON.parse(email.payload).listUnsubscribe.split('/unsubscribe/')[1];
     const page = await call('GET', `/v1/public/subscription/${token}`);
     expect(page.body.email).toContain('***');
-    expect((await call('POST', `/v1/public/subscription/${token}`, undefined, {})).status).toBe(204);
-    expect(q("SELECT status FROM customer_subscriptions WHERE customer_id = ? AND scope_type = 'shop' AND scope_id = ?", email.customer_id, s.shops.kifisia).status).toBe('unsubscribed');
+    // one click stops email from the whole business (H6), the follow stays
+    expect((await call('POST', `/v1/public/subscription/${token}`, undefined, 'List-Unsubscribe=One-Click', { 'Content-Type': 'application/x-www-form-urlencoded' })).status).toBe(204);
+    expect(q('SELECT email_ok FROM customers WHERE id = ?', email.customer_id).email_ok).toBe(0);
+    expect(q("SELECT granted, source FROM consents WHERE customer_id = ? AND channel = 'email' ORDER BY created_at DESC, rowid DESC LIMIT 1", email.customer_id)).toEqual({ granted: 0, source: 'unsubscribe_link' });
+    expect((await call('POST', `/v1/public/subscription/${token}`, undefined, { everything: true })).status).toBe(204);
+    expect(q("SELECT count(*) n FROM customer_subscriptions WHERE customer_id = ? AND status != 'unsubscribed'", email.customer_id).n).toBe(0);
     expect((await call('GET', '/v1/public/subscription/forged.token')).status).toBe(404);
   });
   it('pushes during quiet hours wait until morning, and cancel stops them', async () => {

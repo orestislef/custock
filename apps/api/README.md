@@ -12,14 +12,19 @@ pnpm dev:api           # http://localhost:8787, reloads on change
 
 If the database file does not exist, `pnpm dev:api` creates and seeds it.
 
-Environment, all optional in dev:
+Environment:
 
 | var | default | what |
 |-----|---------|------|
+| `CUSTOCK_DEV` | off | `1` turns on dev features: dev codes in responses, `/v1/dev/*`, the bot check stand in, the dev secret. `pnpm dev:api` passes `--dev`, which does the same |
+| `CUSTOCK_JWT_SECRET` | none | required outside dev, a random value of 32 characters or more. the server refuses to start without it |
+| `CUSTOCK_UNSUB_SECRET` | derived from the jwt secret | key for unsubscribe links |
+| `CUSTOCK_TURNSTILE_SECRET` | none | bot check secret for join pages. outside dev, public signups are refused without it |
+| `CUSTOCK_TRUSTED_PROXY` | off | `1` when the api sits behind our own reverse proxy: the rightmost `X-Forwarded-For` hop is the client. otherwise the socket address is used |
+| `CUSTOCK_SEED` | off | `1` seeds the made up Lemoni business into a new database. dev always does |
 | `PORT` | 8787 | |
 | `CUSTOCK_DB` | `apps/api/data/custock.db` | sqlite file |
-| `CUSTOCK_JWT_SECRET` | a dev value | required when `NODE_ENV=production` |
-| `CUSTOCK_PUBLIC_WEB_URL` | `http://localhost:3000` | base for join links, confirm, invite and unsubscribe links |
+| `CUSTOCK_PUBLIC_WEB_URL` | `http://localhost:3000` | base for join, confirm, invite and unsubscribe links |
 | `CUSTOCK_CORS` | localhost 3000, 8081, 19006 | allowed origins |
 | `CUSTOCK_WORKER` | on | `0` turns the job loop off |
 
@@ -39,7 +44,7 @@ Password for all of them: `custock`.
 | anna@example.com | customer, follows Lemoni |
 
 Customers can also sign in with a one time code: `POST /v1/auth/otp/request` returns `devCode` in
-dev. Nothing is ever sent. Every email, push and sms lands in the `dev_outbox` table instead, and
+dev. Outside dev, codes only sign in customer accounts (users without a password). Nothing is ever sent. Every email, push and sms lands in the `dev_outbox` table instead, and
 owners and admins can read it at `GET /v1/dev/outbox`.
 
 ## test
@@ -81,10 +86,13 @@ Write:
 - team: `POST /invites`, `POST /invites/{id}/revoke`, `POST /v1/invites/accept`, `POST /members/{m}/assignments`, `DELETE /members/{m}/assignments/{a}`, `PATCH /members/{m}`, `POST /roles`
 - customer app: `POST /c/join/{code}`, `POST /c/follow`, `POST /c/unfollow`, `PUT /c/channels`, `POST /c/alerts`, `DELETE /c/alerts/{id}`, `PUT /c/favorites/{product}`
 - public: `POST /public/join/{code}`, `POST /public/confirm`, `POST /public/subscription/{token}`
+- me: `POST /me/email`, `POST /me/email/verify` (email change with a code to the new address)
+- catalog: `DELETE /variants/{v}/barcodes/{id}` (sync reports it as a tombstone)
+- stock: `GET /orgs/{org}/review/negative` (movements accepted offline below zero in strict mode, needs `stock.adjust`)
 - dev only: `GET /v1/dev/outbox`, `POST /v1/dev/run-jobs`
 
-Creates take an `Idempotency-Key` header: the same key from the same user within 24 hours returns
-the first answer. Product and post reads return an `ETag`. An edit with a stale `If-Match` gets
+Creates take an `Idempotency-Key` header: the same key from the same user on the same org, method and
+path within 24 hours returns the first answer. Product and post reads return an `ETag`. An edit with a stale `If-Match` gets
 412 `conflict`.
 
 The join page uses a stand in for the bot check: in dev it accepts no token or `dev-turnstile-ok`.
@@ -103,6 +111,14 @@ The server runs a job loop every 5 seconds. Jobs live in the `jobs` table:
   unsubscribe link and one click headers on emails. Back in stock alerts go out the same way.
 - `rollup_day`: rebuilds `daily_shop_stats` for the last three days, once a day.
 
+## limits
+
+- per ip: 20 auth calls and 120 public calls a minute.
+- per email: 5 wrong passwords in 15 minutes lock login for 15 minutes. 5 codes an hour. 5 wrong
+  codes in 15 minutes lock codes for 15 minutes. 3 join confirmations an hour per business.
+- bodies up to 1 MB, lists and free text have maximum lengths in the shared contract.
+- a 500 never says what broke, the details go to the server log with the request id.
+
 ## rules the code keeps
 
 - `/v1/orgs/{org}/*` loads the member's role assignments and builds their access with
@@ -115,4 +131,14 @@ The server runs a job loop every 5 seconds. Jobs live in the `jobs` table:
 - back in stock fires only on receive, transfer in and return, once per alert. Low stock fires once
   per dip below the reorder point.
 - delegation: scope, ceiling, rank, no self service, and at least one owner, checked on every
-  invite, assignment, member change and role edit.
+  invite, assignment, member change and role edit. a member's status is judged at every scope they
+  hold. an invite never brings back the old roles of a suspended or removed member.
+- consent belongs to the customer: a join page or a staff member only creates a pending request
+  held with the confirmation token. nothing about an existing customer changes until they click,
+  and a join never withdraws anything. one click unsubscribe stops email from the whole business.
+- contact details are not in the searchable key. callers who may see contacts can find someone by
+  the whole email or phone number, nobody can find them by a piece of it.
+- status changes (count apply, transfer send and receive, publish, approve, cancel, invite accept,
+  confirm) are one shot: the update only happens from the expected status.
+- held and queued messages are checked again when they go out: consent, following, suppression.
+- unconfirmed signups are erased after 30 days by the nightly job.
