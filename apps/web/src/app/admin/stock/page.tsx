@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import type { ProductInput } from '@custock/core';
 import { useAdmin, useShopFilter } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
-import { Empty, Group, Row, Segmented, StockBadge, Why, stockState, IconTile } from '@/components/ui/kit';
-import { Photo, Sheet, Tip, useToast } from '@/components/ui/client-kit';
+import { Empty, Group, Row, Segmented, StockBadge, stockState, IconTile } from '@/components/ui/kit';
+import { Photo, Tip, useToast } from '@/components/ui/client-kit';
+import { StockTabs } from '@/components/admin/stock-tabs';
+import { ProductPicker } from '@/components/admin/product-picker';
 import { Tally } from '@/components/ui/tally';
 import { IconBarcode, IconBell, IconPlus, IconSearch } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
@@ -28,7 +29,8 @@ function StockList() {
   const [q, setQ] = useState('');
   const [debounced, setDebounced] = useState('');
   const [filter, setFilter] = useState<Filter>((params.get('filter') as Filter) ?? 'all');
-  const [creating, setCreating] = useState(false);
+  const [resolving, setResolving] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => { const id = setTimeout(() => setDebounced(q), 180); return () => clearTimeout(id); }, [q]);
 
@@ -44,8 +46,9 @@ function StockList() {
   return (
     <Page
       title={t('stock.title')}
-      actions={can('products.create', null) ? <button type="button" className="btn btn-tinted" onClick={() => setCreating(true)}><IconPlus size={18} />{t('stock.newProduct')}</button> : null}
+      actions={can('products.create', null) ? <Link href="/admin/stock/new" className="btn btn-tinted"><IconPlus size={18} />{t('stock.newProduct')}</Link> : null}
     >
+      <StockTabs />
       <Tip id="stock-scan">{t('stock.tipScan')}</Tip>
       <div className="flex flex-col gap-3 mb-5">
         <div className="search">
@@ -72,7 +75,8 @@ function StockList() {
       {filter === 'unknown' ? (
         <Group title={t('stock.unknownTitle')} footer={t('stock.unknownFoot')}>
           {(unknown.data ?? []).map((u) => (
-            <Row key={u.id} leading={<IconTile color="var(--c-ink-3)"><IconBarcode size={18} /></IconTile>} title={<span className="tnum">{u.code}</span>} subtitle={t('stock.unknownSub', { count: u.times, when: relative(u.scannedAt, locale) })} />
+            <Row key={u.id} leading={<IconTile color="var(--c-ink-3)"><IconBarcode size={18} /></IconTile>} title={<span className="tnum">{u.code}</span>} subtitle={t('stock.unknownSub', { count: u.times, when: relative(u.scannedAt, locale) })}
+              trailing={can('products.edit', null) ? <button type="button" className="btn btn-plain" onClick={() => setResolving(u.id)}>{t('stock.attach')}</button> : null} />
           ))}
         </Group>
       ) : list.data && list.data.items.length === 0 ? (
@@ -116,60 +120,12 @@ function StockList() {
         </section>
       )}
 
-      <NewProductSheet open={creating} onClose={() => setCreating(false)} onCreated={(id) => router.push(`/admin/stock/${id}`)} />
+      <ProductPicker open={resolving != null} title={t('stock.attachTo')} onClose={() => setResolving(null)} onPick={({ variantId }) => {
+        const id = resolving;
+        setResolving(null);
+        if (id) void api.resolveUnknownScan(org.orgId, id, variantId).then(() => { toast(t('stock.attached')); void unknown.reload(); void list.reload(); }).catch((e: { code?: string }) => toast(t(`common:error.${e.code ?? 'internal'}`)));
+      }} />
     </Page>
   );
 }
 
-function NewProductSheet({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
-  const { api, org, t, can } = useAdmin();
-  const toast = useToast();
-  const cats = useAsync(() => api.categories(org.orgId), []);
-  const [form, setForm] = useState({ name: '', price: '', barcode: '', categoryId: '' });
-  const [busy, setBusy] = useState(false);
-  const canPrice = can('products.price.edit', null);
-
-  async function save() {
-    setBusy(true);
-    try {
-      const price = Math.round(Number(form.price.replace(',', '.')) * 100);
-      const input: ProductInput = {
-        name: form.name.trim(), uom: 'piece', taxRateBp: 2400, trackStock: true,
-        ...(form.categoryId ? { categoryId: form.categoryId } : {}),
-        ...(form.barcode ? { barcode: form.barcode.trim() } : {}),
-        ...(canPrice && form.price ? { priceMinor: price } : {}),
-      };
-      const p = await api.createProduct(org.orgId, input);
-      toast(t('stock.created', { name: p.name }));
-      setForm({ name: '', price: '', barcode: '', categoryId: '' });
-      onClose();
-      onCreated(p.id);
-    } catch (e) {
-      toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Sheet open={open} onClose={onClose} title={t('stock.newProduct')}
-      footer={<button type="button" className="btn btn-primary btn-large" disabled={busy || !form.name.trim()} onClick={() => void save()}>{t('common:action.add')}</button>}>
-      <div className="list mb-3">
-        <input className="field" placeholder={t('stock.form.name')} aria-label={t('stock.form.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <label className="row-sep relative block">
-          <select className="field" aria-label={t('stock.form.category')} value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} style={{ color: form.categoryId ? 'var(--c-ink)' : 'var(--c-ink-3)' }}>
-            <option value="">{t('stock.form.category')}</option>
-            {(cats.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </label>
-        <div className="row-sep relative">
-          <input className="field tnum" inputMode="numeric" placeholder={t('stock.form.barcode')} aria-label={t('stock.form.barcode')} value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
-        </div>
-        <div className="row-sep relative">
-          <input className="field tnum" inputMode="decimal" disabled={!canPrice} placeholder={t('stock.form.price')} aria-label={t('stock.form.price')} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
-        </div>
-      </div>
-      {canPrice ? <p className="group-foot px-0">{t('stock.form.foot')}</p> : <Why>{t('common:why.setByAdmin')}</Why>}
-    </Sheet>
-  );
-}
