@@ -60,6 +60,8 @@ export function catalogRoutes(app: Hono<AppEnv>) {
     const stockShops = has(c, 'stock.view') ? shopsFor(c, 'stock.view') : [];
     const [p] = loadProducts(t, [c.req.param('id')], { withCost: has(c, 'products.cost.view'), levelShops: stockShops });
     if (!p) throw notFound('product');
+    const stamp = t.get<{ updated_at: number }>('SELECT updated_at FROM products WHERE org_id = @org AND id = @id', { id: p.id });
+    if (stamp) c.header('ETag', `W/"p-${stamp.updated_at}"`);
     return c.json(p);
   });
 
