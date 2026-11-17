@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { serverApi } from '@/lib/api-server';
 import { getT } from '@/lib/i18n-server';
 import { PublicShell } from '@/components/public/public-shell';
@@ -12,10 +13,13 @@ export default async function OffersPage({ params }: PageProps<'/s/[org]/offers'
   const { org } = await params;
   const { t, locale } = await getT();
   const { api } = await serverApi(locale);
-  const items = (await api.catalog(org).catch(() => [])).filter((p) => p.offer);
+  const all = await api.catalog(org).catch(() => null);
+  const items = (all ?? []).filter((p) => p.offer);
   // ending soonest first
   items.sort((a, b) => (a.offer?.validUntil ?? Infinity) - (b.offer?.validUntil ?? Infinity));
-  const orgName = items[0]?.orgName ?? org;
+  const joinCode = process.env.CUSTOCK_DEFAULT_JOIN_CODE ?? 'ig4m8x';
+  const join = await api.joinPage(joinCode).catch(() => null);
+  const orgName = items[0]?.orgName ?? join?.orgName ?? org.charAt(0).toUpperCase() + org.slice(1);
 
   return (
     <PublicShell orgName={orgName} t={t} back={{ href: `/s/${org}`, label: t('catalog.title') }}>
@@ -24,7 +28,8 @@ export default async function OffersPage({ params }: PageProps<'/s/[org]/offers'
       {items.length ? (
         <CatalogGrid items={items} t={t} locale={locale} hrefFor={(p) => `/s/${org}/p/${p.id}`} />
       ) : (
-        <Empty icon={<IconTag size={40} />} title={t('offers.emptyTitle')} body={t('offers.emptyBody')} />
+        <Empty icon={<IconTag size={40} />} title={all ? t('offers.emptyTitle') : t('catalog.followersTitle', { org: orgName })} body={all ? t('offers.emptyBody') : t('catalog.followersBody')}
+          action={join ? <Link href={`/j/${joinCode}`} className="btn btn-primary">{t('offers.join', { org: orgName })}</Link> : undefined} />
       )}
     </PublicShell>
   );

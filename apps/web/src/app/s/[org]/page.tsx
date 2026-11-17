@@ -16,12 +16,16 @@ export default async function CatalogPage({ params, searchParams }: PageProps<'/
   const { t, locale } = await getT();
   const { api } = await serverApi(locale);
   const items = await api.catalog(org, q ? { q } : undefined).catch(() => null);
-  const orgName = items?.[0]?.orgName ?? org.charAt(0).toUpperCase() + org.slice(1);
+  // the business name and its join link come from the business wide join page
+  const joinCode = process.env.CUSTOCK_DEFAULT_JOIN_CODE ?? 'ig4m8x';
+  const join = await api.joinPage(joinCode).catch(() => null);
+  const orgName = items?.[0]?.orgName ?? join?.orgName ?? org.charAt(0).toUpperCase() + org.slice(1);
 
   if (!items) {
     return (
       <PublicShell orgName={orgName} t={t}>
-        <Empty icon={<IconBox size={40} />} title={t('catalog.closedTitle')} body={t('catalog.closedBody', { org: orgName })} />
+        <Empty icon={<IconBox size={40} />} title={t('catalog.followersTitle', { org: orgName })} body={t('catalog.followersBody')}
+          action={join ? <Link href={`/j/${joinCode}`} className="btn btn-primary">{t('catalog.joinToBrowse', { org: orgName })}</Link> : undefined} />
       </PublicShell>
     );
   }

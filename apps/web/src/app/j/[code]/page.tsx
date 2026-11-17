@@ -35,8 +35,7 @@ export default async function JoinPageRoute({ params, searchParams }: PageProps<
           <Photo src={page.imageUrl} alt={page.scopeName} className="w-full h-full" rounded={0} />
         </div>
       ) : null}
-      <p className="t-sub t-2 m-0">{page.orgName}</p>
-      <h1 className="t-large t-display m-0 mt-1">{page.scopeName}</h1>
+      <h1 className="t-large t-display m-0">{page.scopeName}</h1>
       <p className="t-body t-2 mt-3 mb-6">{t('join.lead', { scope: page.scopeName })}</p>
 
       {page.disabled ? (

@@ -20,7 +20,7 @@ export function PublicShell({ orgName, t, children, back }: { orgName: string; t
             <span className="t-headline">{orgName}</span>
           )}
           <span className="flex-1" />
-          <LocaleSwitch compact />
+          <LocaleSwitch />
         </div>
       </header>
       <main className="flex-1 mx-auto w-full max-w-[680px] px-4 pt-4 pb-10 page-in">{children}</main>

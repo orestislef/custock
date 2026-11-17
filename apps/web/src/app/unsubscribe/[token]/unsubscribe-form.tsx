@@ -24,7 +24,7 @@ export function UnsubscribeForm({ token, shop, org }: { token: string; shop: str
 
   return (
     <form action={action}>
-      <section className="group">
+      <section className="inset-group">
         <div className="list">
           {(['shop', 'org'] as const).map((s) => (
             <label key={s} className="row cursor-pointer">
@@ -34,7 +34,7 @@ export function UnsubscribeForm({ token, shop, org }: { token: string; shop: str
             </label>
           ))}
         </div>
-        <p className="group-foot">{t('unsubscribe.foot')}</p>
+        <p className="inset-group-foot">{t('unsubscribe.foot')}</p>
       </section>
       {state.status === 'error' ? <p className="t-sub mb-4" role="alert" style={{ color: 'var(--c-error)' }}>{t(`common:error.${state.error ?? 'internal'}`)}</p> : null}
       <button type="submit" className="btn btn-primary btn-large" disabled={pending}>{t('unsubscribe.button')}</button>
