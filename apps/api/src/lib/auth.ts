@@ -1,0 +1,81 @@
+// dev login provider: short access jwts, rotating refresh tokens with reuse detection.
+// the real login server replaces the issuing part, verification stays the same shape.
+
+import { SignJWT, jwtVerify } from 'jose';
+import { randomToken, sha256 } from '@custock/db';
+import { uuidv7 } from '@custock/core';
+import type { Tokens } from '@custock/core';
+import type { Config } from '../types';
+import { platform } from './tenant';
+import { unauthorized } from './problem';
+
+const ACCESS_TTL_MS = 15 * 60_000;
+const REFRESH_TTL_MS = 30 * 86_400_000;
+
+const key = (cfg: Config) => new TextEncoder().encode(cfg.jwtSecret);
+const now = (cfg: Config) => (cfg.now ? cfg.now() : Date.now());
+
+async function accessToken(cfg: Config, userId: string, sessionId: string): Promise<{ token: string; expiresAt: number }> {
+  const expiresAt = now(cfg) + ACCESS_TTL_MS;
+  const token = await new SignJWT({ sid: sessionId })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(userId)
+    .setIssuedAt(Math.floor(now(cfg) / 1000))
+    .setExpirationTime(Math.floor(expiresAt / 1000))
+    .setIssuer('custock-dev')
+    .sign(key(cfg));
+  return { token, expiresAt };
+}
+
+export async function issueTokens(cfg: Config, userId: string, opts: { familyId?: string; userAgent?: string | null } = {}): Promise<Tokens & { sessionId: string }> {
+  const db = platform(cfg.db);
+  const sessionId = uuidv7(now(cfg));
+  const refreshToken = randomToken();
+  db.run(
+    `INSERT INTO sessions (id, user_id, family_id, refresh_hash, user_agent, created_at, expires_at)
+     VALUES (@id, @user, @family, @hash, @ua, @now, @exp)`,
+    { id: sessionId, user: userId, family: opts.familyId ?? sessionId, hash: sha256(refreshToken), ua: opts.userAgent ?? null, now: now(cfg), exp: now(cfg) + REFRESH_TTL_MS },
+  );
+  const { token, expiresAt } = await accessToken(cfg, userId, sessionId);
+  return { accessToken: token, refreshToken, expiresAt, sessionId };
+}
+
+interface SessionRow {
+  id: string;
+  user_id: string;
+  family_id: string;
+  expires_at: number;
+  replaced_by: string | null;
+  revoked_at: number | null;
+}
+
+// rotation: the old token is spent. presenting a spent token again kills the whole family.
+export async function rotate(cfg: Config, refreshToken: string, userAgent?: string | null): Promise<Tokens> {
+  const db = platform(cfg.db);
+  const row = db.get<SessionRow>('SELECT id, user_id, family_id, expires_at, replaced_by, revoked_at FROM sessions WHERE refresh_hash = @h', { h: sha256(refreshToken) });
+  if (!row) throw unauthorized('unknown refresh token');
+  if (row.revoked_at || row.replaced_by) {
+    db.run('UPDATE sessions SET revoked_at = coalesce(revoked_at, @now) WHERE family_id = @f', { now: now(cfg), f: row.family_id });
+    throw unauthorized('refresh token reused, session family revoked');
+  }
+  if (row.expires_at < now(cfg)) throw unauthorized('refresh token expired');
+  const next = await issueTokens(cfg, row.user_id, { familyId: row.family_id, userAgent });
+  db.run('UPDATE sessions SET replaced_by = @next WHERE id = @id', { next: next.sessionId, id: row.id });
+  return { accessToken: next.accessToken, refreshToken: next.refreshToken, expiresAt: next.expiresAt };
+}
+
+export function revokeFamily(cfg: Config, sessionId: string) {
+  const db = platform(cfg.db);
+  const row = db.get<{ family_id: string }>('SELECT family_id FROM sessions WHERE id = @id', { id: sessionId });
+  if (row) db.run('UPDATE sessions SET revoked_at = coalesce(revoked_at, @now) WHERE family_id = @f', { now: now(cfg), f: row.family_id });
+}
+
+export async function verifyAccess(cfg: Config, token: string): Promise<{ userId: string; sessionId: string }> {
+  try {
+    const { payload } = await jwtVerify(token, key(cfg), { issuer: 'custock-dev', currentDate: new Date(now(cfg)) });
+    if (!payload.sub || typeof payload.sid !== 'string') throw new Error('bad claims');
+    return { userId: payload.sub, sessionId: payload.sid };
+  } catch {
+    throw unauthorized('invalid or expired token');
+  }
+}
