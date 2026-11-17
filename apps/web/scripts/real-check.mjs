@@ -2,6 +2,8 @@
 // opens every section, and reports console errors and failed api calls.
 //   node scripts/real-check.mjs <outDir>
 
+// start the api with CUSTOCK_DEV=1 CUSTOCK_SEED=1 first: sample logins and the dev outbox need both.
+
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,13 +13,13 @@ const base = process.env.WEB_URL ?? 'http://localhost:3000';
 mkdirSync(out, { recursive: true });
 
 const people = (process.env.PEOPLE ?? 'Maria Ioannou,Eleni Papadopoulou,Dimitris Karras,Sofia Lambrou').split(',');
-const sections = ['/admin', '/admin/stock', '/admin/customers', '/admin/posts', '/admin/posts/new', '/admin/reports', '/admin/team', '/admin/team/roles', '/admin/settings', '/admin/join-links'];
+const sections = (process.env.SECTIONS ?? '/admin,/admin/stock,/admin/stock/new,/admin/stock/counts,/admin/stock/transfers,/admin/customers,/admin/posts,/admin/posts/new,/admin/reports,/admin/team,/admin/team/roles,/admin/settings,/admin/join-links,/admin/audit,/admin/dev-outbox').split(',');
 
 const browser = await chromium.launch();
 for (const person of people) {
   const phone = process.env.VIEW === 'phone';
   const lang = process.env.LANG_CODE ?? 'en';
-  const ctx = await browser.newContext({ viewport: phone ? { width: 390, height: 844 } : { width: 1280, height: 860 }, deviceScaleFactor: phone ? 2 : 1, colorScheme: process.env.SCHEME ?? 'light', locale: lang });
+  const ctx = await browser.newContext({ viewport: phone ? { width: 390, height: 844 } : { width: 1280, height: 860 }, deviceScaleFactor: Number(process.env.DPR ?? (phone ? 2 : 1)), colorScheme: process.env.SCHEME ?? 'light', locale: lang });
   await ctx.addCookies([{ name: 'locale', value: lang, url: base }]);
   const page = await ctx.newPage();
   const problems = [];
@@ -37,7 +39,7 @@ for (const person of people) {
   }
   // open the first product and the first customer
   await page.goto(`${base}/admin/stock`, { waitUntil: 'networkidle' });
-  const firstProduct = page.locator('a[href^="/admin/stock/"]').first();
+  const firstProduct = page.locator('main .list a[href^="/admin/stock/"]').first();
   if (await firstProduct.count()) {
     await firstProduct.click();
     await page.waitForLoadState('networkidle');

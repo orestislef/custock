@@ -14,7 +14,7 @@ permissions in `me()`, the server still decides.
 ## run
 
 ```
-pnpm db:reset && pnpm dev:api                         # api on :8787
+CUSTOCK_DEV=1 CUSTOCK_SEED=1 pnpm dev:api              # api on :8787, dev tools and the demo seed on
 CUSTOCK_API_URL=http://localhost:8787 pnpm dev:web    # web on :3000, talks to the api
 pnpm dev:web                                           # or with built in sample data, no api
 ```
@@ -29,4 +29,9 @@ pnpm --filter @custock/web lint
 pnpm --filter @custock/web build
 node apps/web/scripts/shots.mjs <dir>        # screenshots, sample data mode
 node apps/web/scripts/real-check.mjs <dir>   # walks the admin as each role against the api
+node apps/web/scripts/flows.mjs <dir>        # clicks through create, receive, post, count, transfer, outbox
 ```
+
+The checks against the api expect it started with `CUSTOCK_DEV=1 CUSTOCK_SEED=1`: sample logins,
+dev confirm links and the dev outbox only exist then. Nothing is ever sent, messages land in the
+outbox.
