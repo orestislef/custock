@@ -1,69 +1,33 @@
-import Image from "next/image";
+import Link from 'next/link';
+import { getT } from '@/lib/i18n-server';
+import { serverApi } from '@/lib/api-server';
+import { Group, Row, IconTile } from '@/components/ui/kit';
+import { LocaleSwitch } from '@/components/ui/client-kit';
+import { IconBarcode, IconBox, IconGear, IconQr, IconTag } from '@/components/ui/icons';
 
-export default function Home() {
+// a small front door for local development: the admin, and the pages a customer reaches by QR
+export default async function Home() {
+  const { t, locale } = await getT();
+  const { mode } = await serverApi(locale);
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className="mx-auto max-w-[560px] px-4 pt-[calc(56px+env(safe-area-inset-top))] pb-12 page-in">
+      <div className="flex items-center justify-between mb-8">
+        <span className="badge badge-gray">{t(mode === 'real' ? 'home.modeReal' : 'home.modeFixtures')}</span>
+        <LocaleSwitch compact />
+      </div>
+      <h1 className="t-large t-display m-0">Custock</h1>
+      <p className="t-title3 t-2 mt-2 mb-8" style={{ fontWeight: 400 }}>{t('common:app.tagline')}</p>
+
+      <Group title={t('home.forTeams')}>
+        <Row href="/admin" leading={<IconTile><IconGear size={18} /></IconTile>} title={t('home.admin')} subtitle={t('home.adminSub')} />
+      </Group>
+      <Group title={t('home.forCustomers')} footer={t('home.customersFoot')}>
+        <Row href="/j/kif7q2" leading={<IconTile color="#2F5BC8"><IconQr size={18} /></IconTile>} title={t('home.join')} subtitle="/j/kif7q2" />
+        <Row href="/p/5200044170102" leading={<IconTile color="#C98A1B"><IconBarcode size={18} /></IconTile>} title={t('home.shelf')} subtitle="/p/5200044170102" />
+        <Row href="/s/lemoni" leading={<IconTile color="#5E7D3A"><IconBox size={18} /></IconTile>} title={t('home.catalog')} subtitle="/s/lemoni" />
+        <Row href="/s/lemoni/offers" leading={<IconTile color="#7B4FA0"><IconTag size={18} /></IconTile>} title={t('home.offers')} subtitle="/s/lemoni/offers" />
+      </Group>
+      <p className="t-foot t-2 text-center"><Link href="https://github.com/orestislef/custock">github.com/orestislef/custock</Link></p>
+    </main>
   );
 }
