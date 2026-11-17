@@ -2,13 +2,15 @@
 
 import Link from 'next/link';
 import { use, useState } from 'react';
-import type { MovementBatchResult } from '@custock/core';
+import type { MovementBatchResult, StockLevel } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { StockSheet, type StockMode } from '@/components/admin/stock-sheet';
+import { ShopSettingsSheet } from '@/components/admin/shop-settings-sheet';
+import { useRouter } from 'next/navigation';
 import { Group, Row, StockBadge, Why, stockState } from '@/components/ui/kit';
 import { Photo, useToast } from '@/components/ui/client-kit';
 import { Tally } from '@/components/ui/tally';
-import { IconBell, IconChevronLeft, IconPlus, IconEdit, IconTruck } from '@/components/ui/icons';
+import { IconBell, IconChevronLeft, IconPlus, IconEdit, IconTruck, IconGear } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { productName, variantLabel } from '@/lib/names';
 import { money, qtyNumber, relative } from '@/lib/format';
@@ -21,6 +23,9 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const history = useAsync(() => (can('stock.history.view', null) ? api.movements(org.orgId, { shopId: shopId ?? undefined, limit: 30 }) : Promise.resolve(null)), [id, shopId]);
   const [sheet, setSheet] = useState<StockMode | null>(null);
   const [told, setTold] = useState<Record<string, number>>({});
+  const [shopEdit, setShopEdit] = useState<StockLevel | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const router = useRouter();
 
   const p = product.data;
   if (!p) {
@@ -64,7 +69,8 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
           {productName(p, locale) !== p.name ? <p className="t-sub t-2 m-0 mt-1">{p.name}</p> : null}
           <div className="flex gap-2 mt-5 flex-wrap">
             {canReceive ? <button type="button" className="btn btn-primary" onClick={() => setSheet('receive')}><IconPlus size={18} />{t('product.receive')}</button> : null}
-            {canAdjust ? <button type="button" className="btn btn-gray" onClick={() => setSheet('adjust')}><IconEdit size={18} />{t('product.adjust')}</button> : null}
+            {canAdjust ? <button type="button" className="btn btn-gray" onClick={() => setSheet('adjust')}>{t('product.adjust')}</button> : null}
+            {can('products.edit', null) ? <Link href={`/admin/stock/${p.id}/edit`} className="btn btn-gray"><IconEdit size={18} />{t('common:action.edit')}</Link> : null}
           </div>
           {!canReceive && !canAdjust ? <p className="mt-3 mb-0"><Why>{t('product.readOnly')}</Why></p> : null}
         </div>
@@ -95,8 +101,13 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                       </span>
                     }
                     trailing={
-                      <span className="t-title2 t-display tnum" style={{ color: l.onHand < 0 ? 'var(--c-neg-text)' : undefined }}>
-                        <Tally value={l.onHand} format={(n) => qtyNumber(n, p.uom, locale)} />
+                      <span className="inline-flex items-center gap-1">
+                        <span className="t-title2 t-display tnum" style={{ color: l.onHand < 0 ? 'var(--c-neg-text)' : undefined }}>
+                          <Tally value={l.onHand} format={(n) => qtyNumber(n, p.uom, locale)} />
+                        </span>
+                        {can('prices.shop.edit', l.shopId) || can('stock.settings.manage', l.shopId) ? (
+                          <button type="button" className="icon-btn" style={{ color: 'var(--c-ink-3)' }} aria-label={t('shopSettings.open', { shop: shop?.name ?? '' })} onClick={() => setShopEdit(l)}><IconGear size={18} /></button>
+                        ) : null}
                       </span>
                     }
                   />
@@ -154,6 +165,22 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         </div>
       </div>
 
+      {can('products.archive', null) && !p.archivedAt ? (
+        <div className="mt-6 mb-10">
+          {archiving ? (
+            <div className="card p-4 max-w-[520px]">
+              <p className="t-sub m-0">{t('product.archiveConfirm')}</p>
+              <div className="flex gap-2 mt-3">
+                <button type="button" className="btn btn-danger" style={{ background: 'var(--c-neg-tint)' }} onClick={() => void api.archiveProduct(org.orgId, p.id).then(() => { toast(t('product.archived')); router.push('/admin/stock'); }).catch((e: { code?: string }) => toast(t(`common:error.${e.code ?? 'internal'}`)))}>{t('product.archive')}</button>
+                <button type="button" className="btn btn-gray" onClick={() => setArchiving(false)}>{t('common:action.cancel')}</button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="btn btn-danger" onClick={() => setArchiving(true)}>{t('product.archive')}</button>
+          )}
+        </div>
+      ) : null}
+      {shopEdit ? <ShopSettingsSheet product={p} level={shopEdit} onClose={() => setShopEdit(null)} onSaved={() => void product.reload()} /> : null}
       {sheet ? <StockSheet open={Boolean(sheet)} mode={sheet} product={p} onClose={() => setSheet(null)} onDone={onDone} /> : null}
     </div>
   );
