@@ -1,56 +1,85 @@
-# Welcome to your Expo app 👋
+# Custock mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The phone app. One app with two sides: **work** (owners, admins, managers, staff, viewers) and
+**my shops** (customers). Expo SDK 58, React Native 0.88, expo-router with native tabs, so the tab
+bar, sheets and large titles are the real platform ones.
 
-## Get started
+<table>
+  <tr>
+    <td width="25%"><img src="screenshots/home-manager-el-light.png" alt="Manager home in Greek"><br><sub>Manager home, Greek</sub></td>
+    <td width="25%"><img src="screenshots/stock-staff-ru-dark.png" alt="Stock list in Russian, dark"><br><sub>Stock, staff, Russian, dark</sub></td>
+    <td width="25%"><img src="screenshots/product-manager-en-light.png" alt="Product with locked price"><br><sub>Product: locked price, hidden cost</sub></td>
+    <td width="25%"><img src="screenshots/receive-2-moment.png" alt="Back in stock moment"><br><sub>Receiving the honey: 14 people told</sub></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="screenshots/feed-anna-ru-light.png" alt="Customer feed in Russian"><br><sub>Customer feed, Russian</sub></td>
+    <td width="25%"><img src="screenshots/offers-anna-el-dark.png" alt="Offers in Greek, dark"><br><sub>Offers with the 30 day "was" price</sub></td>
+    <td width="25%"><img src="screenshots/catalog-product-anna-en-light.png" alt="Customer product page"><br><sub>Availability per shop, as the merchant allows</sub></td>
+    <td width="25%"><img src="screenshots/count-1-lines.png" alt="Stock count"><br><sub>Counting, sent to the manager for review</sub></td>
+  </tr>
+</table>
 
-1. Install dependencies
+Screenshots are from the web build at phone size. On a phone the tab bar sits at the bottom and is
+the system one.
 
-   ```bash
-   npm install
-   ```
+## run it
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+pnpm install                      # from the repo root
+pnpm dev:mobile                   # expo dev server, scan the QR with Expo Go or a dev build
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+Without an API url the app runs on built in demo data (`src/lib/fixtures.ts`): Lemoni, a deli
+with three shops, with the same permission rules as the server. The sign in screen lists the demo
+accounts. To use the real API:
 
-### Other setup steps
+```
+EXPO_PUBLIC_API_URL=http://<your-ip>:8787 pnpm dev:mobile
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+For screenshots and quick checks on the web build, `/sign-in?as=maria&lang=el&next=/stock` signs
+in as a demo account, sets the language and opens a screen.
 
-## Learn more
+## what is where
 
-To learn more about developing your project with Expo, look at the following resources:
+```
+src/app/(work)/      tabs for members: home, stock, customers, posts, more, and scan
+src/app/(shopper)/   tabs for customers: feed, offers, catalog, shops, profile
+src/app/sheet/       short tasks as sheets: adjust stock, new product, invite, language
+src/lib/             api (real client or demo data), session and permissions, i18n, push, formats
+src/ui/              list sections and rows, buttons, the tally number, stock badges, the back in stock moment
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Every string comes from `packages/i18n` (namespaces `common` and `mobile`) in English, Greek and
+Russian. Permissions come from `/v1/me/context` and are checked with `can()` from `packages/core`.
 
-## Join the community
+## checks
 
-Join our community of developers creating universal apps.
+```
+pnpm --filter @custock/mobile typecheck
+pnpm --filter @custock/mobile lint
+pnpm --filter @custock/mobile test       # the demo data follows the server rules
+npx expo export --platform web       # bundles, from apps/mobile
+npx expo export --platform android
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## builds
+
+Local only. No CI/CD and no cloud builds. `npx expo prebuild` writes the native folders (they are
+not committed), then build with Gradle or Xcode on the machine, or `npx expo run:android`. iOS
+builds need a Mac.
+
+On Windows the Android debug build currently stops in the C++ step of `react-native-worklets`:
+the build folder path plus the source path go over the 260 character limit (`ninja: error: mkdir
+... No such file or directory`). Two ways out: turn on long paths in Windows (needs admin), or
+clone the repo to a short folder like `C:\cs\custock`. Gradle itself runs fine with the JDK that
+ships with Android Studio.
+
+## not done yet
+
+- transfers have no screen on the phone yet. the push for "on the way" lands on home.
+- push registration asks for permission after an explanation screen; sending a real push needs the
+  FCM setup on the server.
+- offline outbox (phase 5 in the roadmap) is not built.
+- checked against the real api on a spare port: sign in, stock, product, customers, posts, the
+  customer feed, offers and catalog all load. product names come in the business language there.
