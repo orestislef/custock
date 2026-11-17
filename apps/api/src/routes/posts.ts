@@ -40,6 +40,8 @@ export function postRoutes(app: Hono<AppEnv>) {
     if (!visibleIds(c).includes(id)) throw notFound('post');
     const [post] = loadPosts(orgOf(c).t, [id], { withStats: true, showPrices: true });
     if (!post) throw notFound('post');
+    const stamp = orgOf(c).t.get<{ updated_at: number }>('SELECT updated_at FROM posts WHERE org_id = @org AND id = @id', { id });
+    if (stamp) c.header('ETag', `W/"post-${stamp.updated_at}"`);
     return c.json(post);
   });
 }
