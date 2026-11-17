@@ -1,19 +1,77 @@
 {
-  "updated": "2026-11-17T18:00:00+02:00",
-  "overall": 22,
+  "updated": "2026-11-17T18:45:00+02:00",
+  "overall": 30,
   "areas": [
-    { "key": "thinking", "name": "Thinking (18 planning docs)", "percent": 100, "state": "done", "note": "Vision, roles, permissions, data model, stock, customers, auth, platform, design, languages, reports, stack, api, edge cases, ideas, roadmap, open questions." },
-    { "key": "demo", "name": "Clickable demo (GitHub Pages)", "percent": 60, "state": "building", "note": "Static HTML demo with made up data. Roles, languages, scanning, back in stock, posts and push banners." },
-    { "key": "setup", "name": "Monorepo and tooling", "percent": 100, "state": "done", "note": "pnpm workspace, TypeScript, local check script. No CI/CD." },
-    { "key": "shared", "name": "Shared packages (contract, tokens, translations)", "percent": 70, "state": "building", "note": "API contract and client interface, design tokens, en/el/ru common translations with tested plurals." },
-    { "key": "backend", "name": "Backend (permissions engine, database, API)", "percent": 5, "state": "building", "note": "Permissions and delegation rules, search and barcode normalisation, SQLite schema and seed, Hono API with tests." },
-    { "key": "web", "name": "Web (customer pages and admin)", "percent": 3, "state": "building", "note": "Next.js: join page, shelf product page, public catalog, admin dashboard, stock, customers, posts, team, reports." },
-    { "key": "mobile", "name": "Phone app (Expo)", "percent": 3, "state": "building", "note": "Staff side with scanning and the customer side with feed, offers and catalog." }
+    {
+      "key": "thinking",
+      "name": "Thinking (18 planning docs)",
+      "percent": 100,
+      "state": "done",
+      "note": "Vision, roles, permissions, data model, stock, customers, auth, platform, design, languages, reports, stack, api, edge cases, ideas, roadmap, open questions."
+    },
+    {
+      "key": "demo",
+      "name": "Clickable demo (GitHub Pages)",
+      "percent": 75,
+      "state": "building",
+      "note": "Live. Roles, languages, search in greek, greeklish and russian, scanning, back in stock moment, posts with push banners, customer feed, offers and catalog. Next: team and roles, reports, counts, transfers, lock screen, customer join flow."
+    },
+    {
+      "key": "setup",
+      "name": "Monorepo and tooling",
+      "percent": 100,
+      "state": "done",
+      "note": "pnpm workspace, TypeScript, local check script. No CI/CD."
+    },
+    {
+      "key": "shared",
+      "name": "Shared packages (contract, tokens, translations)",
+      "percent": 80,
+      "state": "building",
+      "note": "API contract and client interface, design tokens, en/el/ru common translations with tested plurals."
+    },
+    {
+      "key": "backend",
+      "name": "Backend (permissions engine, database, API)",
+      "percent": 15,
+      "state": "building",
+      "note": "Permissions and delegation rules, search and barcode normalisation, SQLite schema and seed, Hono API with tests."
+    },
+    {
+      "key": "web",
+      "name": "Web (customer pages and admin)",
+      "percent": 3,
+      "state": "building",
+      "note": "Next.js: join page, shelf product page, public catalog, admin dashboard, stock, customers, posts, team, reports."
+    },
+    {
+      "key": "mobile",
+      "name": "Phone app (Expo)",
+      "percent": 3,
+      "state": "building",
+      "note": "Staff side with scanning and the customer side with feed, offers and catalog."
+    }
   ],
   "log": [
-    { "at": "2026-11-17T16:45:00+02:00", "text": "Repo created, thinking started." },
-    { "at": "2026-11-17T17:20:00+02:00", "text": "All 18 thinking docs written. Repo public, GitHub Pages on." },
-    { "at": "2026-11-17T17:45:00+02:00", "text": "Monorepo set up: Expo SDK 58, Next.js 16, Hono, SQLite. Shared contract, tokens and translations in place." },
-    { "at": "2026-11-17T18:00:00+02:00", "text": "Backend, web and phone app being built in parallel." }
+    {
+      "at": "2026-11-17T16:45:00+02:00",
+      "text": "Repo created, thinking started."
+    },
+    {
+      "at": "2026-11-17T17:20:00+02:00",
+      "text": "All 18 thinking docs written. Repo public, GitHub Pages on."
+    },
+    {
+      "at": "2026-11-17T17:45:00+02:00",
+      "text": "Monorepo set up: Expo SDK 58, Next.js 16, Hono, SQLite. Shared contract, tokens and translations in place."
+    },
+    {
+      "at": "2026-11-17T18:00:00+02:00",
+      "text": "Backend, web and phone app being built in parallel."
+    },
+    {
+      "at": "2026-11-17T18:45:00+02:00",
+      "text": "Demo stage 1 is live on GitHub Pages. Stage 2 started."
+    }
   ]
 }
