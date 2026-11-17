@@ -54,6 +54,20 @@
     return f.format(Math.round(diff / D), 'day');
   }
 
+  /* the desktop phone frame keeps its real size and scales as one piece */
+  let SCALE = 1;
+  const scale = () => SCALE;
+  function fitDevice() {
+    const dev = document.querySelector('.device');
+    if (!dev) return;
+    if (window.innerWidth <= 600) { SCALE = 1; dev.style.transform = ''; dev.style.marginBottom = ''; return; }
+    SCALE = Math.max(0.62, Math.min(1, (window.innerHeight - 74) / 852));
+    dev.style.transform = SCALE < 1 ? 'scale(' + SCALE + ')' : '';
+    dev.style.marginBottom = SCALE < 1 ? (852 * SCALE - 852) + 'px' : '';
+  }
+  window.addEventListener('resize', fitDevice);
+  function cover() { const r = S.tab && S.stacks[S.tab] ? cur() : null; document.body.classList.toggle('covered', !!(SHEET || TOAST || document.getElementById('lock') || (r && r.modal))); }
+
   /* ---------------- icons (own set, 24 grid, round caps) ---------------- */
   const IC = {
     home: '<path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v10.5H10V14h4v5.5h4.5V9"/>',
@@ -86,7 +100,8 @@
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.7v.1"/>',
     alert: '<path d="M10.3 4.2 2.8 17.5a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0Z"/><path d="M12 9.5v4.5M12 17.2v.1"/>',
     out: '<circle cx="12" cy="12" r="8.5"/><path d="m6 18 12-12"/>',
-    few: '<rect x="3" y="7.5" width="16" height="9" rx="2.2"/><path d="M21.5 10.5v3M6.5 10.5v3"/>',
+    few: '<circle cx="12" cy="12" r="8.5"/><path class="f" d="M12 3.5a8.5 8.5 0 0 0 0 17Z"/>',
+    more: '<circle cx="12" cy="12" r="8.5"/><circle class="f" cx="8" cy="12" r="1.25"/><circle class="f" cx="12" cy="12" r="1.25"/><circle class="f" cx="16" cy="12" r="1.25"/>',
     neg: '<circle cx="12" cy="12" r="8.5"/><path d="M8 12h8"/>',
     bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
     heart: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z"/>',
@@ -153,7 +168,7 @@
     return L(shopById(sc.id).name);
   }
   function initials(name) { return String(name).split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w.charAt(0).toUpperCase()).join(''); }
-  function avatar(name, cls) { return '<span class="avatar ' + (cls || '') + '" style="background:var(--tile-' + (1 + hash(name) % 6) + ')" aria-hidden="true">' + esc(initials(name)) + '</span>'; }
+  function avatar(name, cls) { return '<span class="avatar ' + (cls || '') + '" style="background:var(--tile-' + (2 + hash(name) % 5) + ')" aria-hidden="true">' + esc(initials(name)) + '</span>'; }
   function personName(id) { if (id === 'anna') return 'Anna Sokolova'; const m = memberById(id); return m ? m.name : id; }
   function firstName(id) { return personName(id).split(' ')[0]; }
   function maskEmail(e) { const p = e.split('@'); return p[0].slice(0, 2) + '***@' + p[1]; }
@@ -335,7 +350,7 @@
       void inner.offsetWidth;
       strips.forEach((s, j) => {
         s.style.transition = '';
-        s.style.transitionDelay = ((strips.length - 1 - j) * 45 + i * 20) + 'ms';
+        s.style.transitionDelay = ((strips.length - 1 - j) * 25 + Math.min(i, 4) * 15) + 'ms';
         s.style.transform = 'translateY(-' + s.dataset.to + 'em)';
       });
     });
@@ -351,7 +366,6 @@
   ];
   const CUST_TABS = [
     { id: 'c-home', icon: 'home', label: 'tab.feed' },
-    { id: 'c-offers', icon: 'tag', label: 'tab.offers' },
     { id: 'c-catalog', icon: 'grid', label: 'tab.catalog' },
     { id: 'c-shops', icon: 'store', label: 'tab.shops' },
     { id: 'c-profile', icon: 'user', label: 'tab.profile' }
@@ -371,25 +385,28 @@
     const large = spec.large !== false && !!spec.title;
     let left = spec.left || '';
     if (!left && prev) {
-      const pt = prev.title && prev.title.length <= 13 ? prev.title : t('nav.back');
-      left = '<button class="navbtn back" data-act="back" aria-label="' + T('nav.back') + '">' + ic('chev-left') + '<span>' + esc(pt) + '</span></button>';
+      const pt = prev.title && prev.title.length <= 9 ? prev.title : '';
+      left = '<button class="navbtn back" data-act="back" aria-label="' + T('nav.back') + (pt ? ', ' + esc(pt) : '') + '">' + ic('chev-left') + (pt ? '<span>' + esc(pt) + '</span>' : '') + '</button>';
     }
     const el = document.createElement('section');
     el.className = 'screen ' + (spec.cls || '');
     el.dataset.route = route.name;
     el.innerHTML = '<div class="body">' + (large ? '<h1 class="ltitle t-large">' + esc(spec.title) + '</h1>' : '') + spec.body + '</div>' +
-      '<header class="nav' + (spec.solid ? ' solid' : '') + (large ? '' : ' always') + (spec.navCls ? ' ' + spec.navCls : '') + '"><div class="nav-left">' + left + '</div><div class="nav-title">' + esc(spec.navTitle || spec.title || '') + '</div><div class="nav-right">' + (spec.right || '') + '</div></header>';
+      '<header class="nav' + (spec.solid ? ' solid' : '') + (large || spec.anchor ? '' : ' always') + (spec.navCls ? ' ' + spec.navCls : '') + '"><div class="nav-left">' + left + '</div><div class="nav-title">' + esc(spec.navTitle || spec.title || '') + '</div><div class="nav-right">' + (spec.right || '') + '</div></header>';
     el._spec = spec;
     el._large = large;
     return el;
   }
   function afterRender(el, route) {
     const body = $('.body', el), nav = $('.nav', el);
-    const lim = el._large ? 38 : 4;
+    let lim = el._large ? 38 : 4;
+    if (el._spec.anchor) { const a = $(el._spec.anchor, el); if (a) lim = Math.max(4, a.offsetTop + a.offsetHeight - nav.offsetHeight); }
     const onScroll = () => { nav.classList.toggle('scrolled', body.scrollTop > lim); };
     body.addEventListener('scroll', onScroll, { passive: true });
     if (route.scroll) body.scrollTop = route.scroll;
     onScroll();
+    const bl = $('.navbtn.back span', el);
+    if (bl && bl.scrollWidth > bl.clientWidth + 1) bl.remove();
     if (el._spec.after) el._spec.after(el);
     syncTallies(el);
     $('#statusbar').classList.toggle('on-dark', !!el._spec.dark);
@@ -403,11 +420,14 @@
     const route = cur();
     const el = buildScreen(route);
     el._route = route;
-    if (kind === 'pop' && old) host.insertBefore(el, old); else host.appendChild(el);
+    if (kind === 'push' && route.modal) kind = 'modal-in';
+    if (kind === 'pop' && old && old._route && old._route.modal) kind = 'modal-out';
+    if ((kind === 'pop' || kind === 'modal-out') && old) host.insertBefore(el, old); else host.appendChild(el);
     afterRender(el, route);
     renderTabs();
     if (old) swap(old, el, kind);
     renderNarration();
+    cover();
   }
   function swap(old, el, kind) {
     if (kind === 'tab' || kind === 'none' || !kind) { old.remove(); return; }
@@ -415,6 +435,15 @@
     if (S.reduce || kind === 'fade') {
       el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
       old.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: 'ease-out' }).finished.then(() => old.remove()).catch(() => old.remove());
+      return;
+    }
+    if (kind === 'modal-in') {
+      el.style.boxShadow = '0 -8px 30px rgba(0,0,0,.14)';
+      el.animate([{ transform: 'translateY(100%)' }, { transform: 'translateY(0)' }], { duration: 440, easing: ease }).finished.then(() => { old.remove(); el.style.boxShadow = ''; }).catch(() => old.remove());
+      return;
+    }
+    if (kind === 'modal-out') {
+      old.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(100%)' }], { duration: 380, easing: ease, fill: 'forwards' }).finished.then(() => old.remove()).catch(() => old.remove());
       return;
     }
     if (kind === 'push') {
@@ -464,6 +493,7 @@
     renderApp('fade');
   }
 
+  function recvCount() { return S.ui && S.ui.scanMode === 'receive' ? (S.ui.recvList || []).reduce((a, x) => a + x.n, 0) : 0; }
   function renderTabs() {
     const bar = $('#bottom-bar');
     const list = tabs();
@@ -473,8 +503,9 @@
       const badgeN = x.id === 'c-home' ? Dt().alerts.filter((a) => a.cid === 'c-anna' && a.status === 'notified' && !a.seen).length : 0;
       return '<button class="tab" data-act="tab" data-id="' + x.id + '"' + (on ? ' aria-current="page"' : '') + '>' + ic(on ? x.icon + '-f' : x.icon) +
         '<span class="tl">' + T(x.label) + '</span>' + (badgeN ? '<span class="tbadge">' + badgeN + '</span>' : '') + '</button>';
-    }).join('') + '</nav>' + (acc ? '<button class="accessory" data-act="tab" data-id="' + acc.id + '" aria-label="' + T(acc.label) + '"' + (S.tab === acc.id ? ' aria-current="page"' : '') + '>' + ic(acc.icon) + '</button>' : '');
+    }).join('') + '</nav>' + (acc ? '<button class="accessory" data-act="tab" data-id="' + acc.id + '" aria-label="' + T(acc.label) + '"' + (S.tab === acc.id ? ' aria-current="page"' : '') + '>' + ic(acc.icon) + (acc.id === 'scan' && recvCount() ? '<span class="abadge" aria-label="' + T('a11y.scanned', { n: recvCount() }) + '">' + tally('acc-recv', recvCount()) + '</span>' : '') + '</button>' : '');
     bar.hidden = !!(cur() && cur().modal);
+    syncTallies(bar);
   }
 
   /* ---------------- sheets ---------------- */
@@ -502,6 +533,7 @@
     syncTallies(sh);
     dragSheet(sh);
     if (o.after) o.after(sh);
+    cover();
     setTimeout(() => { const f = $('.sheet-close', sh); if (f && !o.noFocus) f.focus({ preventScroll: true }); }, 60);
   }
   function setSheetY(y, anim) {
@@ -515,7 +547,7 @@
   function closeSheet(instant) {
     if (!SHEET) return;
     const s = SHEET; SHEET = null;
-    const fin = () => { s.el.remove(); s.scrim.remove(); if (s.o.onClose) s.o.onClose(); };
+    const fin = () => { s.el.remove(); s.scrim.remove(); cover(); if (s.o.onClose) s.o.onClose(); };
     if (instant) return fin();
     s.scrim.classList.remove('show');
     if (S.reduce) { s.el.style.transition = 'opacity .2s'; s.el.style.opacity = '0'; } else { s.el.style.transition = 'transform .42s cubic-bezier(0.32, 0.72, 0, 1)'; s.el.style.transform = 'translateY(' + (s.H + 20) + 'px)'; }
@@ -530,7 +562,7 @@
       let last = y0, lt = t0, v = 0;
       z.setPointerCapture(e.pointerId);
       const mv = (ev) => {
-        const dy = ev.clientY - y0;
+        const dy = (ev.clientY - y0) / scale();
         let y = base + dy;
         if (y < 0) y = y / 4;
         const now = performance.now();
@@ -566,8 +598,9 @@
     el.classList.add('show');
     const tm = setTimeout(hideToast, o.ms || 3400);
     TOAST = { el: el, tm: tm, action: o.action };
+    cover();
   }
-  function hideToast() { if (!TOAST) return; const x = TOAST; TOAST = null; clearTimeout(x.tm); x.el.classList.remove('show'); setTimeout(() => x.el.remove(), 300); }
+  function hideToast() { if (!TOAST) return; const x = TOAST; TOAST = null; cover(); clearTimeout(x.tm); x.el.classList.remove('show'); setTimeout(() => x.el.remove(), 300); }
   ACT['toast-action'] = () => { const a = TOAST && TOAST.action; hideToast(); if (a) a(); };
 
   /* ---------------- push notifications ---------------- */
@@ -617,7 +650,7 @@
     el.addEventListener('pointerdown', (e) => {
       const y0 = e.clientY; dragged = false;
       el.setPointerCapture(e.pointerId);
-      const mv = (ev) => { const dy = Math.min(0, ev.clientY - y0); if (Math.abs(dy) > 6) dragged = true; el.style.transition = 'none'; el.style.transform = 'translateY(' + dy + 'px)'; };
+      const mv = (ev) => { const dy = Math.min(0, (ev.clientY - y0) / scale()); if (Math.abs(dy) > 6) dragged = true; el.style.transition = 'none'; el.style.transform = 'translateY(' + dy + 'px)'; };
       const up = (ev) => {
         el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up);
         el.style.transition = ''; el.style.transform = '';
@@ -645,7 +678,7 @@
   function seg(name, options, value) {
     const i = Math.max(0, options.findIndex((o) => o[0] === value));
     return '<div class="seg" role="group" style="--n:' + options.length + '"><span class="seg-thumb" style="width:calc((100% - 4px) / ' + options.length + ');transform:translateX(' + (i * 100) + '%)"></span>' +
-      options.map((o) => '<button data-act="seg" data-name="' + name + '" data-val="' + esc(o[0]) + '" aria-pressed="' + (o[0] === value) + '">' + esc(o[1]) + (o[2] || '') + '</button>').join('') + '</div>';
+      options.map((o) => '<button data-act="seg" data-name="' + name + '" data-val="' + esc(o[0]) + '" aria-pressed="' + (o[0] === value) + '"><span class="seg-l">' + esc(o[1]) + (o[2] || '') + '</span></button>').join('') + '</div>';
   }
   ACT.seg = (el) => {
     const box = el.closest('.seg');
@@ -697,8 +730,8 @@
     const pend = can('posts.publish') ? visiblePosts().filter((p) => p.status === 'pending') : [];
     const unk = Dt().unknownCodes.filter((u) => shops.indexOf(u.shop) >= 0 && can('products.create'));
     let att = '';
-    pend.forEach((p) => { att += cell({ act: 'open-post', data: { id: p.id }, lead: tileI('megaphone', 1), title: T('home.approve', { name: firstName(p.author) }), sub: esc(L(p.title)) }); });
-    if (neg.length) att += cell({ act: 'stock-filter', data: { f: 'neg' }, lead: tileI('neg', 1), title: T('home.neg', { n: neg.length }), sub: T('home.neg.sub') });
+    pend.forEach((p) => { att += cell({ act: 'open-post', data: { id: p.id }, lead: tileI('megaphone', 5), title: T('home.approve', { name: firstName(p.author) }), sub: esc(L(p.title)) }); });
+    if (neg.length) att += cell({ act: 'stock-filter', data: { f: 'neg' }, lead: tileI('neg', 5), title: T('home.neg', { n: neg.length }), sub: T('home.neg.sub') });
     unk.forEach((u) => { att += cell({ act: 'unknown-code', data: { code: u.code }, lead: tileI('scan', 4), title: T('home.unknown', { n: u.times }), sub: T('home.unknown.sub', { name: firstName(u.by), code: u.code }) }); });
     Dt().transfers.filter((x) => x.status === 'sent' && shops.indexOf(x.to) >= 0 && can('stock.transfer.receive', x.to)).forEach((x) => { att += cell({ act: 'open-transfer', data: { id: x.id }, lead: tileI('truck', 2), title: T('home.tr', { n: x.lines.reduce((a, l) => a + l.sent, 0), from: sname(x.from) }), sub: T('home.tr.sub') }); });
     Dt().counts.filter((c) => c.status === 'review' && shops.indexOf(c.shop) >= 0 && can('stock.count.approve', c.shop)).forEach((c) => { att += cell({ act: 'open-count', data: { id: c.id }, lead: tileI('count', 4), title: T('home.cnt', { shop: sname(c.shop) }), sub: T('home.cnt.sub', { name: firstName(c.submittedBy || c.by) }) }); });
@@ -706,18 +739,18 @@
     if (can('reports.view')) manage += cell({ act: 'go', data: { r: 'reports' }, lead: tileI('chart', 6), title: T('rep.title') });
     if (can('stock.count')) manage += cell({ act: 'go', data: { r: 'counts' }, lead: tileI('count', 2), title: T('cnt.title') });
     if (can('members.view')) manage += cell({ act: 'go', data: { r: 'team' }, lead: tileI('people', 3), title: T('team.title') });
-    if (canOrgWide('roles.manage')) manage += cell({ act: 'go', data: { r: 'roles' }, lead: tileI('shield', 1), title: T('roles.title') });
+    if (canOrgWide('roles.manage')) manage += cell({ act: 'go', data: { r: 'roles' }, lead: tileI('shield', 5), title: T('roles.title') });
     const staffQuick = !can('stock.adjust') && (can('stock.sell') || can('stock.receive'));
+    const row = (n, act, data, icon, title, sub) => (n ? cell({ act: act, data: data, lead: tileI(icon, 5), title: T(title), sub: T(sub), val: '<span class="c-tally">' + tally('home-' + title + '-' + S.role, n) + '</span>' }) : '');
+    const glance = row(low, 'stock-filter', { f: 'low' }, 'few', 'kpi.low', 'kpi.low.note') +
+      (can('customers.view') ? row(fresh, 'tab', { id: 'customers' }, 'people', 'kpi.new', 'kpi.new.note') : '') +
+      (can('posts.view') ? row(posts, 'tab', { id: 'posts' }, 'calendar', 'kpi.posts', 'kpi.posts.note') : '');
     return {
       title: t('home.title'),
       right: '<button class="navbtn avatar-btn" data-act="account" aria-label="' + T('a11y.account') + '">' + avatar(personName(S.role), 'md') + '</button>',
       body: shopChips() + tip('home', 'tip.home.t', 'tip.home.b') +
-        '<div class="kpis">' +
-        kpi('c1', 'few', t('kpi.low'), low, t('kpi.low.note'), 'stock-filter', 'low') +
-        kpi('c2', 'bell', t('kpi.waiting'), waiting, t('kpi.waiting.note'), 'stock-filter', 'wanted') +
-        kpi('c3', 'people', t('kpi.new'), fresh, t('kpi.new.note'), can('customers.view') ? 'tab' : '', 'customers') +
-        kpi('c4', 'calendar', t('kpi.posts'), posts, t('kpi.posts.note'), can('posts.view') ? 'tab' : '', 'posts') +
-        '</div>' +
+        (waiting ? '<button class="hero-line" data-act="stock-filter" data-f="wanted"><span class="hl-n">' + tally('home-wait-' + S.role, waiting) + '</span><span class="grow"><span class="hl-t">' + T('home.hero', { n: waiting }) + '</span><span class="hl-s">' + T('home.hero.sub') + '</span></span>' + ic('chev-right', 'chev') + '</button>' : '') +
+        (glance ? '<div class="list with-tiles">' + glance + '</div>' : '') +
         (staffQuick ? '<div class="section-h">' + T('home.quick') + '</div><div class="btn-row">' +
           (can('stock.count', actionShop()) ? '<button class="btn tinted" data-act="go" data-r="counts">' + ic('count') + T('mode.count') + '</button>' : '') +
           (can('stock.sell', actionShop()) ? '<button class="btn tinted" data-act="scan-mode" data-mode="sell">' + ic('bag') + T('mode.sell') + '</button>' : '') +
@@ -726,7 +759,7 @@
         '<div class="section-h">' + T('home.today') + '</div><div class="list with-tiles">' +
         cell({ lead: tileI('bag', 3), title: T('home.sold', { n: soldQty }), val: can('reports.financial.view') ? esc(money(soldVal)) : null, sub: can('reports.financial.view') ? '' : T('home.sold.nomoney') }) +
         cell({ lead: tileI('people', 2), title: T('home.visible', { n: custs.length }), sub: canOrgWide('customers.view') ? T('home.visible.all') : T('home.visible.some') }) +
-        '</div>' + (manage ? '<div class="section-h">' + T('home.manage') + '</div><div class="list with-tiles">' + manage + '</div>' : '') + '<p class="section-f">' + T('home.foot') + '</p>'
+        '</div>' + (manage ? '<div class="section-h">' + T('home.manage') + '</div><div class="list with-tiles">' + manage + '</div>' : '') + '<p class="section-f free">' + T('home.foot') + '</p>'
     };
   };
   ACT.go = (el) => go(el.dataset.r);
@@ -754,7 +787,7 @@
       '<div class="list with-tiles">' + cell({ lead: tileI('shield', 6), title: T('account.perms', { n: mine.length, total: all.length }), sub: T('account.perms.sub') }) +
       cell({ lead: tileI('store', 2), title: esc(Dt().org.name), sub: T('account.org') }) + '</div>' +
       '<div class="list with-tiles mt16">' + (can('members.view') ? cell({ act: 'acc-go', data: { r: 'team' }, lead: tileI('people', 3), title: T('team.title') }) : '') +
-      (canOrgWide('roles.manage') ? cell({ act: 'acc-go', data: { r: 'roles' }, lead: tileI('shield', 1), title: T('roles.title') }) : '') +
+      (canOrgWide('roles.manage') ? cell({ act: 'acc-go', data: { r: 'roles' }, lead: tileI('shield', 5), title: T('roles.title') }) : '') +
       (can('reports.view') ? cell({ act: 'acc-go', data: { r: 'reports' }, lead: tileI('chart', 6), title: T('rep.title') }) : '') +
       cell({ act: 'lock-show', lead: tileI('phone', 5), title: T('lock.title') }) + '</div>' +
       '<div class="section-h">' + T('account.can') + '</div><div class="list">' + window.CSData.PERM_GROUPS.map((g) => {
@@ -782,7 +815,7 @@
       if (f === 'wanted') return p.variants.some((v) => waitingFor(v.id, shops).length);
       return true;
     });
-    if (!list.length) return '<div class="empty"><span class="e-icon">' + ic('search') + '</span><h3>' + T('stock.empty.t') + '</h3><p>' + T('stock.empty.b') + '</p></div>';
+    if (!list.length) return '<div class="empty"><span class="e-icon">' + ic('search') + '</span><h3>' + T('stock.empty.t') + '</h3><p>' + T('stock.empty.b') + '</p><button class="btn tinted" data-act="stock-reset">' + T('stock.showall') + '</button></div>';
     const single = shops.length === 1;
     return '<div class="list with-thumbs">' + list.map((p) => {
       const total = p.variants.reduce((s, v) => s + qtyIn(v.id, shops), 0);
@@ -801,8 +834,8 @@
   SCREENS.stock = () => {
     const f = S.ui.stockFilter || 'all';
     const fs = [['all', t('f.all')], ['low', t('f.low')], ['out', t('f.out')], ['neg', t('f.neg')], ['wanted', t('f.wanted')]];
-    const navR = (can('stock.count', actionShop()) ? '<button class="navbtn" data-act="go" data-r="counts" aria-label="' + T('cnt.title') + '">' + ic('count') + '</button>' : '') +
-      (scopesWith('stock.transfer.send').some((x) => x.scope === 'shop') ? '<button class="navbtn" data-act="transfer-new" aria-label="' + T('tr.new') + '">' + ic('truck') + '</button>' : '');
+    const hasMore = can('stock.count', actionShop()) || scopesWith('stock.transfer.send').some((x) => x.scope === 'shop');
+    const navR = hasMore ? '<button class="navbtn" data-act="stock-more" aria-label="' + T('a11y.moreactions') + '">' + ic('more') + '</button>' : '';
     return {
       title: t('stock.title'), right: navR,
       body: shopChips() +
@@ -813,6 +846,13 @@
         '<p class="section-f">' + T('stock.swipe.hint') + '</p>'
     };
   };
+  ACT['stock-more'] = () => {
+    openSheet({ title: t('stock.more'), render: () => '<div class="list with-tiles">' +
+      (can('stock.count', actionShop()) ? cell({ act: 'stock-more-go', data: { r: 'counts' }, lead: tileI('count', 2), title: T('cnt.title'), sub: T('stock.more.count') }) : '') +
+      (scopesWith('stock.transfer.send').some((x) => x.scope === 'shop') ? cell({ act: 'stock-more-go', data: { r: 'transfer' }, lead: tileI('truck', 3), title: T('tr.new'), sub: T('stock.more.tr') }) : '') + '</div>' });
+  };
+  ACT['stock-more-go'] = (el) => { closeSheet(true); if (el.dataset.r === 'transfer') ACT['transfer-new'](); else go('counts'); };
+  ACT['stock-reset'] = () => { S.ui.stockQ = ''; S.ui.stockFilter = 'all'; refresh(); };
   IN['stock-q'] = (el) => { S.ui.stockQ = el.value; refreshPart('stock-list'); };
   ACT['stock-f'] = (el) => { S.ui.stockFilter = el.dataset.f; $$('[data-act="stock-f"]').forEach((b) => b.setAttribute('aria-pressed', String(b === el))); refreshPart('stock-list'); };
   ACT['open-product'] = (el) => { if (swipedRecently(el)) return; go('product', { pid: el.dataset.pid }); };
@@ -872,14 +912,14 @@
     if (can('stock.sell', ash)) acts.push('<button class="btn tinted" data-act="pd-sell" data-vid="' + v.id + '">' + ic('bag') + T('pd.sell1') + '</button>');
     if (can('stock.receive', ash)) acts.push('<button class="btn tinted" data-act="pd-receive" data-vid="' + v.id + '">' + ic('receive') + T('pd.receive') + '</button>');
     return {
-      title: pname(p), large: false,
-      body: img(p.img, pname(p), 'hero-img', '') +
+      title: pname(p), large: false, anchor: '.pd-name',
+      body: img(p.img, pname(p), 'hero-img wide', '') +
         '<div class="pd-head"><div class="muted t-foot">' + esc(catName) + ' · ' + T('pd.vat', { n: p.vat }) + '</div><h1 class="pd-name">' + esc(pname(p)) + '</h1>' + price + '</div>' +
         (p.variants.length > 1 ? '<div class="chips" style="margin-bottom:10px">' + p.variants.map((x, i) => '<button class="chip" data-act="variant" data-pid="' + p.id + '" data-i="' + i + '" aria-pressed="' + (i === vi) + '">' + esc(L(x.opt)) + '</button>').join('') + '</div>' : '') +
-        (w.length ? '<div class="row-flex" style="margin:4px 0 12px"><span class="waiting">' + ic('bell', 'sm') + T('pd.waiting', { n: w.length }) + '</span></div><p class="section-f" style="margin:-4px 4px 12px">' + T('pd.waiting.why') + '</p>' : '') +
-        (acts.length ? '<div class="btn-row" style="margin-bottom:6px">' + acts.join('') + '</div>' + (ctx() === 'all' ? '<p class="section-f">' + T('pd.actshop', { shop: sname(ash) }) + '</p>' : '') : '') +
-        '<div class="section-h">' + T('pd.stock') + '</div><div class="list">' + stockRowsH + '</div>' +
+        '<div class="list">' + stockRowsH + '</div>' +
         (hidden ? '<p class="section-f">' + T('pd.hidden.shops', { n: hidden }) + '</p>' : '') +
+        (w.length ? '<div class="row-flex" style="margin:16px 0 0"><span class="waiting">' + ic('bell', 'sm') + T('pd.waiting', { n: w.length }) + '</span></div><p class="section-f free">' + T('pd.waiting.why') + '</p>' : '') +
+        (acts.length ? '<div class="btn-row mt16">' + acts.join('') + '</div>' + (ctx() === 'all' ? '<p class="section-f free">' + T('pd.actshop', { shop: sname(ash) }) + '</p>' : '') : '') +
         (cost ? '<div class="section-h">' + T('pd.money') + '</div><div class="list">' + cost + '</div>' : '') +
         '<div class="section-h">' + T('pd.codes') + '</div><div class="list">' + v.barcodes.map((b) => cell({ title: '<span class="barcode">' + esc(b) + '</span>', sub: 'EAN-13 · SKU ' + esc(v.sku) })).join('') + '</div>' +
         (hist ? '<div class="section-h">' + T('pd.history') + '</div><div class="list with-tiles">' + (hist.length ? hist.map((m) => cell({
@@ -908,7 +948,7 @@
     else if (el.dataset.id.indexOf('cl:') === 0) { const p = el.dataset.id.split(':'); const c = Dt().counts.find((x) => x.id === p[1]); countLine(c, p[2], d); if (cur().name === 'count') refresh(); else refreshPart('scan-list'); }
     else if (el.dataset.id.indexOf('tr:') === 0) { const vid = el.dataset.id.slice(3); const v = S.ui.trn; v.lines[vid] = Math.max(0, Math.min(qty(vid, v.from), (v.lines[vid] || 0) + d)); sheetRefresh(); }
     else if (el.dataset.id.indexOf('trr:') === 0) { const p = el.dataset.id.split(':'); const tr = Dt().transfers.find((x) => x.id === p[1]); const l = tr.lines.find((x) => x.vid === p[2]); l.received = Math.max(0, Math.min(l.sent, l.received + d)); refresh(); }
-    else if (el.dataset.id.indexOf('line:') === 0) { const vid = el.dataset.id.slice(5); const l = S.ui.recvList.find((x) => x.vid === vid); if (l) { l.n = Math.max(0, l.n + d); if (!l.n) S.ui.recvList = S.ui.recvList.filter((x) => x !== l); } refreshPart('scan-list'); }
+    else if (el.dataset.id.indexOf('line:') === 0) { const vid = el.dataset.id.slice(5); const l = S.ui.recvList.find((x) => x.vid === vid); if (l) { l.n = Math.max(0, l.n + d); if (!l.n) S.ui.recvList = S.ui.recvList.filter((x) => x !== l); } refreshPart('scan-list'); renderTabs(); }
     haptic(6);
   };
   ACT['recv-confirm'] = (el) => {
@@ -922,7 +962,7 @@
   function moment(vid, shop, told) {
     const v = variant(vid), p = product(v.pid);
     const people = told.map((a) => customerById(a.cid)).filter(Boolean);
-    openSheet({ title: t('moment.title'), render: () => '<div class="moment">' + img(p.img, pname(p), 'thumb', '') +
+    openSheet({ title: t('moment.title'), render: () => '<div class="moment">' + img(p.img, pname(p), 'm-thumb', '') +
       '<div class="t-title3 mt12">' + T('moment.head', { product: vname(v), shop: sname(shop) }) + '</div>' +
       '<div class="mt12"><span class="waiting" id="m-pill">' + ic('bell', 'sm') + '<span id="m-pill-t">' + T('pd.waiting', { n: people.length }) + '</span></span></div>' +
       '<div class="m-avatars" id="m-av">' + people.map((c) => '<span title="' + esc(c.name) + '">' + avatar(c.name).replace('</span>', '<span class="ok"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></svg></span></span>') + '</span>').join('') + '</div>' +
@@ -946,10 +986,11 @@
       const ar = a.getBoundingClientRect();
       const d = document.createElement('span');
       d.className = 'flydot';
-      d.style.left = (pr.left - app.left + pr.width / 2 - 4) + 'px';
-      d.style.top = (pr.top - app.top + pr.height / 2 - 4) + 'px';
+      const k = scale();
+      d.style.left = ((pr.left - app.left + pr.width / 2) / k - 4) + 'px';
+      d.style.top = ((pr.top - app.top + pr.height / 2) / k - 4) + 'px';
       $('#overlays').appendChild(d);
-      const dx = ar.left - pr.left + ar.width / 2 - pr.width / 2, dy = ar.top - pr.top + ar.height / 2 - pr.height / 2;
+      const dx = (ar.left - pr.left + ar.width / 2 - pr.width / 2) / k, dy = (ar.top - pr.top + ar.height / 2 - pr.height / 2) / k;
       d.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: 'translate(' + dx * 0.5 + 'px,' + (dy * 0.5 - 30) + 'px) scale(1.3)', opacity: 1, offset: 0.55 }, { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(.6)', opacity: 0.2 }],
         { duration: 620, delay: i * 55, easing: 'cubic-bezier(.3,.7,.2,1)', fill: 'forwards' }).finished.then(() => { d.remove(); a.classList.add('told'); if (i % 3 === 0) tone(1200 + i * 30, 0, 0.05, 0.03); }).catch(() => d.remove());
     });
@@ -970,24 +1011,24 @@
     const mode = S.ui.scanMode;
     if (mode === 'receive') {
       const l = S.ui.recvList || [];
-      if (!l.length) return '<p class="section-f" style="margin-top:4px">' + T('scan.recv.empty') + '</p>';
+      if (!l.length) return '<p class="section-f free">' + T('scan.recv.empty') + '</p>';
       const total = l.reduce((s, x) => s + x.n, 0);
       return '<div class="list with-thumbs scanlist">' + l.map((x) => cell({ cls: 'line-' + x.vid, lead: img(product(variant(x.vid).pid).img, vname(variant(x.vid)), 'thumb', ''), title: esc(vname(variant(x.vid))), sub: T('scan.instock', { n: qty(x.vid, S.ui.scanShop || actionShop()) }), val: stepper('line:' + x.vid, x.n), chev: false })).join('') + '</div>' +
-        '<div class="mt16"><button class="btn primary block" data-act="scan-recv">' + ic('receive') + T('scan.recv.confirm', { n: total }) + '</button></div>';
+        '<div class="sticky-cta"><button class="btn primary block" data-act="scan-recv">' + ic('receive') + T('scan.recv.confirm', { n: total }) + '</button></div>';
     }
     if (mode === 'sell') {
       const l = S.ui.sold || [];
-      if (!l.length) return '<p class="section-f" style="margin-top:4px">' + T('scan.sell.empty') + '</p>';
+      if (!l.length) return '<p class="section-f free">' + T('scan.sell.empty') + '</p>';
       return '<div class="list with-thumbs scanlist">' + l.slice(0, 6).map((x) => cell({ cls: 'line-' + x.vid, lead: img(product(variant(x.vid).pid).img, vname(variant(x.vid)), 'thumb', ''), title: esc(vname(variant(x.vid))), sub: T('scan.sold.n', { n: x.n }), val: '<span class="qty">' + tally('sq-' + x.vid + '-' + x.shop, qty(x.vid, x.shop)) + '</span>', chev: false })).join('') + '</div><p class="section-f">' + T('scan.sell.note') + '</p>';
     }
     if (mode === 'count') {
       const c = openCount(S.ui.scanShop || actionShop());
-      if (!c) return '<p class="section-f" style="margin-top:4px">' + T('scan.count.empty') + '</p>';
+      if (!c) return '<p class="section-f free">' + T('scan.count.empty') + '</p>';
       const lines = Object.keys(c.lines);
-      return (lines.length ? '<div class="list with-thumbs scanlist">' + lines.map((vid) => cell({ cls: 'line-' + vid, lead: img(product(variant(vid).pid).img, vname(variant(vid)), 'thumb', ''), title: esc(vname(variant(vid))), sub: T('cnt.counted'), val: stepper('cl:' + c.id + ':' + vid, c.lines[vid].counted), chev: false })).join('') + '</div>' : '<p class="section-f" style="margin-top:4px">' + T('scan.count.go') + '</p>') +
+      return (lines.length ? '<div class="list with-thumbs scanlist">' + lines.map((vid) => cell({ cls: 'line-' + vid, lead: img(product(variant(vid).pid).img, vname(variant(vid)), 'thumb', ''), title: esc(vname(variant(vid))), sub: T('cnt.counted'), val: stepper('cl:' + c.id + ':' + vid, c.lines[vid].counted), chev: false })).join('') + '</div>' : '<p class="section-f free">' + T('scan.count.go') + '</p>') +
         '<div class="mt16"><button class="btn tinted block" data-act="open-count" data-id="' + c.id + '">' + ic('count') + T('scan.count.open', { a: lines.length, b: countScope(c).length }) + '</button></div>';
     }
-    return '<p class="section-f" style="margin-top:4px">' + T('scan.lookup.note') + '</p>';
+    return '<p class="section-f free">' + T('scan.lookup.note') + '</p>';
   }
   PARTS['scan-list'] = scanList;
   SCREENS.scan = () => {
@@ -1000,17 +1041,17 @@
       title: t('scan.title'), large: false, cls: 'scan-screen', navCls: 'on-camera', dark: true,
       body: '<div class="viewfinder" id="vf" style="background-image:url(\'' + esc(imgSrc('hero-scan', 'scan')) + '\')"><div class="vf-top">' +
         '<button class="vf-pill" data-act="scan-shop" aria-label="' + T('a11y.shop') + '">' + ic('pin', 'xs') + esc(sname(sh)) + (shops.length > 1 ? ic('chev-down', 'xs') : '') + '</button>' +
-        '<span class="vf-pill">' + ic('sparkle', 'xs') + T('scan.continuous') + '</span></div>' +
+        '<span class="vf-pill static">' + T('scan.continuous') + '</span></div>' +
         '<div class="vf-frame"><span class="vf-c tl"></span><span class="vf-c tr"></span><span class="vf-c bl"></span><span class="vf-c br"></span><span class="vf-line"></span></div>' +
         '<div class="vf-hint">' + T('scan.hint') + '</div></div>' +
-        '<div class="scan-pad">' + seg('scanmode', ms, S.ui.scanMode) + '</div>' +
+        '<div class="scan-pad">' + seg('scanmode', ms, S.ui.scanMode) + '<div class="mt12" data-part="scan-list">' + scanList() + '</div></div>' +
         '<div class="section-h">' + T('scan.shelf') + '</div>' +
         '<div class="shelf" role="list">' + items.map((v) => '<button class="shelf-item" role="listitem" data-act="scan-item" data-vid="' + v.id + '" aria-label="' + T('a11y.scanitem', { name: vname(v) }) + '">' + img(product(v.pid).img, vname(v), '', '') + '<div class="si-name">' + esc(vname(v)) + '</div></button>').join('') +
         '<button class="shelf-item" data-act="scan-unknown" aria-label="' + T('scan.unknown') + '"><div class="si-unknown">' + ic('scan') + '</div><div class="si-name">' + T('scan.unknown') + '</div></button></div>' +
-        '<div class="scan-pad">' + tip('scan', 'tip.scan.t', 'tip.scan.b') + '<div data-part="scan-list">' + scanList() + '</div></div>'
+        '<div class="scan-pad">' + tip('scan', 'tip.scan.t', 'tip.scan.b') + '</div>'
     };
   };
-  SEG.scanmode = (v) => { S.ui.scanMode = v; refreshPart('scan-list'); renderNarration(); };
+  SEG.scanmode = (v) => { S.ui.scanMode = v; refreshPart('scan-list'); renderTabs(); renderNarration(); };
   ACT['scan-shop'] = () => {
     const shops = myShops('stock.view');
     if (shops.length < 2) return;
@@ -1023,11 +1064,12 @@
     const im = srcEl.querySelector('img');
     const target = $('.line-' + vid + ' .thumb') || $('[data-part="scan-list"]');
     if (!im || !target || S.reduce) { const row = $('.line-' + vid); if (row) row.classList.add('pulse'); return; }
+    const k = scale();
     const app = $('#app').getBoundingClientRect(), a = im.getBoundingClientRect(), b = target.getBoundingClientRect();
     const f = document.createElement('img'); f.className = 'fly'; f.src = im.src; f.alt = '';
-    f.style.left = (a.left - app.left) + 'px'; f.style.top = (a.top - app.top) + 'px'; f.style.width = a.width + 'px'; f.style.height = a.height + 'px';
+    f.style.left = (a.left - app.left) / k + 'px'; f.style.top = (a.top - app.top) / k + 'px'; f.style.width = a.width / k + 'px'; f.style.height = a.height / k + 'px';
     $('#overlays').appendChild(f);
-    const dx = b.left - a.left + (b.width - a.width) / 2, dy = b.top - a.top + (b.height - a.height) / 2, sc = Math.max(0.3, b.width / a.width);
+    const dx = (b.left - a.left + (b.width - a.width) / 2) / k, dy = (b.top - a.top + (b.height - a.height) / 2) / k, sc = Math.max(0.3, b.width / a.width);
     f.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sc + ')', opacity: 0.9 }], { duration: 480, easing: 'cubic-bezier(.3,.7,.2,1)' })
       .finished.then(() => { f.remove(); const row = $('.line-' + vid); if (row) { row.classList.remove('pulse'); void row.offsetWidth; row.classList.add('pulse'); } }).catch(() => f.remove());
   }
@@ -1044,7 +1086,7 @@
       S.ui.recvList = S.ui.recvList || [];
       const l = S.ui.recvList.find((x) => x.vid === vid);
       if (l) l.n += 1; else S.ui.recvList.unshift({ vid: vid, n: 1 });
-      refreshPart('scan-list'); scanFx(el, vid); return;
+      refreshPart('scan-list'); renderTabs(); scanFx(el, vid); return;
     }
     if (mode === 'sell') {
       const res = applyMove({ vid: vid, shop: sh, delta: -1, kind: 'sale', price: (activeOffer(vid, sh) || {}).price || variant(vid).price });
@@ -1065,7 +1107,7 @@
     let told = null, total = 0;
     l.forEach((x) => { const r = applyMove({ vid: x.vid, shop: sh, delta: x.n, kind: 'receive', cost: variant(x.vid).cost }); total += x.n; if (r.told.length && !told) told = r; });
     S.ui.recvList = [];
-    refreshPart('scan-list');
+    refreshPart('scan-list'); renderTabs();
     tick();
     if (told) moment(told.m.vid, sh, told.told);
     else toast(t('toast.recv.batch', { n: total, shop: sname(sh) }), { icon: 'check' });
@@ -1112,6 +1154,7 @@
     const shops = myShops('customers.view');
     return Dt().customers.filter((c) => shops.some((s) => reaches(c, s)));
   }
+  const tagLabel = (x) => t('tag.' + x.replace(/ (\w)/g, (_, ch) => ch.toUpperCase()));
   function followLabel(c) {
     const s = c.subs.filter((x) => x.status === 'subscribed');
     if (!s.length) return t('cust.unsub');
@@ -1142,7 +1185,7 @@
   PARTS['cust-list'] = custRows;
   SCREENS.customers = () => {
     const f = S.ui.custF || 'all';
-    const fs = [['all', t('f.all')], ['new', t('f.new')], ['push', t('f.push')], ['vip', 'VIP']];
+    const fs = [['all', t('f.all')], ['new', t('f.new')], ['push', t('f.push')], ['vip', tagLabel('vip')]];
     return {
       title: t('cust.title'),
       body: '<label class="search">' + ic('search') + '<input type="search" placeholder="' + T('cust.search') + '" value="' + esc(S.ui.custQ || '') + '" data-in="cust-q" aria-label="' + T('cust.search') + '"></label>' +
@@ -1170,7 +1213,7 @@
         (full ? '' : '<p class="section-f">' + T('cust.masked.one') + '</p>') +
         '<div class="section-h">' + T('cust.follows') + '</div><div class="list">' + c.subs.map((s) => cell({ title: esc(s.scope === 'org' ? t('scope.org.long') : scopeName(s)), sub: T('sub.' + s.status) + ' · ' + esc(dt(s.at)) })).join('') + '</div>' +
         '<div class="section-h">' + T('cust.consents') + '</div><div class="list">' + (c.consents.length ? c.consents.map((k) => cell({ title: T('ch.' + k.ch) + ' · ' + (k.granted ? T('consent.yes') : T('consent.no')), sub: esc(dt(k.at, { day: 'numeric', month: 'short', year: 'numeric' })) + ' · ' + T('csrc.' + k.src) + ' · ' + esc(k.text) })).join('') : cell({ title: T('consent.none') })) + '</div><p class="section-f">' + T('cust.consents.note') + '</p>' +
-        (c.tags.length ? '<div class="section-h">' + T('cust.tags') + '</div><div class="tagrow" style="padding:0 4px">' + c.tags.map((x) => '<span class="chip static">' + esc(x) + '</span>').join('') + '</div>' : '') +
+        (c.tags.length ? '<div class="section-h">' + T('cust.tags') + '</div><div class="tagrow" style="padding:0 4px">' + c.tags.map((x) => '<span class="chip static">' + esc(tagLabel(x)) + '</span>').join('') + '</div>' : '') +
         (waits.length ? '<div class="section-h">' + T('cust.waits') + '</div><div class="list with-thumbs">' + waits.map((a) => { const v = variant(a.vid); return cell({ lead: img(product(v.pid).img, vname(v), 'thumb', ''), title: esc(vname(v)), sub: esc(a.shop ? sname(a.shop) : t('shop.any')) + ' · ' + T('alert.' + a.status) }); }).join('') + '</div>' : '') +
         (c.notes.length ? '<div class="section-h">' + T('cust.notes') + '</div><div class="list">' + c.notes.map((n) => cell({ title: esc(L(n.text)), sub: esc(firstName(n.by)) + ' · ' + esc(dt(n.at)) })).join('') + '</div>' : '')
     };
@@ -1218,7 +1261,7 @@
           cell({ title: T('post.feedviews'), val: num(p.stats.feedViews) }) +
           (p.stats.pushSent ? cell({ title: T('post.push'), val: T('post.opened', { a: p.stats.pushOpened, b: p.stats.pushSent }) }) : '') +
           (p.stats.emailSent ? cell({ title: T('post.email'), val: T('post.opened', { a: p.stats.emailOpened, b: p.stats.emailSent }) }) : '') + '</div><p class="section-f">' + T('post.opens.note') + '</p>' : '') +
-        (canApprove ? '<div class="mt24"><button class="btn primary block" data-act="approve" data-id="' + p.id + '">' + ic('send') + T('post.approve') + '</button></div><p class="section-f">' + T('post.approve.note') + '</p>' :
+        (canApprove ? '<div class="mt24"><button class="btn primary block" data-act="approve" data-id="' + p.id + '">' + ic('send') + T('post.approve') + '</button></div><p class="section-f free">' + T('post.approve.note') + '</p>' :
           p.status === 'pending' ? '<div class="mt16">' + why(T('post.waiting')) + '</div>' : '')
     };
   };
@@ -1291,6 +1334,7 @@
       if (a.capped) parts.push('<li>' + ic('info') + '<span>' + T('aud.capped', { n: a.capped, cap: s.pushCap }) + '</span></li>');
       parts.push('<li>' + ic('moon') + '<span>' + (quiet ? T('aud.quiet.now', { from: s.quietFrom + ':00', to: '0' + s.quietTo + ':00' }) : T('aud.quiet', { from: s.quietFrom + ':00', to: '0' + s.quietTo + ':00' })) + '</span></li>');
     }
+    if (c.tags.length) { const all = audience(sc, [], ch); parts.unshift('<li>' + ic('tag') + '<span>' + T('aud.tagged', { tags: c.tags.map(tagLabel).join(', '), n: a.total, of: all.total }) + '</span></li>'); }
     if (c.email && a.noEmail) parts.push('<li>' + ic('mail') + '<span>' + T('aud.noemail', { n: a.noEmail }) + '</span></li>');
     return '<div class="audience"><div class="a-total">' + tally('aud-total', a.total) + '<small>' + T('aud.people', { n: a.total }) + '</small></div><ul>' + parts.join('') + '</ul></div>';
   }
@@ -1307,7 +1351,7 @@
   PARTS['lang-tabs'] = langTabs;
   function composeProducts() {
     const c = S.compose;
-    if (!c.products.length) return '<div class="list">' + cell({ act: 'pick-products', lead: tileI('plus', 1), title: T('cmp.addproducts'), sub: T('cmp.addproducts.sub') }) + '</div>';
+    if (!c.products.length) return '<div class="list">' + cell({ act: 'pick-products', lead: tileI('plus', 5), title: T('cmp.addproducts'), sub: T('cmp.addproducts.sub') }) + '</div>';
     return '<div class="list with-thumbs">' + c.products.map((x) => {
       const v = variant(x.vid), p = product(v.pid);
       const was = wasPrice(v.id, Date.now());
@@ -1315,7 +1359,7 @@
         (c.kind === 'offer' ? T('cmp.was', { price: money(was) }) + (was !== v.price ? ' ' + T('cmp.was.lower', { now: money(v.price) }) : '') : esc(money(v.price))) + '</span></span>' +
         (c.kind === 'offer' ? '<span class="offer-row"><input inputmode="decimal" aria-label="' + T('cmp.offerprice') + '" data-in="offer-price" data-vid="' + v.id + '" value="' + (x.offer != null ? (x.offer / 100).toFixed(2) : '') + '" placeholder="' + T('cmp.offer.ph') + '"></span>' : '') +
         '<button class="iconbtn" style="width:36px;height:36px;margin-left:4px" data-act="cmp-rm" data-vid="' + v.id + '" aria-label="' + T('a11y.remove') + '">' + ic('x', 'sm') + '</button></div>';
-    }).join('') + cell({ act: 'pick-products', lead: tileI('plus', 1), title: T('cmp.addmore') }) + '</div>' + (c.kind === 'offer' ? '<p class="section-f">' + T('cmp.omnibus') + '</p>' : '');
+    }).join('') + cell({ act: 'pick-products', lead: tileI('plus', 5), title: T('cmp.addmore') }) + '</div>' + (c.kind === 'offer' ? '<p class="section-f">' + T('cmp.omnibus') + '</p>' : '');
   }
   PARTS['cmp-products'] = composeProducts;
   SCREENS.compose = () => {
@@ -1329,7 +1373,7 @@
       title: t('cmp.title'), large: false, solid: true, modal: true,
       left: '<button class="navbtn" data-act="cmp-cancel">' + T('cancel') + '</button>',
       right: '<button class="navbtn strong" data-act="cmp-send">' + (publish ? (c.when === 'now' ? T('cmp.publish') : T('cmp.schedule')) : T('cmp.submit')) + '</button>',
-      body: '<div style="margin-top:8px">' + seg('ckind', kinds, c.kind) + '</div>' +
+      body: '<div class="list" style="margin-top:8px">' + cell({ act: 'cmp-kind', title: T('cmp.kind'), val: esc(t('kind.' + c.kind)) }) + '</div>' +
         '<div class="section-h">' + T('cmp.text') + '<button class="linkbtn" data-act="cmp-example">' + T('cmp.example') + '</button></div>' +
         '<div class="lang-tabs" data-part="lang-tabs">' + langTabs() + '</div>' +
         '<div class="list"><div class="input-cell"><input style="text-align:left" data-in="cmp-title" placeholder="' + T('cmp.title.ph') + '" value="' + esc(c.title[c.lang]) + '" aria-label="' + T('cmp.title.ph') + '"></div>' +
@@ -1338,19 +1382,29 @@
         '<div class="section-h">' + T('cmp.products') + '</div><div data-part="cmp-products">' + composeProducts() + '</div>' +
         '<div class="section-h">' + T('cmp.who') + '</div>' +
         '<div class="chips" style="margin-bottom:8px">' + scopes.map((s) => '<button class="chip" data-act="cmp-scope" data-k="' + skey(s) + '" aria-pressed="' + (c.scopes.indexOf(skey(s)) >= 0) + '">' + esc(s.scope === 'org' ? t('scope.org.short') : scopeName(s)) + '</button>').join('') + '</div>' +
-        '<div class="chips" style="margin-bottom:12px">' + tagsAll.map((x) => '<button class="chip" data-act="cmp-tag" data-k="' + esc(x) + '" aria-pressed="' + (c.tags.indexOf(x) >= 0) + '">' + ic('tag', 'xs') + esc(x) + '</button>').join('') + '</div>' +
+        '<div class="section-h">' + T('cmp.tagged') + '</div><div class="chips" style="margin-bottom:12px">' + tagsAll.map((x) => '<button class="chip" data-act="cmp-tag" data-k="' + esc(x) + '" aria-pressed="' + (c.tags.indexOf(x) >= 0) + '">' + ic('tag', 'xs') + esc(tagLabel(x)) + '</button>').join('') + '</div>' +
         '<div data-part="audience">' + audienceHtml() + '</div>' +
         '<div class="section-h">' + T('cmp.channels') + '</div><div class="list with-tiles">' +
         cell({ lead: tileI('home', 5), title: T('ch.feed'), sub: T('cmp.feed.sub'), val: sw('noop', true, true, t('ch.feed')) }) +
-        cell({ lead: tileI('bell', 1), title: T('ch.push'), sub: can('posts.channel.push') ? T('cmp.push.sub') : '<span class="lock-note">' + ic('lock') + T('cmp.locked') + '</span>', val: sw('cmp-push', c.push, !can('posts.channel.push'), t('ch.push')) }) +
+        cell({ lead: tileI('bell', 5), title: T('ch.push'), sub: can('posts.channel.push') ? T('cmp.push.sub') : '<span class="lock-note">' + ic('lock') + T('cmp.locked') + '</span>', val: sw('cmp-push', c.push, !can('posts.channel.push'), t('ch.push')) }) +
         cell({ lead: tileI('mail', 2), title: T('ch.email'), sub: can('posts.channel.email') ? T('cmp.email.sub') : '<span class="lock-note">' + ic('lock') + T('cmp.locked') + '</span>', val: sw('cmp-email', c.email, !can('posts.channel.email'), t('ch.email')) }) + '</div>' +
         '<div class="section-h">' + T('cmp.when') + '</div>' + seg('cwhen', [['now', t('cmp.now')], ['tomorrow', t('cmp.tomorrow')]], c.when) +
-        (publish ? '' : '<div class="mt12">' + why(T('cmp.needs.approval')) + '</div>') +
-        '<div class="mt24"><button class="btn primary block" data-act="cmp-send">' + ic('send') + (publish ? (c.when === 'now' ? T('cmp.publish') : T('cmp.schedule')) : T('cmp.submit')) + '</button></div>'
+        (publish ? '' : '<div class="mt12">' + why(T('cmp.needs.approval')) + '</div>')
     };
   };
   ACT.compose = () => { S.compose = newCompose(); go('compose'); };
-  ACT['cmp-cancel'] = () => { S.compose = null; back(); };
+  ACT['cmp-cancel'] = () => {
+    const c = S.compose;
+    const dirty = c && (['en', 'el', 'ru'].some((l) => c.title[l] || c.body[l]) || c.products.length);
+    if (!dirty) { S.compose = null; back(); return; }
+    openSheet({ title: t('cmp.discard.t'), render: () => '<p class="section-f" style="text-align:center;margin:4px 0 16px">' + T('cmp.discard.b') + '</p><button class="btn danger block" data-act="cmp-discard">' + T('cmp.discard') + '</button><div class="mt8"><button class="btn gray block" data-act="sheet-close">' + T('cmp.keep') + '</button></div>' });
+  };
+  ACT['cmp-discard'] = () => { closeSheet(true); S.compose = null; back(); };
+  ACT['cmp-kind'] = () => {
+    const kinds = ['news', 'offer', 'new_arrival', 'event'];
+    openSheet({ title: t('cmp.kind'), render: () => '<div class="list">' + kinds.map((k) => cell({ act: 'cmp-kind-set', data: { k: k }, title: T('kind.' + k), val: S.compose.kind === k ? '<span style="color:var(--accent-text)">' + ic('check') + '</span>' : '', chev: false })).join('') + '</div>' });
+  };
+  ACT['cmp-kind-set'] = (el) => { S.compose.kind = el.dataset.k; closeSheet(); refresh(); };
   SEG.ckind = (v) => { S.compose.kind = v; refreshPart('cmp-products'); };
   SEG.clang = (v) => { S.compose.lang = v; const c = S.compose; const ti = $('[data-in="cmp-title"]'), bo = $('[data-in="cmp-body"]'); if (ti) ti.value = c.title[v]; if (bo) bo.value = c.body[v]; };
   SEG.cwhen = (v) => { S.compose.when = v; refresh(); };
@@ -1440,26 +1494,28 @@
       .concat(Dt().otherOrgs.flatMap((o) => o.posts.map((p) => ({ at: p.sentAt, html: custPostCard(p, o) }))))
       .sort((a, b) => b.at - a.at);
     notified.forEach((a) => { a.seen = true; });
+    const f = S.ui.cFeed || 'all';
+    if (f === 'offers') {
+      const offers = annaPosts().filter((p) => p.kind === 'offer' && p.validUntil > Date.now());
+      return {
+        title: t('c.home.title'),
+        body: '<div style="margin-bottom:14px">' + seg('cfeed', [['all', t('c.feed.all')], ['offers', t('c.feed.offers')]], f) + '</div>' +
+          (offers.length ? offers.map((p) => custPostCard(p, null)).join('') + '<p class="section-f free">' + T(Dt().org.settings.prices ? 'c.omnibus' : 'c.noprices') + '</p>' :
+            '<div class="empty"><span class="e-icon">' + ic('tag') + '</span><h3>' + T('c.offers.empty.t') + '</h3><p>' + T('c.offers.empty.b') + '</p></div>')
+      };
+    }
     return {
       title: t('c.home.title'),
-      body: tip('c-home', 'tip.chome.t', 'tip.chome.b') +
+      body: '<div style="margin-bottom:14px">' + seg('cfeed', [['all', t('c.feed.all')], ['offers', t('c.feed.offers')]], f) + '</div>' + tip('c-home', 'tip.chome.t', 'tip.chome.b') +
         notified.map((a) => { const v = variant(a.vid), p = product(v.pid); return '<button class="card row-flex" style="width:100%;border:0;text-align:left;margin-bottom:14px;gap:12px;color:inherit" data-act="c-open-product" data-pid="' + p.id + '">' + img(p.img, pname(p), 'thumb', '') + '<span class="grow"><span class="badge ok">' + ic('check', 'xs') + T('c.back') + '</span><span class="t-headline" style="display:block;margin-top:4px">' + esc(vname(v)) + '</span><span class="muted t-foot">' + T('c.back.sub', { shop: sname(a.shop) }) + '</span></span>' + ic('chev-right', 'chev') + '</button>'; }).join('') +
         items.map((x) => x.html).join('')
     };
   };
+  SEG.cfeed = (v) => { S.ui.cFeed = v; refresh(); };
   ACT['c-open-post'] = (el) => go('c-post', { id: el.dataset.id });
   SCREENS['c-post'] = (pr) => {
     const p = Dt().posts.find((x) => x.id === pr.id);
-    return { title: t('kind.' + p.kind), large: false, body: custPostCard(p, null) + (p.kind === 'offer' && Dt().org.settings.prices ? '<p class="section-f">' + T('c.omnibus') + '</p>' : '') };
-  };
-  SCREENS['c-offers'] = () => {
-    const now = Date.now();
-    const offers = annaPosts().filter((p) => p.kind === 'offer' && p.validUntil > now);
-    return {
-      title: t('c.offers.title'),
-      body: offers.length ? offers.map((p) => custPostCard(p, null)).join('') + (Dt().org.settings.prices ? '<p class="section-f">' + T('c.omnibus') + '</p>' : '<p class="section-f">' + T('c.noprices') + '</p>') :
-        '<div class="empty"><span class="e-icon">' + ic('tag') + '</span><h3>' + T('c.offers.empty.t') + '</h3><p>' + T('c.offers.empty.b') + '</p></div>'
-    };
+    return { title: t('kind.' + p.kind), large: false, body: custPostCard(p, null) + (p.kind === 'offer' && Dt().org.settings.prices ? '<p class="section-f free">' + T('c.omnibus') + '</p>' : '') };
   };
   SCREENS['c-catalog'] = () => {
     const s = Dt().org.settings;
@@ -1499,11 +1555,11 @@
       const av = custAvail(p, v.id, sh);
       if (!av) return null;
       const waiting = Dt().alerts.find((a) => a.cid === 'c-anna' && a.vid === v.id && a.shop === sh && a.status === 'waiting');
-      const notify = av.st === 'out' ? (waiting ? '<span class="badge ok">' + ic('check', 'xs') + T('c.notify.on') + '</span>' : '<button class="btn small tinted" data-act="c-notify" data-vid="' + v.id + '" data-shop="' + sh + '">' + ic('bell', 'sm') + T('c.notify') + '</button>') : '';
-      return cell({ title: esc(sname(sh)), sub: av.html, val: notify, chev: false });
+      const notify = av.st === 'out' ? (waiting ? '<button class="btn small gray" data-act="c-alert-stop" data-id="' + waiting.id + '">' + T('c.notify.stop') + '</button>' : '<button class="btn small tinted" data-act="c-notify" data-vid="' + v.id + '" data-shop="' + sh + '">' + ic('bell', 'sm') + T('c.notify') + '</button>') : '';
+      return cell({ title: esc(sname(sh)), sub: av.html + (waiting ? ' <span class="badge ok">' + ic('check', 'xs') + T('c.notify.on') + '</span>' : ''), val: notify, chev: false });
     }).filter(Boolean);
     return {
-      title: pname(p), large: false,
+      title: pname(p), large: false, anchor: '.pd-name',
       right: '<button class="navbtn heart' + (fav ? ' on' : '') + '" data-act="c-fav" data-pid="' + p.id + '" aria-pressed="' + fav + '" aria-label="' + T('c.fav') + '">' + ic('heart') + '</button><button class="navbtn" data-act="c-share" aria-label="' + T('c.share') + '">' + ic('share') + '</button>',
       body: img(p.img, pname(p), 'hero-img', '') + '<div class="pd-head"><h1 class="pd-name">' + esc(pname(p)) + '</h1>' +
         (s.prices ? '<div class="price-row"><span class="price">' + esc(money(off ? off.price : v.price)) + '</span>' + (off ? '<span class="was">' + esc(money(off.was)) + '</span><span class="badge accent">' + ic('tag', 'xs') + T('c.offer.until', { date: dt(off.post.validUntil, { weekday: 'long' }) }) + '</span>' : '') + '</div>' + (off ? '<p class="section-f" style="margin:6px 0 0">' + T('c.omnibus') + '</p>' : '') : '<p class="muted mt8">' + T('c.noprice') + '</p>') +
@@ -1513,6 +1569,7 @@
           '<div class="mt12">' + why(T('c.stock.hidden')) + '</div>')
     };
   };
+  ACT['c-alert-stop'] = (el) => { const x = Dt().alerts.find((y) => y.id === el.dataset.id); if (x) x.status = 'cancelled'; haptic(8); toast(t('prof.alert.cancelled'), { icon: 'bell' }); refresh(); };
   ACT['c-variant'] = (el) => { S.ui.cVariant = S.ui.cVariant || {}; S.ui.cVariant[el.dataset.pid] = +el.dataset.i; refresh(); };
   ACT['c-fav'] = (el) => { const k = 'c-anna|' + el.dataset.pid; if (Dt().favorites.has(k)) Dt().favorites.delete(k); else { Dt().favorites.add(k); haptic(8); } refresh(); };
   ACT['c-share'] = () => toast(t('c.shared'), { icon: 'share' });
@@ -1555,6 +1612,15 @@
     return best;
   }
   const myRankFor = (sc) => rankFor(S.role, sc);
+  function rankText(rank, selfId) {
+    const rs = Object.values(Dt().roles).filter((r) => r.id !== selfId);
+    const below = rs.filter((r) => r.rank < rank).sort((a, b) => b.rank - a.rank)[0];
+    const above = rs.filter((r) => r.rank > rank).sort((a, b) => a.rank - b.rank)[0];
+    if (below && above) return t('rank.between', { below: roleName(below), above: roleName(above) });
+    if (below) return t('rank.above', { below: roleName(below) });
+    if (above) return t('rank.below', { above: roleName(above) });
+    return t('rank.top');
+  }
   function holds(perm, sc) {
     const lv = level(perm);
     if (lv === 'org') return canOrgWide(perm);
@@ -1629,7 +1695,7 @@
       body: '<div style="text-align:center;margin:8px 0 18px">' + avatar(m.name, 'lg') + '<div class="t-title2 mt12">' + esc(m.name) + '</div><div class="muted t-sub">' + esc(m.email) + (m.status !== 'active' ? ' · ' + T('mstatus.' + m.status) : '') + '</div></div>' +
         '<div class="section-h">' + T('mem.access') + '</div><div class="list">' + m.assign.map((a, i) => {
           const r = Dt().roles[a.role];
-          return cell({ act: chk.ok ? 'change-role' : null, data: { id: m.id, i: i }, title: esc(roleName(r)), sub: esc(scopeName(a)) + ' · ' + T('role.rank', { n: r.rank }) });
+          return cell({ act: chk.ok ? 'change-role' : null, data: { id: m.id, i: i }, title: esc(roleName(r)), sub: esc(scopeName(a)) + ' · ' + esc(rankText(r.rank, r.id)) });
         }).join('') + '</div>' +
         (chk.ok ? '<p class="section-f">' + T('mem.tapchange') + '</p><div class="mt16"><button class="btn gray block" data-act="toggle-suspend" data-id="' + m.id + '">' + (m.status === 'suspended' ? T('mem.reactivate') : T('mem.suspend')) + '</button></div>'
           : '<div class="mt12">' + why(esc(chk.why)) + '</div>') +
@@ -1640,7 +1706,7 @@
     return '<div class="list">' + Object.values(Dt().roles).sort((x, y) => y.rank - x.rank).map((r) => {
       const g = grantCheck(r.id, sc);
       if (!g.ok) return '<div class="cell" aria-disabled="true"><span class="c-main"><span class="c-title muted" style="display:block">' + esc(roleName(r)) + '</span><span class="lock-note">' + ic('lock') + esc(g.why) + '</span></span></div>';
-      return cell({ act: act, data: Object.assign({ role: r.id }, data), title: esc(roleName(r)), sub: T('role.rank', { n: r.rank }) + ' · ' + T('role.nperms', { n: r.perms.size }), val: r.id === current ? '<span style="color:var(--accent-text)">' + ic('check') + '</span>' : '', chev: false });
+      return cell({ act: act, data: Object.assign({ role: r.id }, data), title: esc(roleName(r)), sub: esc(rankText(r.rank, r.id)) + ' · ' + T('role.nperms', { n: r.perms.size }), val: r.id === current ? '<span style="color:var(--accent-text)">' + ic('check') + '</span>' : '', chev: false });
     }).join('') + '</div>';
   }
   ACT['change-role'] = (el) => {
@@ -1694,7 +1760,7 @@
       body: tip('roles', 'tip.roles.t', 'tip.roles.b') + '<div class="list">' + roles.map((r) => cell({
         act: 'open-role', data: { id: r.id },
         title: esc(roleName(r)) + (r.custom ? ' <span class="badge plain">' + T('roles.custom') + '</span>' : '') + (r.locked ? ' <span class="lock-note">' + ic('lock') + '</span>' : ''),
-        sub: T('role.rank', { n: r.rank }) + ' · ' + T('role.nperms', { n: r.perms.size }) + ' · ' + T('roles.people', { n: roleCount(r.id).length })
+        sub: esc(rankText(r.rank, r.id)) + ' · ' + T('role.nperms', { n: r.perms.size }) + ' · ' + T('roles.people', { n: roleCount(r.id).length })
       })).join('') + '</div><p class="section-f">' + T('roles.foot') + '</p>'
     };
   };
@@ -1711,7 +1777,7 @@
     const reason = r.locked ? t('re.owner') : !canOrgWide('roles.manage') ? t('re.noperm') : r.rank >= mine ? t('re.rankwhy', { r: r.rank, mine: mine }) : '';
     return { mine: mine, ro: !!reason, reason: reason };
   }
-  function rankLine() { const d = S.ui.rd; return T('re.rankline', { n: d.rank, mine: roleState(Dt().roles[d.id]).mine }); }
+  function rankLine() { const d = S.ui.rd; return T('re.rankline', { text: rankText(d.rank, d.id) }); }
   PARTS['re-rank'] = rankLine;
   SCREENS.role = (pr) => {
     const r = Dt().roles[pr.id];
@@ -1721,7 +1787,7 @@
       const have = holds(p, { scope: 'org', id: 'lemoni' });
       const on = d.perms.has(p);
       const lock = st.ro || !have;
-      return '<div class="perm-row"><div class="grow"><div class="t-callout">' + T('perm.' + p) + '</div><div class="pk">' + esc(p) + '</div>' +
+      return '<div class="perm-row"><div class="grow"><div class="t-callout">' + T('perm.' + p) + '</div>' +
         (!have && !st.ro ? '<div class="locked">' + ic('lock') + T('re.nothave') + '</div>' : '') + '</div>' +
         '<label class="switch"><input type="checkbox" role="switch" data-ch="re-perm" data-p="' + p + '"' + (on ? ' checked' : '') + (lock ? ' disabled' : '') + ' aria-label="' + T('perm.' + p) + '"><span class="track"></span><span class="knob"></span></label></div>';
     }).join('') + '</div>').join('');
@@ -1732,7 +1798,7 @@
         '<div class="section-h">' + T('re.rank') + '</div><div class="list"><div class="cell" style="flex-direction:column;align-items:stretch;gap:4px"><span class="c-title" data-part="re-rank">' + rankLine() + '</span>' +
         '<input class="range" type="range" min="1" max="' + Math.max(1, st.mine - 1) + '" value="' + Math.min(d.rank, Math.max(1, st.mine - 1)) + '" data-in="re-rank"' + (st.ro ? ' disabled' : '') + ' aria-label="' + T('re.rank') + '"></div></div>' +
         '<p class="section-f">' + T('re.rank.note') + '</p>' + groups +
-        (st.ro ? '' : '<div class="mt24"><button class="btn primary block" data-act="role-save">' + T('re.save') + '</button></div>')
+        ''
     };
   };
   IN['re-rank'] = (el) => { S.ui.rd.rank = +el.value; refreshPart('re-rank'); };
@@ -1755,7 +1821,7 @@
 
   /* ---------- reports (dataviz rules: one hue, thin marks, 4px data ends, legend only for 2+ series, table view) ---------- */
   function days14() { const d0 = new Date(); d0.setHours(0, 0, 0, 0); const out = []; for (let i = 13; i >= 0; i--) out.push(d0.getTime() - i * D); return out; }
-  function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); const f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
+  function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); const f = v / p; const st = [1, 1.2, 1.5, 2, 2.5, 5, 8, 10]; return st.find((x) => f <= x) * p; }
   function barPathV(x, y, w, h) { const r = Math.min(4, w / 2, h); return 'M' + x + ',' + (y + h) + 'V' + (y + r) + 'Q' + x + ',' + y + ' ' + (x + r) + ',' + y + 'H' + (x + w - r) + 'Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) + 'V' + (y + h) + 'Z'; }
   function barPathH(x, y, w, h) { const r = Math.min(4, h / 2, w); return 'M' + x + ',' + y + 'H' + (x + w - r) + 'Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) + 'V' + (y + h - r) + 'Q' + (x + w) + ',' + (y + h) + ' ' + (x + w - r) + ',' + (y + h) + 'H' + x + 'Z'; }
   const short = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
@@ -1774,26 +1840,17 @@
       const h = max ? (v / max) * ih : 0, x = pl + i * slot + (slot - bw) / 2, y = pt + ih - h;
       g += '<g class="hitbar" tabindex="0" data-tip="' + esc(fmt(v) + '|' + labels[i].full) + '"><rect class="hitrect" x="' + (pl + i * slot) + '" y="' + pt + '" width="' + slot + '" height="' + ih + '" fill="transparent"/>' + (h > 0 ? '<path class="bar" d="' + barPathV(x, y, bw, h) + '"/>' : '') + '</g>';
       if ((i === iMax || i === iLast) && v > 0) g += '<text class="v" x="' + (x + bw / 2) + '" y="' + (y - 5) + '" text-anchor="middle">' + esc(fmt(v, true)) + '</text>';
-      if (i % 2 === 1 || i === iLast) g += '<text x="' + (x + bw / 2) + '" y="' + (Hh - 6) + '" text-anchor="middle">' + esc(labels[i].tick) + '</text>';
+      if (i === 0 || i === iLast || (i % 3 === 0 && i < iLast - 1)) g += '<text x="' + (i === 0 ? x : x + bw / 2) + '" y="' + (Hh - 5) + '" text-anchor="' + (i === 0 ? 'start' : 'middle') + '">' + esc(labels[i].tick) + '</text>';
     });
     return '<svg viewBox="0 0 ' + W + ' ' + Hh + '" role="img">' + g + '</svg>';
   }
   function barsChart(rows, fmt, two) {
-    const W = 340, rowH = two ? 40 : 30, lw = 112, bx = lw + 8, bmax = W - bx - 52, bh = two ? 11 : 14;
-    const max = niceMax(Math.max.apply(null, rows.map((r) => Math.max(r.a, two ? r.b : 0))));
-    const Hh = rows.length * rowH + 4;
-    let g = '';
-    rows.forEach((r, i) => {
-      const y0 = i * rowH + 4;
-      g += '<text x="0" y="' + (y0 + rowH / 2 + 2) + '">' + esc(short(r.label, 19)) + '</text>';
-      const series = two ? [['soft', r.a, y0 + (rowH - 2 * bh - 2) / 2], ['', r.b, y0 + (rowH - 2 * bh - 2) / 2 + bh + 2]] : [['', r.a, y0 + (rowH - bh) / 2]];
-      series.forEach((s) => {
-        const w = Math.max(2, (s[1] / max) * bmax);
-        g += '<g class="hitbar" tabindex="0" data-tip="' + esc(fmt(s[1]) + '|' + r.label + (r.tipExtra ? ' · ' + r.tipExtra : '')) + '"><rect class="hitrect" x="' + bx + '" y="' + (s[2] - 3) + '" width="' + (bmax + 40) + '" height="' + (bh + 6) + '" fill="transparent"/><path class="bar ' + s[0] + '" d="' + barPathH(bx, s[2], w, bh) + '"/></g>' +
-          '<text class="v" x="' + (bx + w + 6) + '" y="' + (s[2] + bh / 2 + 4) + '">' + esc(fmt(s[1], true)) + '</text>';
-      });
-    });
-    return '<svg viewBox="0 0 ' + W + ' ' + Hh + '" role="img">' + g + '</svg>';
+    const max = Math.max.apply(null, rows.map((r) => Math.max(r.a, two ? r.b : 0))) || 1;
+    const line = (v, cls) => '<div class="hline"><div class="hbar ' + cls + '" style="width:calc((100% - 52px) * ' + (v / max).toFixed(4) + ')"></div><span class="hval">' + esc(fmt(v, true)) + '</span></div>';
+    return '<div class="hbars" role="list">' + rows.map((r) => {
+      const tipText = fmt(two ? r.b : r.a) + '|' + r.label + (two ? ' \u00b7 ' + t('rep.opens') + ': ' + fmt(r.a) : '') + (r.tipExtra ? ' \u00b7 ' + r.tipExtra : '');
+      return '<div class="hrow hitbar" role="listitem" tabindex="0" data-tip="' + esc(tipText) + '"><div class="hlabel">' + esc(r.label) + '</div><div class="htrack">' + (two ? line(r.a, 'outline') + line(r.b, 'thin') : line(r.a, '')) + '</div></div>';
+    }).join('') + '</div>';
   }
   function chartCard(title, sub, svg, table, legend) {
     return '<section class="chart-card"><h3>' + esc(title) + '</h3><div class="c-sub">' + esc(sub) + '</div>' + (legend || '') + svg + table + '</section>';
@@ -1817,7 +1874,7 @@
     const stockVal = Dt().products.reduce((s, p) => s + p.variants.reduce((x, v) => x + Math.max(0, qtyIn(v.id, shops)) * v.cost, 0), 0);
     const fmtQ = (v) => num(Math.round(v));
     const fmtM = (v, tick) => (tick ? new Intl.NumberFormat(LOC[S.lang], { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v / 100) : money(v));
-    const labels = days.map((d) => ({ tick: String(new Date(d).getDate()), full: dt(d, { weekday: 'short', day: 'numeric', month: 'short' }) }));
+    const labels = days.map((d, i) => ({ tick: i === 0 ? dt(d, { day: 'numeric', month: 'short' }) : String(new Date(d).getDate()), full: dt(d, { weekday: 'short', day: 'numeric', month: 'short' }) }));
     const sales = chartCard(t(fin ? 'rep.sales.v' : 'rep.sales.q'), t(fin ? 'rep.sales.v.sub' : 'rep.sales.q.sub'), columnsChart(fin ? valD : qtyD, labels, fin ? fmtM : fmtQ),
       tableView([t('rep.day'), fin ? t('rep.revenue') : t('rep.items')], days.map((d, i) => [labels[i].full, fin ? money(valD[i]) : num(qtyD[i])])));
     const top = Object.keys(byProd).sort((a, b) => byProd[b] - byProd[a]).slice(0, 6).map((pid) => ({ label: pname(product(pid)), a: byProd[pid] }));
@@ -1829,9 +1886,9 @@
       : chartCard(t('rep.want'), t('rep.want.none'), '', '');
     const links = Dt().links.filter((l) => shopsOfScope({ scope: l.scope, id: l.sid }).some((s) => shops.indexOf(s) >= 0));
     const lrows = links.map((l) => ({ label: L(l.label) + (l.scope === 'shop' ? ', ' + sname(l.sid) : ''), a: l.opens, b: l.signups }));
-    const legend = '<div class="legend"><span><i style="background:var(--data-1-soft)"></i>' + T('rep.opens') + '</span><span><i style="background:var(--data-1)"></i>' + T('rep.signups') + '</span></div>';
+    const legend = '<div class="legend"><span><i class="outline"></i>' + T('rep.opens') + '</span><span><i style="background:var(--data-1)"></i>' + T('rep.signups') + '</span></div>';
     const linkC = chartCard(t('rep.links'), t('rep.links.sub'), barsChart(lrows, fmtQ, true), tableView([t('rep.link'), t('rep.opens'), t('rep.signups'), t('rep.conv')], links.map((l) => [L(l.label) + (l.scope === 'shop' ? ', ' + sname(l.sid) : ''), num(l.opens), num(l.signups), pct(l.signups / l.opens)])), legend);
-    const srows = Object.keys(shrink).sort((a, b) => (fin ? shrink[b].v - shrink[a].v : shrink[b].q - shrink[a].q)).map((k) => ({ label: t('r.' + k), a: fin ? shrink[k].v : shrink[k].q }));
+    const srows = Object.keys(shrink).sort((a, b) => (fin ? shrink[b].v - shrink[a].v : shrink[b].q - shrink[a].q)).map((k) => { const lb = t('r.' + k); return { label: lb.charAt(0).toUpperCase() + lb.slice(1), a: fin ? shrink[k].v : shrink[k].q }; });
     const shrinkC = chartCard(t('rep.shrink'), t(fin ? 'rep.shrink.v' : 'rep.shrink.q'), barsChart(srows, fin ? fmtM : fmtQ), tableView([t('rep.reason'), fin ? t('rep.cost') : t('rep.items')], srows.map((r) => [r.label, fin ? money(r.a) : num(r.a)])));
     const tiles = '<div class="kpis" style="margin-bottom:14px">' +
       kpi('c3', 'bag', t('rep.k.sold'), totalQ, t('rep.k.14')) +
@@ -1840,7 +1897,7 @@
       kpi('c1', 'bell', t('kpi.waiting'), Object.values(wantMap).reduce((a, b) => a + b, 0), t('kpi.waiting.note')) + '</div>';
     return {
       title: t('rep.title'),
-      body: shopChips() + (fin ? '' : '<div class="why" style="margin-bottom:12px">' + ic('lock') + '<span>' + T('rep.nofin') + '</span></div>') + tiles + sales + topC + wantC + linkC + shrinkC + '<p class="section-f">' + T('rep.foot') + '</p>'
+      body: shopChips() + (fin ? '' : '<div class="why" style="margin-bottom:12px">' + ic('lock') + '<span>' + T('rep.nofin') + '</span></div>') + tiles + sales + topC + wantC + linkC + shrinkC + '<p class="section-f free">' + T('rep.foot') + '</p>'
     };
   };
   function chartTip(target) {
@@ -1851,11 +1908,12 @@
     tipEl.textContent = '';
     const b = document.createElement('b'); b.textContent = parts[0]; tipEl.appendChild(b);
     tipEl.appendChild(document.createTextNode(parts.slice(1).join('|')));
-    const cr = card.getBoundingClientRect(), r = (target.querySelector('.bar') || target).getBoundingClientRect();
+    const k = scale();
+    const cr = card.getBoundingClientRect(), r = (target.querySelector('.bar, .hbar:last-child, .hbar') || target).getBoundingClientRect();
     tipEl.style.opacity = '1';
-    const x = Math.min(cr.width - tipEl.offsetWidth - 6, Math.max(6, r.left - cr.left + r.width / 2 - tipEl.offsetWidth / 2));
+    const x = Math.min(cr.width / k - tipEl.offsetWidth - 6, Math.max(6, (r.left - cr.left + r.width / 2) / k - tipEl.offsetWidth / 2));
     tipEl.style.left = x + 'px';
-    tipEl.style.top = Math.max(4, r.top - cr.top - tipEl.offsetHeight - 8) + 'px';
+    tipEl.style.top = Math.max(4, (r.top - cr.top) / k - tipEl.offsetHeight - 8) + 'px';
   }
   function chartTipHide(target) { const card = target.closest('.chart-card'); const tp = card && card.querySelector('.chart-tip'); if (tp) tp.style.opacity = '0'; }
   document.addEventListener('pointerover', (e) => { const h = e.target.closest && e.target.closest('.hitbar'); if (h) chartTip(h); });
@@ -1979,7 +2037,7 @@
     return '<div class="section-h" style="margin-top:4px">' + T('tr.from') + '</div><div class="chips">' + from.map((s) => '<button class="chip" data-act="trn-from" data-id="' + s + '" aria-pressed="' + (v.from === s) + '">' + esc(sname(s)) + '</button>').join('') + '</div>' +
       '<div class="section-h">' + T('tr.to') + '</div><div class="chips">' + Dt().shops.filter((s) => s.id !== v.from).map((s) => '<button class="chip" data-act="trn-to" data-id="' + s.id + '" aria-pressed="' + (v.to === s.id) + '">' + esc(sname(s.id)) + '</button>').join('') + '</div>' +
       '<div class="section-h">' + T('tr.items') + '</div><div class="list with-thumbs">' + items.map((x) => cell({ lead: img(product(x.pid).img, vname(x), 'thumb', ''), title: esc(vname(x)), sub: T('tr.have', { n: qty(x.id, v.from) }), val: stepper('tr:' + x.id, v.lines[x.id] || 0), chev: false })).join('') + '</div>' +
-      '<div class="mt16"><button class="btn primary block" data-act="trn-send"' + (total ? '' : ' disabled') + '>' + ic('truck') + T('tr.send', { n: total }) + '</button></div><p class="section-f">' + T('tr.note') + '</p>';
+      '<div class="mt16"><button class="btn primary block" data-act="trn-send"' + (total ? '' : ' disabled') + '>' + ic('truck') + T('tr.send', { n: total }) + '</button></div><p class="section-f free">' + T('tr.note') + '</p>';
   }
   ACT['trn-from'] = (el) => { S.ui.trn.from = el.dataset.id; if (S.ui.trn.to === el.dataset.id) S.ui.trn.to = Dt().shops.find((s) => s.id !== el.dataset.id).id; S.ui.trn.lines = {}; sheetRefresh(); };
   ACT['trn-to'] = (el) => { S.ui.trn.to = el.dataset.id; sheetRefresh(); };
@@ -2048,10 +2106,11 @@
     }
     el.innerHTML = lockHtml();
     $('#statusbar').classList.add('on-dark');
+    cover();
   }
   function closeLock() {
     const el = $('#lock'); if (!el) return;
-    el.classList.remove('show'); setTimeout(() => el.remove(), 360);
+    el.classList.remove('show'); setTimeout(() => { el.remove(); cover(); }, 360);
     const scr = $$('.screen').pop();
     $('#statusbar').classList.toggle('on-dark', !!(scr && scr._spec && scr._spec.dark));
   }
@@ -2080,7 +2139,7 @@
     title: t('qr.title'), large: false, cls: 'scan-screen', navCls: 'on-camera', dark: true,
     body: '<div class="viewfinder" id="vf" style="background-image:url(\'' + esc(imgSrc('hero-shop', 'shop')) + '\')"><div class="vf-frame"><span class="vf-c tl"></span><span class="vf-c tr"></span><span class="vf-c bl"></span><span class="vf-c br"></span><span class="vf-line"></span></div><div class="vf-hint">' + T('qr.hint') + '</div></div>' +
       '<div class="scan-pad"><button class="qr-poster" data-act="qr-scan" aria-label="' + T('qr.poster.a') + '">' + qrSvg('gly-window') + '<span><span class="qp-t" style="display:block">Lemoni ' + esc(sname('gly')) + '</span><span style="display:block;margin-top:4px">' + T('qr.poster') + '</span></span></button>' +
-      '<p class="section-f">' + T('qr.note') + '</p></div>'
+      '<p class="section-f free">' + T('qr.note') + '</p></div>'
   });
   ACT['qr-scan'] = () => {
     const vf = $('#vf'); if (vf) { vf.classList.remove('flash'); void vf.offsetWidth; vf.classList.add('flash'); }
@@ -2140,7 +2199,7 @@
     return {
       title: t('wel.title'), large: false, left: '<span></span>',
       body: '<div class="welcome-check"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></svg></div><div class="t-title2" style="text-align:center">' + T('wel.head', { shop: 'Lemoni ' + sname('gly') }) + '</div>' +
-        '<div class="audience" style="margin-top:18px"><ul style="margin:0">' + items.join('') + '</ul></div><p class="section-f">' + T('wel.note') + '</p>' +
+        '<div class="audience" style="margin-top:18px"><ul style="margin:0">' + items.join('') + '</ul></div><p class="section-f free">' + T('wel.note') + '</p>' +
         '<div class="mt24"><button class="btn primary block" data-act="wel-done">' + T('wel.done') + '</button></div>'
     };
   };
@@ -2165,15 +2224,15 @@
         '<div class="section-h">' + T('prof.lang') + '</div>' + seg('lang', [['en', 'English'], ['el', 'Ελληνικά'], ['ru', 'Русский']], S.lang) +
         '<p class="section-f">' + T('prof.lang.note') + '</p>' +
         orgs.map((o) => { const f = annaFlags(o[0]); return '<div class="section-h">' + esc(o[1]) + '</div><div class="list with-tiles">' +
-          cell({ lead: tileI('bell', 1), title: T('ch.push'), val: '<label class="switch"><input type="checkbox" role="switch" data-ch="c-ch" data-org="' + o[0] + '" data-c="push"' + (f.push ? ' checked' : '') + ' aria-label="' + T('ch.push') + ', ' + esc(o[1]) + '"><span class="track"></span><span class="knob"></span></label>' }) +
+          cell({ lead: tileI('bell', 5), title: T('ch.push'), val: '<label class="switch"><input type="checkbox" role="switch" data-ch="c-ch" data-org="' + o[0] + '" data-c="push"' + (f.push ? ' checked' : '') + ' aria-label="' + T('ch.push') + ', ' + esc(o[1]) + '"><span class="track"></span><span class="knob"></span></label>' }) +
           cell({ lead: tileI('mail', 2), title: T('ch.email'), val: '<label class="switch"><input type="checkbox" role="switch" data-ch="c-ch" data-org="' + o[0] + '" data-c="email"' + (f.email ? ' checked' : '') + ' aria-label="' + T('ch.email') + ', ' + esc(o[1]) + '"><span class="track"></span><span class="knob"></span></label>' }) + '</div>'; }).join('') +
         '<p class="section-f">' + T('prof.ch.note') + '</p>' +
         '<div class="section-h">' + T('prof.alerts') + '</div>' + (alerts.length ? '<div class="list with-thumbs">' + alerts.map((x) => { const v = variant(x.vid); return '<div class="swipe"><div class="sw-actions"><button class="sw-a2" data-act="c-alert-cancel" data-id="' + x.id + '">' + ic('x') + T('prof.alert.cancel') + '</button></div>' +
-          cell({ act: 'c-open-product', data: { pid: v.pid }, lead: img(product(v.pid).img, vname(v), 'thumb', ''), title: esc(vname(v)), sub: esc(x.shop ? sname(x.shop) : t('shop.any')) + ' · ' + T('alert.' + x.status) }) + '</div>'; }).join('') + '</div><p class="section-f">' + T('prof.alerts.note') + '</p>' : '<p class="section-f">' + T('prof.alerts.none') + '</p>') +
+          cell({ lead: img(product(v.pid).img, vname(v), 'thumb', ''), title: esc(vname(v)), sub: esc(x.shop ? sname(x.shop) : t('shop.any')) + ' · ' + T('alert.' + x.status), val: '<button class="btn small gray" data-act="c-alert-cancel" data-id="' + x.id + '">' + T('prof.alert.cancel') + '</button>', chev: false }) + '</div>'; }).join('') + '</div><p class="section-f">' + T('prof.alerts.note') + '</p>' : '<p class="section-f">' + T('prof.alerts.none') + '</p>') +
         '<div class="section-h">' + T('prof.saved') + '</div>' + (favs.length ? '<div class="list with-thumbs">' + favs.map((p) => cell({ act: 'c-open-product', data: { pid: p.id }, lead: img(p.img, pname(p), 'thumb', ''), title: esc(pname(p)) })).join('') + '</div>' : '<p class="section-f">' + T('prof.saved.none') + '</p>') +
         '<div class="section-h">' + T('prof.data') + '</div><div class="list with-tiles">' +
         cell({ act: 'c-export', lead: tileI('receive', 2), title: T('prof.export'), sub: T('prof.export.sub') }) +
-        cell({ act: 'c-delete', cls: 'danger', lead: '<span class="tile" style="background:var(--error)">' + ic('x') + '</span>', title: T('prof.delete'), chev: false }) + '</div><p class="section-f">' + T('prof.data.note') + '</p>'
+        cell({ act: 'c-delete', cls: 'danger', lead: '<span class="tile" style="background:var(--danger-fill)">' + ic('x') + '</span>', title: T('prof.delete'), chev: false }) + '</div><p class="section-f">' + T('prof.data.note') + '</p>'
     };
   };
   CH['c-ch'] = (el) => {
@@ -2187,6 +2246,48 @@
   ACT['c-delete'] = () => openSheet({ title: t('del.title'), render: () => '<div class="t-title3" style="text-align:center;margin:6px 0 8px">' + T('del.head') + '</div><p class="section-f" style="text-align:center;margin:0 0 16px">' + T('del.body') + '</p>' +
     '<button class="btn danger block" data-act="c-delete-do">' + T('del.cta') + '</button><div class="mt8"><button class="btn gray block" data-act="sheet-close">' + T('cancel') + '</button></div>' });
   ACT['c-delete-do'] = () => { closeSheet(); toast(t('del.demo'), { icon: 'info', ms: 4200 }); };
+
+  /* ---------------- edge swipe back ---------------- */
+  document.addEventListener('pointerdown', (e) => {
+    if (e.button > 0 || SHEET || document.getElementById('lock')) return;
+    if (!e.target.closest || !e.target.closest('#screens')) return;
+    if (stack().length < 2 || cur().modal) return;
+    const ar = $('#app').getBoundingClientRect();
+    if (e.clientX - ar.left > 22 * scale()) return;
+    const host = $('#screens'), top = $$('.screen', host).pop();
+    if (!top) return;
+    const prevRoute = stack()[stack().length - 2];
+    const x0 = e.clientX, W = top.offsetWidth;
+    let under = null, started = false, dx = 0;
+    const mv = (ev) => {
+      dx = Math.max(0, (ev.clientX - x0) / scale());
+      if (!started) {
+        if (dx < 8) return;
+        started = true; SWALLOW = Date.now() + 100000;
+        prevRoute.scroll = prevRoute.scroll || 0;
+        under = buildScreen(prevRoute); under._route = prevRoute;
+        host.insertBefore(under, top); afterRender(under, prevRoute); under.classList.add('dim');
+        top.style.boxShadow = '-8px 0 30px rgba(0,0,0,.12)';
+      }
+      top.style.transform = 'translateX(' + dx + 'px)';
+      under.style.transform = 'translateX(' + (-30 + 30 * Math.min(1, dx / W)) + '%)';
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+      if (!started) return;
+      SWALLOW = Date.now();
+      const ease = 'cubic-bezier(0.32, 0.72, 0, 1)';
+      if (dx > W * 0.35) {
+        const a = top.animate([{ transform: top.style.transform }, { transform: 'translateX(100%)' }], { duration: 220, easing: ease, fill: 'forwards' });
+        const b = under.animate([{ transform: under.style.transform }, { transform: 'translateX(0)' }], { duration: 220, easing: ease, fill: 'forwards' });
+        a.finished.then(() => { top.remove(); stack().pop(); b.cancel(); under.style.transform = ''; under.classList.remove('dim'); renderTabs(); renderNarration(); }).catch(() => {});
+      } else {
+        const a = top.animate([{ transform: top.style.transform }, { transform: 'translateX(0)' }], { duration: 220, easing: ease });
+        a.finished.then(() => { top.style.transform = ''; top.style.boxShadow = ''; if (under) under.remove(); }).catch(() => {});
+      }
+    };
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  }, { passive: true });
 
   /* ---------------- swipe rows ---------------- */
   function closeSwipes(except) { $$('.swipe.open').forEach((r) => { if (r !== except) { r.classList.remove('open'); $('.cell', r).style.transform = ''; } }); }
@@ -2206,7 +2307,7 @@
       const dx = ev.clientX - x0, dy = ev.clientY - y0;
       if (!drag && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) { drag = true; row.classList.add('dragging'); closeSwipes(row); }
       if (!drag) return;
-      x = Math.max(-w - 40, Math.min(0, base + dx));
+      x = Math.max(-w - 40, Math.min(0, base + dx / scale()));
       c.style.transform = 'translateX(' + x + 'px)';
     };
     const up = () => {
@@ -2247,7 +2348,7 @@
     const foot = $('.demo-foot');
     if (foot) foot.innerHTML = T('foot.demo') + ' <a href="https://github.com/orestislef/custock" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/orestislef/custock/tree/main/thinking" target="_blank" rel="noopener">' + T('foot.thinking') + '</a> · <a href="../status/">' + T('foot.progress') + '</a>';
     const pill = $('#demo-pill');
-    if (pill) { pill.lastChild.textContent = t('panel.pill'); pill.setAttribute('aria-label', t('a11y.panel')); }
+    if (pill) { const pt = pill.querySelector('.pill-t'); if (pt) pt.textContent = t('panel.pill'); pill.setAttribute('aria-label', t('a11y.panel')); }
     const panel = $('#panel');
     if (panel) panel.setAttribute('aria-label', t('a11y.panel'));
   }
@@ -2388,6 +2489,7 @@
     S.tab = firstTab();
     applyChrome();
     renderPanel();
+    fitDevice();
     renderApp('none');
     clock(); setInterval(clock, 20000);
     $('#panel-scrim').addEventListener('click', closePanel);
