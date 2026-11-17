@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-18T00:30:00+02:00",
-  "overall": 84,
+  "updated": "2026-11-18T01:15:00+02:00",
+  "overall": 88,
   "areas": [
     {
       "key": "thinking",
@@ -40,9 +40,9 @@
     {
       "key": "web",
       "name": "Web (customer pages and admin)",
-      "percent": 88,
+      "percent": 96,
       "state": "building",
-      "note": "Customer pages (QR join, shelf product, catalog, offers, unsubscribe) and the full admin: dashboard, stock, product form with barcode scanning, counts, transfers, customers, posts with the audience breakdown, team and roles, reports, audit log, dev outbox showing what would be sent, settings. Every action works on the real API. An 8 step end to end flow passes. Keyboard and contrast reviewed."
+      "note": "Customer pages and the full admin, every action on the real API, end to end flow passing. Independent Apple design review applied: accessible numbers, home leads with what needs you, staff today screen, real tables on wide screens, role editor as a page, audit log in plain sentences, variants and photo upload, names in the reader's language."
     },
     {
       "key": "mobile",
@@ -112,6 +112,10 @@
     {
       "at": "2026-11-18T00:30:00+02:00",
       "text": "Backend ready for a server: external login adapter, live transports kept off, fast search, OpenAPI, deploy files and backups. Web design review fixes in progress."
+    },
+    {
+      "at": "2026-11-18T01:15:00+02:00",
+      "text": "Web design review applied: tables on wide screens, staff today screen, audit in plain sentences, photo upload. Screenshots refreshed."
     }
   ],
   "screens": [
@@ -129,7 +133,7 @@
     },
     {
       "src": "../apps/mobile/screenshots/stock-staff-ru-dark.png",
-      "caption": "Phone app, staff stock list, Russian, dark"
+      "caption": "Phone app, staff stock, Russian, dark"
     },
     {
       "src": "../apps/mobile/screenshots/feed-anna-ru-light.png",
@@ -140,6 +144,30 @@
       "caption": "Phone app, customer offers, Greek, dark"
     },
     {
+      "src": "../apps/web/screenshots/phone-light-el-home.png",
+      "caption": "Web admin on a phone, home, Greek"
+    },
+    {
+      "src": "../apps/web/screenshots/phone-light-en-staff-today.png",
+      "caption": "Web admin, staff today screen"
+    },
+    {
+      "src": "../apps/web/screenshots/phone-light-el-stock.png",
+      "caption": "Web admin on a phone, stock, Greek"
+    },
+    {
+      "src": "../apps/web/screenshots/phone-dark-ru-composer.png",
+      "caption": "Web admin, post composer, Russian, dark"
+    },
+    {
+      "src": "../apps/web/screenshots/phone-dark-ru-transfers.png",
+      "caption": "Web admin, transfers, Russian, dark"
+    },
+    {
+      "src": "../apps/web/screenshots/phone-dark-ru-settings.png",
+      "caption": "Web admin, what customers see, Russian, dark"
+    },
+    {
       "src": "../apps/web/screenshots/phone-light-el-join.png",
       "caption": "Web, QR join page, Greek"
     },
@@ -148,8 +176,9 @@
       "caption": "Web, shelf product page, Greek"
     },
     {
-      "src": "../apps/web/screenshots/phone-dark-ru-transfers.png",
-      "caption": "Web admin on a phone, transfers, Russian"
+      "src": "../apps/web/screenshots/desktop-light-en-stock.png",
+      "caption": "Web admin, stock as a table on wide screens",
+      "wide": true
     },
     {
       "src": "../apps/web/screenshots/desktop-dark-el-product.png",
@@ -157,8 +186,18 @@
       "wide": true
     },
     {
-      "src": "../apps/web/screenshots/desktop-dark-el-composer.png",
-      "caption": "Web admin, post composer, Greek, dark",
+      "src": "../apps/web/screenshots/desktop-dark-el-product-form.png",
+      "caption": "Web admin, product form with variants and photos",
+      "wide": true
+    },
+    {
+      "src": "../apps/web/screenshots/desktop-light-en-customers.png",
+      "caption": "Web admin, customers",
+      "wide": true
+    },
+    {
+      "src": "../apps/web/screenshots/desktop-dark-el-role-editor.png",
+      "caption": "Web admin, role editor, Greek, dark",
       "wide": true
     },
     {
@@ -167,13 +206,13 @@
       "wide": true
     },
     {
-      "src": "../apps/web/screenshots/desktop-light-en-outbox.png",
-      "caption": "Web admin, dev outbox: what would have been sent",
+      "src": "../apps/web/screenshots/desktop-light-en-audit.png",
+      "caption": "Web admin, audit log in plain sentences",
       "wide": true
     },
     {
-      "src": "../apps/web/screenshots/desktop-light-en-settings.png",
-      "caption": "Web admin, what customers see",
+      "src": "../apps/web/screenshots/desktop-light-en-outbox.png",
+      "caption": "Web admin, dev outbox: what would have been sent",
       "wide": true
     }
   ]
