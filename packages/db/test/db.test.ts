@@ -18,7 +18,7 @@ describe('migrations', () => {
   it('apply once and record themselves', () => {
     expect(migrate(db)).toEqual([]);
     const row = one<{ n: number }>('SELECT count(*) n FROM schema_migrations');
-    expect(row.n).toBe(3);
+    expect(row.n).toBe(6);
   });
   it('turn on foreign keys', () => {
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
@@ -95,5 +95,18 @@ describe('security fixes', () => {
   it('seeds even when two image keys share a url', () => {
     const n = one<{ n: number; d: number }>('SELECT count(*) n, count(DISTINCT storage_key) d FROM files');
     expect(n.n).toBe(n.d);
+  });
+});
+
+describe('search index', () => {
+  it('stays in step with products and customers through triggers', async () => {
+    const { hasSearchIndex } = await import('../src/index');
+    expect(hasSearchIndex(db)).toBe(true);
+    const hit = (table: string, q: string) => (db.prepare(`SELECT count(*) n FROM ${table}_fts WHERE ${table}_fts MATCH ?`).get(q) as { n: number }).n;
+    expect(hit('products', '"meli"*')).toBe(1);
+    db.prepare("UPDATE products SET search_key = 'kapari capers' WHERE id = ?").run(s.products['p-thyme-honey']);
+    expect(hit('products', '"meli"*')).toBe(0);
+    expect(hit('products', '"kapar"*')).toBe(1);
+    expect(hit('customers', '"petrova"*')).toBeGreaterThan(0);
   });
 });

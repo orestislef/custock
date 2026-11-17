@@ -3,16 +3,15 @@
 import type { Context, Hono } from 'hono';
 import { shopsInScope, type DashboardCards, type SeriesPoint } from '@custock/core';
 import type { AppEnv } from '../types';
-import { has, need, nowOf, orgOf, shopsFor } from '../lib/context';
+import { has, need, nowOf, orgOf, productNameSql, readerLocale, shopsFor } from '../lib/context';
 import { variantLabel } from '../services/catalog';
+import { dayKey } from '../lib/time';
 import { loadPosts, postShops } from '../services/posts';
 import { canSee, customerVisibility, loadSubscriptions, reachedShops } from '../services/customers';
 
 const DAY = 86_400_000;
 
-export function dayKey(ts: number, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ts));
-}
+export { dayKey };
 
 function days(c: Context<AppEnv>, def: number): number {
   const n = Number(c.req.query('days'));
@@ -38,6 +37,11 @@ function postsReaching(c: Context<AppEnv>, status: string, shops: string[]): num
 }
 
 export function reportRoutes(app: Hono<AppEnv>) {
+  app.use('/v1/orgs/:org/reports/*', async (c, next) => {
+    c.set('localeName', readerLocale(c, orgOf(c).org.default_locale));
+    await next();
+  });
+
   // the home screen of every work role. each number needs its own permission.
   app.get('/v1/orgs/:org/reports/dashboard', (c) => {
     const { t, access, org } = orgOf(c);
@@ -64,8 +68,8 @@ export function reportRoutes(app: Hono<AppEnv>) {
     let newFollowers = 0;
     if (has(c, 'customers.view')) {
       const v = customerVisibility(c);
-      const subs = loadSubscriptions(c);
       const recent = t.all<{ id: string }>('SELECT id FROM customers WHERE org_id = @org AND erased_at IS NULL AND created_at > @since', { since: now - 7 * DAY });
+      const subs = loadSubscriptions(c, recent.map((r) => r.id));
       newFollowers = recent.filter((r) => {
         const reached = reachedShops(c, subs.get(r.id) ?? []);
         return canSee(v, reached) && reached.some((s) => shops.includes(s));
@@ -137,19 +141,22 @@ export function reportRoutes(app: Hono<AppEnv>) {
     const n = days(c, 14);
     const now = nowOf(c);
     const money = shops.every((s) => has(c, 'reports.financial.view', s));
-    const rows = t.all<{ recorded_at: number; qty_delta: number; uom: string; price: number }>(
-      `SELECT m.recorded_at, m.qty_delta, p.uom, coalesce(m.unit_price_minor, v.price_minor, 0) AS price
+    // 15 minute buckets in sql (enough for any timezone offset), local days in code
+    const rows = t.all<{ slot: number; pieces: number; value: number }>(
+      `SELECT m.recorded_at / 900000 AS slot,
+              sum(CASE WHEN p.uom = 'piece' THEN -m.qty_delta ELSE 0 END) AS pieces,
+              sum(-(CASE WHEN p.uom = 'piece' THEN m.qty_delta ELSE m.qty_delta / 1000.0 END) * coalesce(m.unit_price_minor, v.price_minor, 0)) AS value
          FROM stock_movements m JOIN product_variants v ON v.id = m.variant_id JOIN products p ON p.id = v.product_id
-        WHERE m.org_id = @org AND m.kind = 'sale' AND m.recorded_at >= @from AND m.shop_id IN (SELECT value FROM json_each(@shops))`,
+        WHERE m.org_id = @org AND m.kind = 'sale' AND m.recorded_at >= @from AND m.shop_id IN (SELECT value FROM json_each(@shops))
+        GROUP BY slot`,
       { shops, from: now - n * DAY },
     );
     const buckets = new Map<string, number>();
     for (let i = n - 1; i >= 0; i--) buckets.set(dayKey(now - i * DAY, org.timezone), 0);
     for (const r of rows) {
-      const k = dayKey(r.recorded_at, org.timezone);
+      const k = dayKey(r.slot * 900000, org.timezone);
       if (!buckets.has(k)) continue;
-      const u = -units(r.qty_delta, r.uom);
-      buckets.set(k, buckets.get(k)! + (money ? u * r.price : r.uom === 'piece' ? u : 0));
+      buckets.set(k, buckets.get(k)! + (money ? r.value : r.pieces));
     }
     const out: SeriesPoint[] = [...buckets].map(([day, value]) => ({ day, value: Math.round(value) }));
     c.header('X-Series-Unit', money ? 'minor' : 'pieces');
@@ -160,15 +167,23 @@ export function reportRoutes(app: Hono<AppEnv>) {
     const shops = reportShops(c);
     const { t } = orgOf(c);
     const money = shops.every((s) => has(c, 'reports.financial.view', s));
+    // group the ledger alone first, then join the few thousand totals to their products
     const rows = t.all<{ variant_id: string; name: string; options: string | null; uom: 'piece' | 'kg' | 'l' | 'm'; qty: number; value: number }>(
-      `SELECT m.variant_id, p.name, v.options, p.uom, -sum(m.qty_delta) AS qty,
-              sum(-(CASE WHEN p.uom = 'piece' THEN m.qty_delta ELSE m.qty_delta / 1000.0 END) * coalesce(m.unit_price_minor, v.price_minor, 0)) AS value
-         FROM stock_movements m JOIN product_variants v ON v.id = m.variant_id JOIN products p ON p.id = v.product_id
-        WHERE m.org_id = @org AND m.kind = 'sale' AND m.recorded_at >= @from AND m.shop_id IN (SELECT value FROM json_each(@shops))
-        GROUP BY m.variant_id ORDER BY value DESC LIMIT 10`,
-      { shops, from: nowOf(c) - days(c, 30) * DAY },
+      `SELECT a.variant_id, ${productNameSql('p')} AS name, v.options, p.uom, a.qty,
+              (CASE WHEN p.uom = 'piece' THEN a.qp + a.unpriced * coalesce(v.price_minor, 0) ELSE (a.qp + a.unpriced * coalesce(v.price_minor, 0)) / 1000.0 END) AS value
+         FROM (
+           SELECT m.variant_id, -sum(m.qty_delta) AS qty,
+                  sum(-m.qty_delta * coalesce(m.unit_price_minor, 0)) AS qp,
+                  sum(CASE WHEN m.unit_price_minor IS NULL THEN -m.qty_delta ELSE 0 END) AS unpriced
+             FROM stock_movements m
+            WHERE m.org_id = @org AND m.kind = 'sale' AND m.recorded_at >= @from AND m.shop_id IN (SELECT value FROM json_each(@shops))
+            GROUP BY m.variant_id
+         ) a JOIN product_variants v ON v.id = a.variant_id JOIN products p ON p.id = v.product_id
+        WHERE v.org_id = @org
+        ORDER BY value DESC LIMIT 10`,
+      { shops, from: nowOf(c) - days(c, 30) * DAY, loc: c.get('localeName') },
     );
-    return c.json(rows.map((r) => ({ variantId: r.variant_id, name: variantLabel(r.name, r.options, c.get('locale')), qty: r.qty, uom: r.uom, valueMinor: money ? Math.round(r.value) : null })));
+    return c.json(rows.map((r) => ({ variantId: r.variant_id, name: variantLabel(r.name, r.options, c.get('localeName')), qty: r.qty, uom: r.uom, valueMinor: money ? Math.round(r.value) : null })));
   });
 
   // what customers ask for while it is out: the best hint for the next order
@@ -176,14 +191,14 @@ export function reportRoutes(app: Hono<AppEnv>) {
     const shops = reportShops(c);
     const { t } = orgOf(c);
     const rows = t.all<{ variant_id: string; name: string; options: string | null; waiting: number; on_hand: number | null }>(
-      `SELECT a.variant_id, p.name, v.options, count(*) AS waiting,
+      `SELECT a.variant_id, ${productNameSql('p')} AS name, v.options, count(*) AS waiting,
               (SELECT sum(l.on_hand) FROM stock_levels l WHERE l.variant_id = a.variant_id AND l.shop_id IN (SELECT value FROM json_each(@shops))) AS on_hand
          FROM stock_alerts a JOIN product_variants v ON v.id = a.variant_id JOIN products p ON p.id = v.product_id
         WHERE a.org_id = @org AND a.status = 'waiting' AND (a.shop_id IS NULL OR a.shop_id IN (SELECT value FROM json_each(@shops)))
         GROUP BY a.variant_id ORDER BY waiting DESC LIMIT 20`,
-      { shops },
+      { shops, loc: c.get('localeName') },
     );
-    return c.json(rows.map((r) => ({ variantId: r.variant_id, name: variantLabel(r.name, r.options, c.get('locale')), waiting: r.waiting, onHand: r.on_hand ?? 0 })));
+    return c.json(rows.map((r) => ({ variantId: r.variant_id, name: variantLabel(r.name, r.options, c.get('localeName')), waiting: r.waiting, onHand: r.on_hand ?? 0 })));
   });
 
   app.get('/v1/orgs/:org/reports/join-links', (c) => {

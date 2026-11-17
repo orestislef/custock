@@ -3,13 +3,16 @@
 import type { Hono } from 'hono';
 import { contactMatches, effectiveAtScope, followsShop, matches, type CustomerDetail, type JoinLink } from '@custock/core';
 import type { AppEnv } from '../types';
-import { cfgOf, need, orgOf } from '../lib/context';
+import { cfgOf, need, orgOf, productNameSql, readerLocale } from '../lib/context';
+import { searchClause } from '../services/search';
 import { notFound } from '../lib/problem';
 import { clampLimit, decodeCursor, page } from '../lib/tenant';
 import { CUSTOMER_COLUMNS, canSee, canSeeContact, customerVisibility, loadSubscriptions, loadTags, reachedShops, toCustomer, type CustomerRow } from '../services/customers';
 import { variantLabel } from '../services/catalog';
 
 export function customerRoutes(app: Hono<AppEnv>) {
+  // reach is decided in sql (a subscription row that covers the member's shops), and checked
+  // exactly in code only for the few customers who unsubscribed somewhere (most specific wins)
   app.get('/v1/orgs/:org/customers', (c) => {
     need(c, 'customers.view');
     const { t, topology } = orgOf(c);
@@ -18,28 +21,55 @@ export function customerRoutes(app: Hono<AppEnv>) {
     const limit = clampLimit(q.limit);
     const offset = decodeCursor(q.cursor);
     const v = customerVisibility(c);
-    const rows = t.all<CustomerRow>(
-      `SELECT ${CUSTOMER_COLUMNS} FROM customers WHERE org_id = @org AND erased_at IS NULL
+    let textSql = '1=1';
+    let textParams: string[] = [];
+    if (q.q) {
+      const s = searchClause(cfgOf(c).db, 'customers', 'search_key', 'customers.rowid', q.q);
+      const contact = q.q.includes('@') ? q.q.trim().toLowerCase() : q.q.replace(/\D/g, '');
+      textSql = contact.length >= 8 ? `(${s.sql} OR contact_key LIKE ?)` : s.sql;
+      textParams = contact.length >= 8 ? [...s.params, `%${contact.replace(/[%_]/g, '')}%`] : s.params;
+    }
+    const reachShops = q.shopId ? [q.shopId] : v.all ? null : v.shops;
+    const reachGroups = reachShops ? Object.entries(topology.groups).filter(([, shops]) => shops.some((x) => reachShops.includes(x))).map(([id]) => id) : [];
+    const reachSql = reachShops
+      ? `EXISTS (SELECT 1 FROM customer_subscriptions s WHERE s.org_id = @org AND s.customer_id = customers.id AND s.status != 'unsubscribed'
+           AND (s.scope_type = 'org' OR (s.scope_type = 'shop' AND s.scope_id IN (SELECT value FROM json_each(@rshops)))
+                OR (s.scope_type = 'group' AND s.scope_id IN (SELECT value FROM json_each(@rgroups)))))`
+      : '1=1';
+    const candidates = t.all<{ id: string; search_key: string | null; contact_key: string | null }>(
+      `SELECT id, search_key, contact_key FROM customers WHERE org_id = @org AND erased_at IS NULL
          AND (@locale IS NULL OR locale = @locale)
          AND (@channel IS NULL OR (@channel = 'email' AND email_ok = 1) OR (@channel = 'push' AND push_ok = 1))
          AND (@tag IS NULL OR EXISTS (SELECT 1 FROM customer_tags ct WHERE ct.customer_id = customers.id AND ct.tag = @tag))
-       ORDER BY created_at DESC`,
-      { locale: q.locale ?? null, channel: q.channel ?? null, tag: q.tag ?? null },
+         AND ${textSql} AND ${reachSql}
+       ORDER BY created_at DESC, id DESC`,
+      { locale: q.locale ?? null, channel: q.channel ?? null, tag: q.tag ?? null, rshops: reachShops ?? [], rgroups: reachGroups },
+      textParams,
     );
-    const subs = loadSubscriptions(c);
-    const visible = rows.filter((r) => {
-      const s = subs.get(r.id) ?? [];
+    // exact checks only where they can change the answer
+    const unsubscribedSomewhere = new Set(
+      t.all<{ customer_id: string }>("SELECT DISTINCT customer_id FROM customer_subscriptions WHERE org_id = @org AND status = 'unsubscribed'").map((r) => r.customer_id),
+    );
+    const needExact = candidates.filter((r) => unsubscribedSomewhere.has(r.id) || (q.q && !matches(r.search_key ?? '', q.q))).map((r) => r.id);
+    const exactSubs = loadSubscriptions(c, needExact);
+    const visible = candidates.filter((r) => {
+      if (!unsubscribedSomewhere.has(r.id) && !(q.q && !matches(r.search_key ?? '', q.q))) return true;
+      const s = exactSubs.get(r.id) ?? [];
       const reached = reachedShops(c, s);
       if (!canSee(v, reached)) return false;
       if (q.shopId && !followsShop(s, topology, q.shopId, true)) return false;
       if (q.q && !matches(r.search_key ?? '', q.q) && !(canSeeContact(v, reached) && contactMatches(r.contact_key, q.q))) return false;
       return true;
     });
-    const slice = visible.slice(offset, offset + limit + 1);
-    const tags = loadTags(c, slice.map((r) => r.id));
-    const items = slice.map((r) => {
-      const s = subs.get(r.id) ?? [];
-      return toCustomer(r, s, tags.get(r.id) ?? [], v, reachedShops(c, s));
+    const sliceIds = visible.slice(offset, offset + limit + 1).map((r) => r.id);
+    const rows = new Map(
+      t.all<CustomerRow>(`SELECT ${CUSTOMER_COLUMNS} FROM customers WHERE org_id = @org AND id IN (SELECT value FROM json_each(@ids))`, { ids: sliceIds }).map((r) => [r.id, r]),
+    );
+    const subs = loadSubscriptions(c, sliceIds);
+    const tags = loadTags(c, sliceIds);
+    const items = sliceIds.map((id) => {
+      const s = subs.get(id) ?? [];
+      return toCustomer(rows.get(id)!, s, tags.get(id) ?? [], v, reachedShops(c, s));
     });
     return c.json({ ...page(items, offset, limit), total: visible.length });
   });
@@ -55,7 +85,7 @@ export function customerRoutes(app: Hono<AppEnv>) {
     const reached = reachedShops(c, subs);
     if (!canSee(v, reached)) throw notFound('customer');
     const base = toCustomer(row, subs, loadTags(c, [id]).get(id) ?? [], v, reached);
-    const locale = c.get('locale');
+    const locale = readerLocale(c, orgOf(c).org.default_locale);
     const detail: CustomerDetail = {
       ...base,
       consents: t
@@ -73,16 +103,16 @@ export function customerRoutes(app: Hono<AppEnv>) {
         .map((x) => ({ id: x.id, body: x.body, authorName: x.author_name, createdAt: x.created_at })),
       waitingFor: t
         .all<{ variant_id: string; name: string; options: string | null; shop_id: string | null }>(
-          `SELECT a.variant_id, p.name, v.options, a.shop_id FROM stock_alerts a JOIN product_variants v ON v.id = a.variant_id JOIN products p ON p.id = v.product_id
+          `SELECT a.variant_id, ${productNameSql('p')} AS name, v.options, a.shop_id FROM stock_alerts a JOIN product_variants v ON v.id = a.variant_id JOIN products p ON p.id = v.product_id
             WHERE a.org_id = @org AND a.customer_id = @id AND a.status = 'waiting' ORDER BY a.created_at DESC`,
-          { id },
+          { id, loc: locale },
         )
         .map((x) => ({ variantId: x.variant_id, productName: variantLabel(x.name, x.options, locale), shopId: x.shop_id })),
       favorites: t
         .all<{ product_id: string; name: string }>(
-          `SELECT f.product_id, p.name FROM customer_favorites f JOIN products p ON p.id = f.product_id
+          `SELECT f.product_id, ${productNameSql('p')} AS name FROM customer_favorites f JOIN products p ON p.id = f.product_id
             WHERE f.org_id = @org AND f.customer_id = @id ORDER BY f.created_at DESC`,
-          { id },
+          { id, loc: locale },
         )
         .map((x) => ({ productId: x.product_id, productName: x.name })),
       deliveries: t

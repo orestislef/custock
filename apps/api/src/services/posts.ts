@@ -41,6 +41,8 @@ interface PostRow {
 export interface PostLoadOpts {
   withStats: boolean;
   showPrices: boolean;
+  // linked product names in this language
+  locale?: string;
   // customers do not see audience filters (tags, interests), only the scopes
   publicAudience?: boolean;
 }
@@ -63,11 +65,12 @@ export function loadPosts(t: Tenant, ids: string[], opts: PostLoadOpts): Post[] 
     { ids },
   );
   const products = t.all<{ post_id: string; variant_id: string; offer_price_minor: number | null; product_id: string; name: string; price_minor: number | null; storage_key: string | null; options: string | null }>(
-    `SELECT pp.post_id, pp.variant_id, pp.offer_price_minor, v.product_id, pr.name, v.price_minor, v.options,
+    `SELECT pp.post_id, pp.variant_id, pp.offer_price_minor, v.product_id,
+            coalesce((SELECT ptr.name FROM product_translations ptr WHERE ptr.product_id = pr.id AND ptr.locale = @loc), pr.name) AS name, v.price_minor, v.options,
             (SELECT f.storage_key FROM product_images i JOIN files f ON f.id = i.file_id WHERE i.product_id = pr.id ORDER BY i.sort LIMIT 1) AS storage_key
        FROM post_products pp JOIN product_variants v ON v.id = pp.variant_id JOIN products pr ON pr.id = v.product_id
       WHERE pr.org_id = @org AND pp.post_id IN (SELECT value FROM json_each(@ids)) ORDER BY pp.sort`,
-    { ids },
+    { ids, loc: opts.locale ?? '' },
   );
   const stats = opts.withStats
     ? t.all<{ post_id: string; status: string; n: number }>(

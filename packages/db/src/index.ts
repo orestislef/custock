@@ -4,8 +4,9 @@ import { fileURLToPath } from 'node:url';
 import type { Db } from './open';
 import * as schema from './schema';
 
-export { openDb, migrate, MIGRATIONS_DIR, type Db } from './open';
+export { openDb, migrate, MIGRATIONS_DIR, hasFts5, hasSearchIndex, rebuildSearch, type Db } from './open';
 export { seed, type SeedResult } from './seed';
+export { seedBig, type SynthOptions, type SynthResult } from './synth';
 export { hashPassword, verifyPassword, burnPasswordCheck, sha256, randomToken } from './password';
 export { schema };
 

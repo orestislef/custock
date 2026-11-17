@@ -10,6 +10,16 @@ import { hashPassword } from './password';
 
 const DAY = 86_400_000;
 
+// the Lemoni categories: key, greek (the org default), english, russian
+export const CATEGORY_NAMES: [string, string, string, string][] = [
+  ['pantry', 'Κελάρι', 'Pantry', 'Кладовая'],
+  ['coffee', 'Καφές και τσάι', 'Coffee and tea', 'Кофе и чай'],
+  ['sweets', 'Γλυκά και ξηροί καρποί', 'Sweets and nuts', 'Сладости и орехи'],
+  ['home', 'Σπίτι', 'Home', 'Для дома'],
+  ['care', 'Περιποίηση', 'Body care', 'Уход'],
+  ['cheese', 'Τυριά', 'Cheese', 'Сыры'],
+];
+
 export interface SeedResult {
   orgId: string;
   shops: Record<'kifisia' | 'marousi' | 'glyfada', string>;
@@ -188,13 +198,12 @@ export function seed(db: Db, opts: { now?: number; passwordHash?: string } = {})
 
     // ------------------------------------------------------------ categories
     const cats: Record<string, string> = {};
-    const catDefs: [string, string][] = [
-      ['pantry', 'Κελάρι'], ['coffee', 'Καφές και τσάι'], ['sweets', 'Γλυκά και ξηροί καρποί'],
-      ['home', 'Σπίτι'], ['care', 'Περιποίηση'], ['cheese', 'Τυριά'],
-    ];
-    catDefs.forEach(([k, name], i) => {
+    const catDefs: [string, string, string, string][] = CATEGORY_NAMES;
+    catDefs.forEach(([k, name, en, ru], i) => {
       cats[k] = id(now - 61 * DAY);
       ins('categories', { id: cats[k], org_id: orgId, parent_id: null, name, sort: i });
+      ins('category_translations', { category_id: cats[k], locale: 'en', name: en });
+      ins('category_translations', { category_id: cats[k], locale: 'ru', name: ru });
     });
 
     // ------------------------------------------------------------ products

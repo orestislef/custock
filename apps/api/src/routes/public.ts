@@ -3,7 +3,7 @@
 import type { Hono } from 'hono';
 import { normalizeBarcode, type JoinPage } from '@custock/core';
 import type { AppEnv, OrgRow } from '../types';
-import { cfgOf, nowOf, optionalAuth, ORG_COLUMNS } from '../lib/context';
+import { categoryNameSql, cfgOf, nowOf, optionalAuth, ORG_COLUMNS, readerLocale } from '../lib/context';
 import { forbidden, notFound } from '../lib/problem';
 import { rateLimit } from '../lib/ratelimit';
 import { platform, Tenant } from '../lib/tenant';
@@ -64,7 +64,10 @@ export function publicRoutes(app: Hono<AppEnv>) {
       imageUrl: fileUrl(imageKey),
       disabled,
       interests: t
-        .all<{ id: string; parent_id: string | null; name: string }>('SELECT id, parent_id, name FROM categories WHERE org_id = @org AND parent_id IS NULL AND archived_at IS NULL ORDER BY sort')
+        .all<{ id: string; parent_id: string | null; name: string }>(
+          `SELECT c.id, c.parent_id, ${categoryNameSql('c')} AS name FROM categories c WHERE c.org_id = @org AND c.parent_id IS NULL AND c.archived_at IS NULL ORDER BY c.sort`,
+          { loc: readerLocale(c, org.default_locale) },
+        )
         .map((x) => ({ id: x.id, parentId: x.parent_id, name: x.name })),
     };
     return c.json(body);
@@ -88,7 +91,7 @@ export function publicRoutes(app: Hono<AppEnv>) {
     const org = platform(db).get<OrgRow>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE id = @id`, { id: hit.org_id })!;
     const user = c.get('user');
     const viewer = user ? followingOf(db, user.id).find((f) => f.org.id === org.id)?.customerIds ?? [] : [];
-    const [p] = storefrontProducts(db, org, [hit.product_id], { locale: c.get('locale'), viewerCustomerIds: viewer, now: nowOf(c) });
+    const [p] = storefrontProducts(db, org, [hit.product_id], { locale: readerLocale(c, org.default_locale), viewerCustomerIds: viewer, now: nowOf(c) });
     if (!p) throw notFound('product');
     return c.json(p);
   });
@@ -99,6 +102,6 @@ export function publicRoutes(app: Hono<AppEnv>) {
     if (!org) throw notFound('organization');
     if (org.customer_catalog !== 'public') throw forbidden('catalog is not public');
     const ids = catalogIds(db, org.id, c.req.query('q'), c.req.query('categoryId'));
-    return c.json(storefrontProducts(db, org, ids, { locale: c.get('locale'), now: nowOf(c) }));
+    return c.json(storefrontProducts(db, org, ids, { locale: readerLocale(c, org.default_locale), now: nowOf(c) }));
   });
 }

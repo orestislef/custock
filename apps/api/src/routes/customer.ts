@@ -2,14 +2,15 @@
 // but each organization only ever sees its own customer record.
 
 import type { Context, Hono } from 'hono';
-import { followedShops, searchSql, type FeedItem, type Subscription } from '@custock/core';
+import { followedShops, type FeedItem, type Subscription } from '@custock/core';
 import type { Db } from '@custock/db';
 import type { AppEnv, OrgRow } from '../types';
-import { cfgOf, loadTopology, nowOf, ORG_COLUMNS, requireAuth } from '../lib/context';
+import { cfgOf, loadTopology, nowOf, ORG_COLUMNS, readerLocale, requireAuth } from '../lib/context';
 import { forbidden, notFound } from '../lib/problem';
 import { decodeCursor, page, platform, Tenant, clampLimit } from '../lib/tenant';
 import { loadPosts, postShops } from '../services/posts';
 import { storefrontProducts } from '../services/storefront';
+import { searchClause } from '../services/search';
 import { loadShops } from './org';
 
 export interface Following {
@@ -59,7 +60,7 @@ function feedItems(c: Context<AppEnv>, kind?: 'offer'): FeedItem[] {
          AND (@kind IS NULL OR coalesce(valid_from, sent_at) <= @now)`,
       { kind: kind ?? null, now },
     );
-    const posts = loadPosts(t, rows.map((r) => r.id), { withStats: false, showPrices: !!f.org.customer_prices, publicAudience: true });
+    const posts = loadPosts(t, rows.map((r) => r.id), { withStats: false, showPrices: !!f.org.customer_prices, publicAudience: true, locale: readerLocale(c, f.org.default_locale) });
     for (const full of posts) {
       const reach = postShops(t, full, f.topology).filter((s) => f.shops.includes(s));
       if (!reach.length) continue;
@@ -88,7 +89,7 @@ export function catalogOrg(db: Db, slug: string, userId: string | null): { org: 
 
 export function catalogIds(db: Db, orgId: string, q?: string, categoryId?: string): string[] {
   const t = new Tenant(db, orgId);
-  const s = q ? searchSql('search_key', q) : { sql: '1=1', params: [] };
+  const s = q ? searchClause(db, 'products', 'search_key', 'rowid', q) : { sql: '1=1', params: [] };
   return t
     .all<{ id: string }>(
       `SELECT id FROM products WHERE org_id = @org AND archived_at IS NULL AND customer_visible = 1
@@ -124,13 +125,13 @@ export function customerRoutes(app: Hono<AppEnv>) {
     const db = cfgOf(c).db;
     const { org, viewer } = catalogOrg(db, c.req.param('slug'), c.get('user').id);
     const ids = catalogIds(db, org.id, c.req.query('q'), c.req.query('categoryId'));
-    return c.json(storefrontProducts(db, org, ids, { locale: c.get('locale'), viewerCustomerIds: viewer, now: nowOf(c) }));
+    return c.json(storefrontProducts(db, org, ids, { locale: readerLocale(c, org.default_locale), viewerCustomerIds: viewer, now: nowOf(c) }));
   });
 
   app.get('/v1/c/orgs/:slug/products/:id', (c) => {
     const db = cfgOf(c).db;
     const { org, viewer } = catalogOrg(db, c.req.param('slug'), c.get('user').id);
-    const [p] = storefrontProducts(db, org, [c.req.param('id')], { locale: c.get('locale'), viewerCustomerIds: viewer, now: nowOf(c) });
+    const [p] = storefrontProducts(db, org, [c.req.param('id')], { locale: readerLocale(c, org.default_locale), viewerCustomerIds: viewer, now: nowOf(c) });
     if (!p) throw notFound('product');
     return c.json(p);
   });

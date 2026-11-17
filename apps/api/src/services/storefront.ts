@@ -31,7 +31,7 @@ export function storefrontProducts(
   const shops = t.all<ShopRow>(
     'SELECT id, name, customer_visible, customer_stock FROM shops WHERE org_id = @org AND archived_at IS NULL ORDER BY created_at, name',
   ).filter((s) => s.customer_visible);
-  const products = loadProducts(t, productIds, { withCost: false, levelShops: shops.map((s) => s.id), locale: opts.locale });
+  const products = loadProducts(t, productIds, { withCost: false, levelShops: shops.map((s) => s.id), locale: opts.locale, localizeName: true });
   const viewer = opts.viewerCustomerIds ?? [];
 
   return products

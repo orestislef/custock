@@ -2,7 +2,7 @@
 
 import type { Context, Hono } from 'hono';
 import type { AppEnv } from '../types';
-import { need, orgOf, orgWide, shopsFor } from '../lib/context';
+import { need, orgOf, orgWide, readerLocale, shopsFor } from '../lib/context';
 import { notFound } from '../lib/problem';
 import { clampLimit, decodeCursor, page } from '../lib/tenant';
 import { loadPosts, postShops } from '../services/posts';
@@ -31,14 +31,14 @@ export function postRoutes(app: Hono<AppEnv>) {
     const limit = clampLimit(q.limit);
     const offset = decodeCursor(q.cursor);
     const ids = visibleIds(c, q.status).slice(offset, offset + limit + 1);
-    return c.json(page(loadPosts(t, ids, { withStats: true, showPrices: true }), offset, limit));
+    return c.json(page(loadPosts(t, ids, { withStats: true, showPrices: true, locale: readerLocale(c, orgOf(c).org.default_locale) }), offset, limit));
   });
 
   app.get('/v1/orgs/:org/posts/:id', (c) => {
     need(c, 'posts.view');
     const id = c.req.param('id');
     if (!visibleIds(c).includes(id)) throw notFound('post');
-    const [post] = loadPosts(orgOf(c).t, [id], { withStats: true, showPrices: true });
+    const [post] = loadPosts(orgOf(c).t, [id], { withStats: true, showPrices: true, locale: readerLocale(c, orgOf(c).org.default_locale) });
     if (!post) throw notFound('post');
     const stamp = orgOf(c).t.get<{ updated_at: number }>('SELECT updated_at FROM posts WHERE org_id = @org AND id = @id', { id });
     if (stamp) c.header('ETag', `W/"post-${stamp.updated_at}"`);
