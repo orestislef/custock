@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-17T23:00:00+02:00",
-  "overall": 76,
+  "updated": "2026-11-17T23:30:00+02:00",
+  "overall": 80,
   "areas": [
     {
       "key": "thinking",
@@ -40,9 +40,9 @@
     {
       "key": "web",
       "name": "Web (customer pages and admin)",
-      "percent": 60,
+      "percent": 88,
       "state": "building",
-      "note": "Next.js 16. Customer pages: QR join, shelf product, public catalog, offers, unsubscribe. Admin: dashboard, stock with greeklish search, product with stock per shop, customers, posts composer with the audience breakdown, team, role editor, reports with charts, customer page settings, printable QR posters. Works against the real API. Next: counts, transfers, product editing, audit log, all writes."
+      "note": "Customer pages (QR join, shelf product, catalog, offers, unsubscribe) and the full admin: dashboard, stock, product form with barcode scanning, counts, transfers, customers, posts with the audience breakdown, team and roles, reports, audit log, dev outbox showing what would be sent, settings. Every action works on the real API. An 8 step end to end flow passes. Keyboard and contrast reviewed."
     },
     {
       "key": "mobile",
@@ -104,6 +104,10 @@
     {
       "at": "2026-11-17T23:00:00+02:00",
       "text": "All 31 security findings fixed, 186 backend tests passing. Deploy setup and performance work started."
+    },
+    {
+      "at": "2026-11-17T23:30:00+02:00",
+      "text": "Web app second round done: counts, transfers, product form, audit log, dev outbox, every action on the real API, end to end flow passing."
     }
   ],
   "screens": [
@@ -132,30 +136,39 @@
       "caption": "Phone app, customer offers, Greek, dark"
     },
     {
-      "src": "../apps/web/screenshots/phone-el-join.png",
+      "src": "../apps/web/screenshots/phone-light-el-join.png",
       "caption": "Web, QR join page, Greek"
     },
     {
-      "src": "../apps/web/screenshots/phone-el-shelf.png",
+      "src": "../apps/web/screenshots/phone-light-el-shelf.png",
       "caption": "Web, shelf product page, Greek"
     },
     {
-      "src": "../apps/web/screenshots/desktop-en-home.png",
-      "caption": "Web admin, dashboard",
+      "src": "../apps/web/screenshots/phone-dark-ru-transfers.png",
+      "caption": "Web admin on a phone, transfers, Russian"
+    },
+    {
+      "src": "../apps/web/screenshots/desktop-dark-el-product.png",
+      "caption": "Web admin, product, Greek, dark",
       "wide": true
     },
     {
-      "src": "../apps/web/screenshots/desktop-en-product.png",
-      "caption": "Web admin, product",
+      "src": "../apps/web/screenshots/desktop-dark-el-composer.png",
+      "caption": "Web admin, post composer, Greek, dark",
       "wide": true
     },
     {
-      "src": "../apps/web/screenshots/desktop-en-reports.png",
+      "src": "../apps/web/screenshots/desktop-light-en-reports.png",
       "caption": "Web admin, reports",
       "wide": true
     },
     {
-      "src": "../apps/web/screenshots/desktop-en-settings.png",
+      "src": "../apps/web/screenshots/desktop-light-en-outbox.png",
+      "caption": "Web admin, dev outbox: what would have been sent",
+      "wide": true
+    },
+    {
+      "src": "../apps/web/screenshots/desktop-light-en-settings.png",
       "caption": "Web admin, what customers see",
       "wide": true
     }
