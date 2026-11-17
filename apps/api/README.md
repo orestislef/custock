@@ -27,6 +27,16 @@ Environment:
 | `CUSTOCK_PUBLIC_WEB_URL` | `http://localhost:3000` | base for join, confirm, invite and unsubscribe links |
 | `CUSTOCK_CORS` | localhost 3000, 8081, 19006 | allowed origins |
 | `CUSTOCK_WORKER` | on | `0` turns the job loop off |
+| `CUSTOCK_API_URL` | `http://localhost:<PORT>` | the api's own public address, for upload links and files it serves |
+| `CUSTOCK_UPLOAD_DIR` | next to the database, `uploads/` | where dev uploads are stored |
+| `CUSTOCK_AUTH_MODE` | `local` | `local` is the built in login. `jwks` trusts the real login server |
+| `CUSTOCK_AUTH_JWKS_URL`, `CUSTOCK_AUTH_ISSUER`, `CUSTOCK_AUTH_AUDIENCE` | | required with `jwks` |
+| `CUSTOCK_TRANSPORT` | `outbox` | `outbox` keeps every message in the database. `live` sends them |
+| `CUSTOCK_ALLOW_SENDING` | | must be `yes` for `live`, together with the three below |
+| `CUSTOCK_FCM_SERVICE_ACCOUNT` | | path to the Firebase service account json |
+| `CUSTOCK_SMTP_URL`, `CUSTOCK_MAIL_FROM` | | the mail server and our sender address |
+
+Running on a server: see [deploy/README.md](../../deploy/README.md).
 
 ## dev logins
 
@@ -53,7 +63,7 @@ owners and admins can read it at `GET /v1/dev/outbox`.
 pnpm --filter @custock/api test
 ```
 
-Four suites on a fresh in-memory database: the read side (with a second business to prove nothing
+Several suites on fresh in-memory databases: the read side (with a second business to prove nothing
 leaks), the write side and the edge cases from `thinking/15-edge-cases.md`, and the shared client
 against every path.
 
@@ -99,6 +109,90 @@ The join page uses a stand in for the bot check: in dev it accepts no token or `
 
 `/reports/sales` returns money per day when the caller may see money, otherwise pieces sold. The
 `X-Series-Unit` header says which.
+
+## browsing the api
+
+`GET /v1/openapi.json` is an OpenAPI 3.1 document built from the registered routes and the zod
+contract (`z.toJSONSchema`). Paste the url into any OpenAPI viewer.
+
+## sign in: local or the real login server
+
+`CUSTOCK_AUTH_MODE=local` (the default) is the built in login with short access tokens and rotating
+refresh tokens. With `CUSTOCK_AUTH_MODE=jwks` the api trusts tokens from the real login server:
+RS256 or ES256, checked against its JWKS, issuer and audience. `sub` is the user id. A user row is
+made the first time a subject is seen, with the `email`, `name` and `locale` claims; an email that
+already belongs to another account is not taken over. Customer records with the same confirmed
+email are linked when `email_verified` is true. In this mode our own `/v1/auth/*` endpoints answer
+404, the login server owns sign in.
+
+## messages: outbox or live
+
+Every email and push is written to the `dev_outbox` table first. In `outbox` mode (the default)
+that is where it stays, for reading in the admin. In `live` mode the worker drains the table: push
+through FCM HTTP v1 (a service account, one message per device token, a dead token is dropped),
+email through SMTP. Live mode refuses to start unless the credentials exist and
+`CUSTOCK_ALLOW_SENDING=yes`.
+
+What a message carries:
+
+- push: the shop or business as title, the post title (or the back in stock line) in the reader's
+  language, the cover image, `custock://post/<id>` or `custock://product/<id>` as the deep link,
+  the org as the iOS thread id so the lock screen groups per business. Permission changes go as
+  silent data pushes.
+- email: "Lemoni Kifisia via Custock" as the sender name with our address, reply-to the shop,
+  `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, the unsubscribe link
+  in the footer, `Content-Language` set to the reader's language.
+
+## photos and uploads
+
+`POST /orgs/{org}/uploads/presign` with `{ purpose, mime, bytes }` returns a signed upload slot:
+jpeg, png or webp, up to 5 MB, valid 10 minutes, needs the permission of the thing it is for. In
+dev the api stores the file under `CUSTOCK_UPLOAD_DIR` after checking the size, the type and the
+first bytes, and serves it at `/files/uploads/<org>/<file>`. Use that url in `imageUrls`. Outside
+dev the endpoint answers 501 until object storage (R2) is wired; the response shape stays the same.
+
+Products take the full list of `variants` (sku, options, price, cost, barcodes) and `imageUrls`
+on create and update. Variants left out are archived when they have history and deleted when they
+do not. A changed price needs `products.price.edit`, a cost needs `products.cost.edit`.
+
+## languages
+
+Names come back in the reader's language: `Accept-Language`, else the signed in person's language,
+else the business default. That covers categories, `product.displayName` and `categoryName`
+(staff keep `name` in the default language, it is the one they edit), customer facing product
+names, linked products in posts, report names, count and transfer lines, `movement.productName`,
+and the join page interests.
+
+## speed
+
+`pnpm --filter @custock/api bench` builds a made up business with 2,000 products, 200,000 stock
+movements and 20,000 customers in a temporary database and times the main reads. On the
+development machine (Windows 10, node 22, sqlite 3.54 with FTS5), median of 7 runs:
+
+| endpoint | median ms | worst ms |
+|---|---:|---:|
+| products, first page | 6 | 7 |
+| products, search "meli" | 5 | 7 |
+| products, low stock filter | 28 | 30 |
+| product detail | 3 | 3 |
+| customers, first page (owner) | 52 | 57 |
+| customers, first page (shop manager) | 60 | 67 |
+| customers, search "maria" | 23 | 27 |
+| customers, exact phone | 24 | 24 |
+| movements, first page | 2 | 2 |
+| dashboard (owner, all shops) | 42 | 48 |
+| dashboard (shop manager) | 17 | 18 |
+| sales per day, 30 days | 108 | 109 |
+| top sellers, 30 days | 44 | 45 |
+| most wanted | 3 | 3 |
+| shrinkage, 30 days | 7 | 8 |
+| sync, full (one shop) | 56 | 58 |
+
+`CUSTOCK_PERF=1 pnpm --filter @custock/api test` runs the same check as a test (under 150 ms each).
+Search uses FTS5 tables over the normalised `search_key`, kept in step by triggers and rebuilt when
+the server starts (row ids can move after a restore). Without FTS5 in the sqlite build it falls
+back to `LIKE`. Reports group the ledger in sql before joining products, and a covering index
+serves the sales queries.
 
 ## the worker
 
