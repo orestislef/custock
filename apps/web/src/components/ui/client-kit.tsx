@@ -4,12 +4,16 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { LOCALES, LOCALE_NAMES, type AppLocale } from '@custock/i18n';
 import { setLocaleCookie, useLocale, useT } from '@/lib/i18n-client';
 import { IconClose, IconGlobe } from './icons';
 
 // ---------------------------------------------------------------- sheet
+
+// open sheets, newest last. only the top one answers escape and keeps the tab focus.
+const sheetStack: object[] = [];
 
 export function Sheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode }) {
   const t = useT();
@@ -19,21 +23,35 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const me = {};
+    sheetStack.push(me);
+    const onKey = (e: KeyboardEvent) => {
+      if (sheetStack[sheetStack.length - 1] !== me) return;
+      if (e.key === 'Escape') { onClose(); return; }
+      // keep tab inside the sheet while it is open
+      if (e.key !== 'Tab' || !ref.current) return;
+      const items = [...ref.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')];
+      if (!items.length) return;
+      const first = items[0]!, last = items[items.length - 1]!;
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
     document.addEventListener('keydown', onKey);
     const prev = document.activeElement as HTMLElement | null;
     ref.current?.querySelector<HTMLElement>('input, textarea, select, button:not([data-close])')?.focus();
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
+      sheetStack.splice(sheetStack.indexOf(me), 1);
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = overflow;
       prev?.focus?.();
     };
   }, [open, onClose]);
 
-  if (!open) return null;
-  return (
+  if (!open || typeof document === 'undefined') return null;
+  // rendered at the end of the body, so a sheet opened from inside another sheet stacks on top
+  return createPortal(
     <>
       <div className="scrim" onClick={onClose} aria-hidden="true" />
       <div
@@ -63,7 +81,8 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
         <div className="px-4">{children}</div>
         {footer ? <div className="px-4 pt-3">{footer}</div> : null}
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 

@@ -2,6 +2,7 @@
 // used when the real api is not running. same shapes as the real client, in memory only.
 
 import type {
+  AuditEntry, DevOutboxItem, Invite, StockCount, StockCountLine, Transfer, UncountedPolicy,
   Audience, AudiencePreview, Category, Customer, CustomerDetail, CustockApi, DashboardCards, FeedItem,
   GrantableRole, JoinInput, JoinLink, JoinPage, Locale, MeContext, Member, Movement, MovementBatchResult,
   MovementInput, OrgAccess, OrgSettings, Page, Post, PostInput, Product, ProductInput, PublicProduct, Role,
@@ -359,6 +360,40 @@ const joinLinks: JoinLink[] = [
   { id: 'jl-3', code: 'mr3c5t', scopeType: 'shop', scopeId: 'shop-marousi', label: 'Receipt', url: '/j/mr3c5t', opens: 210, signups: 58, confirmed: 52, disabled: false },
 ];
 
+
+// ---------------------------------------------------------------- stage 2: counts, transfers, audit, dev outbox
+
+const counts: StockCount[] = [];
+const transfers: Transfer[] = [
+  {
+    id: 'tr-1', fromShopId: 'shop-marousi', toShopId: 'shop-kifisia', status: 'sent', note: 'Για το Σάββατο',
+    createdBy: 'u-nikos', createdAt: NOW - 5 * 3_600_000, sentAt: NOW - 4 * 3_600_000, receivedAt: null,
+    lines: [{ variantId: 'v-coffee-0', name: 'Ελληνικός καφές 200g', qtySent: 12, qtyReceived: null, lost: 0 }],
+  },
+];
+const auditLog: AuditEntry[] = [
+  { id: 'au-1', actorId: 'u-eleni', actorName: 'Eleni Papadopoulou', actorKind: 'member', action: 'role.assigned', entityType: 'member', entityId: 'm-maria', before: null, after: { role: 'manager', shop: 'Kifisia' }, createdAt: NOW - 20 * DAY },
+  { id: 'au-2', actorId: 'u-nikos', actorName: 'Nikos Georgiou', actorKind: 'member', action: 'product.price_changed', entityType: 'product', entityId: 'p-oil', before: { price: 1190 }, after: { price: 1290 }, createdAt: NOW - 6 * DAY },
+  { id: 'au-3', actorId: 'u-eleni', actorName: 'Eleni Papadopoulou', actorKind: 'member', action: 'customers.exported', entityType: 'org', entityId: ORG, before: null, after: { rows: 412 }, createdAt: NOW - 2 * DAY },
+  { id: 'au-4', actorId: 'u-nikos', actorName: 'Nikos Georgiou', actorKind: 'member', action: 'post.published', entityType: 'post', entityId: 'post-offer', before: null, after: null, createdAt: NOW - DAY },
+];
+const outbox: DevOutboxItem[] = [];
+const invites: Invite[] = [
+  { id: 'inv-1', email: 'katerina@example.com', roleId: 'role-staff', roleName: 'staff', scopeType: 'shop', scopeId: 'shop-marousi', invitedBy: 'u-nikos', createdAt: NOW - DAY, expiresAt: NOW + 6 * DAY },
+];
+
+function logAudit(by: Person | null, action: string, entityType: string, entityId: string, before: unknown = null, after: unknown = null) {
+  auditLog.unshift({ id: uid(), actorId: by?.userId ?? null, actorName: by?.name ?? null, actorKind: by ? 'member' : 'system', action, entityType, entityId, before, after, createdAt: Date.now() });
+}
+
+function queueOutbox(channel: DevOutboxItem['channel'], c: CustomerRow, title: string, body: string, payload: unknown = null) {
+  outbox.unshift({ id: uid(), channel, orgId: ORG, userId: null, customerId: c.id, to: channel === 'email' ? c.email : c.name, locale: c.locale, title, body, payload, createdAt: Date.now() });
+}
+
+function productOfVariant(variantId: string) {
+  return products.find((p) => p.variants.some((v) => v.id === variantId));
+}
+
 // ---------------------------------------------------------------- the fixture api
 
 function page<T>(items: T[], cursor?: string, limit = 50): Page<T> {
@@ -524,14 +559,22 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       if (!canDo('products.create')) throw new FixtureError(403, 'forbidden');
       const id = `p-${uid().slice(0, 8)}`;
       const code = input.barcode ?? ean13(`20${String(2000 + barcodeSeq++).padStart(10, '0')}`);
+      // the sample data already takes variants and photo urls, the shapes the form sends
+      const extra = input as ProductInput & { variants?: { options: Record<string, string>; priceMinor: number | null }[]; imageUrls?: string[] };
+      const specs = extra.variants?.length ? extra.variants : [{ options: null as unknown as Record<string, string>, priceMinor: input.priceMinor ?? null }];
       const row: ProductRow = {
         id, orgId: ORG, categoryId: input.categoryId ?? null, categoryName: catName(input.categoryId ?? null), name: input.name, description: input.description ?? null,
-        brand: input.brand ?? null, uom: input.uom, taxRateBp: input.taxRateBp, trackStock: input.trackStock, customerVisible: true, customerStockHidden: false, images: [],
-        variants: [{ id: `v-${id}`, productId: id, sku: null, options: null, priceMinor: input.priceMinor ?? null, costMinor: input.costMinor ?? null, isDefault: true, barcodes: [{ id: uid(), code, codeNorm: code.padStart(14, '0'), symbology: 'ean13', packQty: 1 }] }],
+        brand: input.brand ?? null, uom: input.uom, taxRateBp: input.taxRateBp, trackStock: input.trackStock, customerVisible: true, customerStockHidden: false,
+        images: (extra.imageUrls ?? []).map((url) => ({ id: uid(), url, width: null, height: null })),
+        variants: specs.map((v, j) => {
+          const vcode = j === 0 ? code : ean13(`20${String(2000 + barcodeSeq++).padStart(10, '0')}`);
+          return { id: `v-${id}-${j}`, productId: id, sku: null, options: v.options, priceMinor: v.priceMinor ?? input.priceMinor ?? null, costMinor: input.costMinor ?? null, isDefault: j === 0, barcodes: [{ id: uid(), code: vcode, codeNorm: vcode.padStart(14, '0'), symbology: 'ean13', packQty: 1 }] };
+        }),
         archivedAt: null, key: searchKey(input.name, input.brand), shopPrices: {},
       };
       products.unshift(row);
-      for (const s of shops) levels.push({ shopId: s.id, variantId: `v-${id}`, onHand: 0, inTransitIn: 0, reorderPoint: null, lastMovementAt: null, waiting: 0 });
+      for (const s of shops) for (const v of row.variants) levels.push({ shopId: s.id, variantId: v.id, onHand: 0, inTransitIn: 0, reorderPoint: null, lastMovementAt: null, waiting: 0 });
+      logAudit(me(), 'product.created', 'product', id, null, { name: input.name });
       return productOut(row);
     },
     async updateProduct(_org, id, patch) {
@@ -541,6 +584,13 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       if (patch.priceMinor !== undefined && !canDo('products.price.edit')) throw new FixtureError(403, 'forbidden');
       if (patch.name) { p.name = patch.name; p.key = searchKey(p.name, p.translations?.en?.name, p.translations?.ru?.name); }
       if (patch.description !== undefined) p.description = patch.description ?? null;
+      if (patch.brand !== undefined) p.brand = patch.brand ?? null;
+      if (patch.categoryId !== undefined) { p.categoryId = patch.categoryId ?? null; p.categoryName = catName(p.categoryId); }
+      if (patch.uom) p.uom = patch.uom;
+      if (patch.taxRateBp) p.taxRateBp = patch.taxRateBp;
+      if (patch.trackStock !== undefined) p.trackStock = patch.trackStock;
+      if (patch.costMinor !== undefined && canDo('products.cost.edit')) p.variants[0]!.costMinor = patch.costMinor ?? null;
+      if (patch.barcode) { const code = patch.barcode.trim(); p.variants[0]!.barcodes.push({ id: uid(), code, codeNorm: code.padStart(14, '0'), symbology: 'ean13', packQty: 1 }); }
       if (patch.priceMinor !== undefined) p.variants[0]!.priceMinor = patch.priceMinor ?? null;
       return productOut(p);
     },
@@ -578,6 +628,11 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
         result.accepted.push(m.id);
         if (before <= 0 && l.onHand > 0 && ['receive', 'transfer_in', 'return'].includes(m.kind) && l.waiting > 0) {
           result.backInStock.push({ variantId: m.variantId, shopId: m.shopId, notified: l.waiting });
+          const prod = productOfVariant(m.variantId);
+          const shopName = shops.find((x) => x.id === m.shopId)?.name ?? '';
+          for (const c of customers.filter((x) => x.waitingFor.some((w) => w.variantId === m.variantId))) {
+            queueOutbox(c.pushOk ? 'push' : 'email', c, `${settings.name} ${shopName}`, `${prod?.translations?.[c.locale]?.name ?? prod?.name ?? ''}: back in stock`, { kind: 'back_in_stock', variantId: m.variantId });
+          }
           l.waiting = 0;
         }
         if (l.reorderPoint != null && before > l.reorderPoint && l.onHand <= l.reorderPoint) result.lowStock.push({ variantId: m.variantId, shopId: m.shopId, onHand: l.onHand });
@@ -666,7 +721,16 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       if (!mayPublish) { p.status = 'pending_approval'; return p; }
       const pr = preview(p.audience, p.channels);
       p.status = p.scheduledAt && p.scheduledAt > Date.now() ? 'scheduled' : 'sent';
-      if (p.status === 'sent') { p.sentAt = Date.now(); p.recipientsCount = pr.total; p.stats = { queued: 0, sent: pr.push.count + pr.email.count, failed: 0, opened: 0, skipped: 0 }; }
+      if (p.status === 'sent') {
+        p.sentAt = Date.now(); p.recipientsCount = pr.total; p.stats = { queued: 0, sent: pr.push.count + pr.email.count, failed: 0, opened: 0, skipped: 0 };
+        const reached = customers.filter((c) => p.audience.scopes.some((sc) => sc.scopeType === 'org' || shops.some((sh) => covers(sc.scopeType, sc.scopeId, sh.id) && customerReaches(c, sh.id))));
+        for (const c of reached) {
+          const text = p.translations[c.locale] ?? p.translations[p.defaultLocale]!;
+          if (p.channels.includes('push') && c.pushOk) queueOutbox('push', c, settings.name, text.title, { kind: 'post', postId: p.id });
+          if (p.channels.includes('email') && c.emailOk) queueOutbox('email', c, text.title, text.body, { kind: 'post', postId: p.id });
+        }
+        logAudit(me(), 'post.published', 'post', p.id);
+      }
       return p;
     },
     async approvePost(org, id) {
@@ -774,7 +838,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
         a.qty += -m.qtyDelta; a.value += -m.qtyDelta * (m.unitPriceMinor ?? 0);
         agg.set(m.variantId, a);
       }
-      return [...agg.entries()].map(([variantId, a]) => ({ variantId, name: products.find((p) => p.variants.some((v) => v.id === variantId))!.name, qty: a.qty, valueMinor: money ? a.value : null }))
+      return [...agg.entries()].map(([variantId, a]) => { const p = products.find((x) => x.variants.some((v) => v.id === variantId))!; return { variantId, name: p.name, qty: a.qty, uom: p.uom, valueMinor: money ? a.value : null }; })
         .sort((x, y) => y.qty - x.qty).slice(0, 6);
     },
     async mostWanted(_org, shopId) {
@@ -860,6 +924,194 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       if (!p) throw new FixtureError(404, 'not_found');
       return publicProduct(p);
     },
+
+    // ------------------------------------------------------------ stage 2
+    async archiveProduct(_org, productId) {
+      if (!canDo('products.archive')) throw new FixtureError(403, 'forbidden');
+      const p = products.find((x) => x.id === productId);
+      if (p) { p.archivedAt = Date.now(); logAudit(me(), 'product.archived', 'product', productId); }
+    },
+    async setBasePrice(_org, variantId, priceMinor) {
+      if (!canDo('products.price.edit')) throw new FixtureError(403, 'forbidden');
+      const v = products.flatMap((p) => p.variants).find((x) => x.id === variantId);
+      if (v) { logAudit(me(), 'product.price_changed', 'variant', variantId, { price: v.priceMinor }, { price: priceMinor }); v.priceMinor = priceMinor; }
+    },
+    async setShopVariantSettings(_org, shopId, variantId, input) {
+      const l = lvl(shopId, variantId);
+      if (!l) throw new FixtureError(404, 'not_found');
+      if (input.priceOverrideMinor !== undefined) {
+        if (!canDo('prices.shop.edit', shopId)) throw new FixtureError(403, 'forbidden');
+        const p = productOfVariant(variantId);
+        if (p) { if (input.priceOverrideMinor == null) delete p.shopPrices[shopId]; else p.shopPrices[shopId] = input.priceOverrideMinor; }
+      }
+      if (input.reorderPoint !== undefined) {
+        if (!canDo('stock.settings.manage', shopId)) throw new FixtureError(403, 'forbidden');
+        l.reorderPoint = input.reorderPoint;
+      }
+    },
+    async nextInternalBarcode() { return { code: ean13(`20${String(3000 + barcodeSeq++).padStart(10, '0')}`) }; },
+    async resolveUnknownScan(_org, id, variantId) {
+      const i = unknownScans.findIndex((u) => u.id === id);
+      if (i < 0) return;
+      if (variantId) {
+        const v = products.flatMap((p) => p.variants).find((x) => x.id === variantId);
+        v?.barcodes.push({ id: uid(), code: unknownScans[i]!.code, codeNorm: unknownScans[i]!.code.padStart(14, '0'), symbology: 'ean13', packQty: 1 });
+      }
+      unknownScans.splice(i, 1);
+    },
+
+    async counts(_org, q = {}) {
+      return counts.filter((c) => (!q.shopId || c.shopId === q.shopId) && (!q.status || c.status === q.status) && visibleShops().includes(c.shopId));
+    },
+    async stockCount(_org, id) {
+      const c = counts.find((x) => x.id === id);
+      if (!c) throw new FixtureError(404, 'not_found');
+      return c;
+    },
+    async startCount(_org, shopId, input) {
+      if (!canDo('stock.count', shopId)) throw new FixtureError(403, 'forbidden');
+      const c: StockCount = { id: `count-${uid().slice(0, 8)}`, shopId, kind: input.kind, filter: input.filter ?? null, status: 'open', startedBy: me()!.userId, startedAt: Date.now(), submittedAt: null, appliedBy: null, appliedAt: null, uncountedPolicy: null, lines: [] };
+      counts.unshift(c);
+      return c;
+    },
+    async setCountLine(_org, id, variantId, countedQty, mode = 'set') {
+      const c = counts.find((x) => x.id === id);
+      if (!c || c.status !== 'open') throw new FixtureError(409, 'conflict');
+      const p = productOfVariant(variantId)!;
+      const expected = lvl(c.shopId, variantId)?.onHand ?? 0;
+      let line = c.lines.find((l) => l.variantId === variantId);
+      const showCost = canDo('products.cost.view');
+      if (!line) {
+        line = { variantId, productId: p.id, name: p.name, countedQty: 0, expectedQty: expected, difference: 0, differenceCostMinor: null, countedBy: me()!.userId, countedByName: me()!.name, countedAt: Date.now() };
+        c.lines.push(line);
+      }
+      line.countedQty = mode === 'add' ? line.countedQty + countedQty : countedQty;
+      line.expectedQty = expected;
+      line.difference = line.countedQty - expected;
+      const unit = p.uom === 'piece' ? 1 : 1000;
+      line.differenceCostMinor = showCost ? Math.round((line.difference / unit) * (p.variants[0]!.costMinor ?? 0)) : null;
+      line.countedAt = Date.now();
+      return line as StockCountLine;
+    },
+    async submitCount(_org, id) {
+      const c = counts.find((x) => x.id === id)!;
+      c.status = 'review'; c.submittedAt = Date.now();
+      return c;
+    },
+    async applyCount(org, id, policy: UncountedPolicy = 'ignore') {
+      const c = counts.find((x) => x.id === id)!;
+      if (!canDo('stock.count.approve', c.shopId)) throw new FixtureError(403, 'forbidden');
+      const moves: MovementInput[] = c.lines.filter((l) => l.difference !== 0).map((l) => ({ id: uid(), shopId: c.shopId, variantId: l.variantId, qtyDelta: l.difference, kind: 'count', refType: 'count', refId: c.id, occurredAt: Date.now() }));
+      if (c.kind === 'full' && policy === 'set_zero') {
+        const counted = new Set(c.lines.map((l) => l.variantId));
+        for (const l of levels) if (l.shopId === c.shopId && !counted.has(l.variantId) && l.onHand !== 0) moves.push({ id: uid(), shopId: c.shopId, variantId: l.variantId, qtyDelta: -l.onHand, kind: 'count', refType: 'count', refId: c.id, occurredAt: Date.now() });
+      }
+      if (moves.length) await api.postMovements!(org, moves);
+      c.status = 'applied'; c.appliedAt = Date.now(); c.appliedBy = me()!.userId; c.uncountedPolicy = policy;
+      logAudit(me(), 'count.applied', 'count', c.id, null, { lines: moves.length });
+      return c;
+    },
+    async cancelCount(_org, id) {
+      const c = counts.find((x) => x.id === id)!;
+      c.status = 'cancelled';
+      return c;
+    },
+
+    async transfers(_org, q = {}) {
+      const ids = visibleShops();
+      return transfers.filter((x) => (ids.includes(x.fromShopId) || ids.includes(x.toShopId)) && (!q.shopId || x.fromShopId === q.shopId || x.toShopId === q.shopId) && (!q.status || x.status === q.status));
+    },
+    async transfer(_org, id) {
+      const x = transfers.find((y) => y.id === id);
+      if (!x) throw new FixtureError(404, 'not_found');
+      return x;
+    },
+    async createTransfer(_org, input) {
+      if (!canDo('stock.transfer.send', input.fromShopId)) throw new FixtureError(403, 'forbidden');
+      const x: Transfer = {
+        id: `tr-${uid().slice(0, 8)}`, fromShopId: input.fromShopId, toShopId: input.toShopId, status: 'draft', note: input.note ?? null,
+        createdBy: me()!.userId, createdAt: Date.now(), sentAt: null, receivedAt: null,
+        lines: input.lines.map((l) => ({ variantId: l.variantId, name: productOfVariant(l.variantId)?.name ?? '', qtySent: l.qty, qtyReceived: null, lost: 0 })),
+      };
+      transfers.unshift(x);
+      return x;
+    },
+    async sendTransfer(org, id) {
+      const x = transfers.find((y) => y.id === id)!;
+      if (!canDo('stock.transfer.send', x.fromShopId)) throw new FixtureError(403, 'forbidden');
+      await api.postMovements!(org, x.lines.map((l) => ({ id: uid(), shopId: x.fromShopId, variantId: l.variantId, qtyDelta: -l.qtySent, kind: 'transfer_out', refType: 'transfer', refId: x.id, occurredAt: Date.now() })));
+      for (const l of x.lines) { const lv = lvl(x.toShopId, l.variantId); if (lv) lv.inTransitIn += l.qtySent; }
+      x.status = 'sent'; x.sentAt = Date.now();
+      return x;
+    },
+    async receiveTransfer(org, id, lines) {
+      const x = transfers.find((y) => y.id === id)!;
+      if (!canDo('stock.transfer.receive', x.toShopId)) throw new FixtureError(403, 'forbidden');
+      const got = new Map(lines.map((l) => [l.variantId, l.qtyReceived]));
+      const moves: MovementInput[] = [];
+      for (const l of x.lines) {
+        l.qtyReceived = got.get(l.variantId) ?? l.qtySent;
+        l.lost = Math.max(0, l.qtySent - l.qtyReceived);
+        const lv = lvl(x.toShopId, l.variantId);
+        if (lv) lv.inTransitIn = Math.max(0, lv.inTransitIn - l.qtySent);
+        if (l.qtyReceived > 0) moves.push({ id: uid(), shopId: x.toShopId, variantId: l.variantId, qtyDelta: l.qtyReceived, kind: 'transfer_in', refType: 'transfer', refId: x.id, occurredAt: Date.now() });
+      }
+      if (moves.length) await api.postMovements!(org, moves);
+      x.status = 'received'; x.receivedAt = Date.now();
+      return x;
+    },
+    async cancelTransfer(_org, id) {
+      const x = transfers.find((y) => y.id === id)!;
+      if (x.status !== 'draft') throw new FixtureError(409, 'conflict');
+      x.status = 'cancelled';
+      return x;
+    },
+
+    async addCustomer(_org, input) {
+      if (!canDo('customers.add', input.shopId)) throw new FixtureError(403, 'forbidden');
+      const row: CustomerRow = {
+        id: `c-${uid().slice(0, 6)}`, name: input.name, email: input.email ?? '', phone: null, fullPhone: input.phone ?? '', contactMasked: false,
+        locale: input.locale, emailOk: false, pushOk: false, smsOk: false, hasApp: false, source: 'staff', tags: input.tags,
+        subscriptions: [{ scopeType: 'shop', scopeId: input.shopId, status: 'pending' }], createdAt: Date.now(),
+        consents: [], notes: [], waitingFor: [], favorites: [], deliveries: [], key: searchKey(input.name, input.email),
+      };
+      customers.unshift(row);
+      if (input.email) queueOutbox('email', row, `${settings.name}`, 'Confirm your email to get news and offers.');
+      return customerOut(row);
+    },
+    async eraseCustomer(_org, id) {
+      if (!canDo('customers.erase')) throw new FixtureError(403, 'forbidden');
+      const c = customers.find((x) => x.id === id);
+      if (c) { c.name = null; c.email = ''; c.fullPhone = ''; c.tags = []; c.notes = []; c.key = ''; logAudit(me(), 'customer.erased', 'customer', id); }
+    },
+    async updateJoinLink(_org, id, patch) {
+      const l = joinLinks.find((x) => x.id === id)!;
+      if (patch.label !== undefined) l.label = patch.label;
+      if (patch.disabled !== undefined) l.disabled = patch.disabled;
+      return l;
+    },
+    async deletePost(_org, id) {
+      if (!canDo('posts.delete')) throw new FixtureError(403, 'forbidden');
+      const i = posts.findIndex((x) => x.id === id);
+      if (i >= 0) posts.splice(i, 1);
+    },
+
+    async invites() { return invites; },
+    async revokeInvite(_org, id) { const i = invites.findIndex((x) => x.id === id); if (i >= 0) invites.splice(i, 1); },
+    async updateMember(_org, membershipId, patch) {
+      const p = people.find((x) => x.membershipId === membershipId);
+      if (p) logAudit(me(), `member.${patch.status}`, 'member', membershipId);
+    },
+    async roleImpact(_org, roleId) {
+      const names = people.filter((p) => p.assignments.some((a) => a.roleId === roleId)).map((p) => p.name);
+      return { members: names.length, names };
+    },
+    async audit(_org, cursor) {
+      if (!canDo('org.audit.view')) throw new FixtureError(403, 'forbidden');
+      return page(auditLog, cursor, 50);
+    },
+    async devOutbox(limit = 100) { return outbox.slice(0, limit); },
+    async devRunJobs() { return { ran: 0 }; },
   };
   // anything the sample data does not cover answers like a missing endpoint
   return new Proxy(api, {

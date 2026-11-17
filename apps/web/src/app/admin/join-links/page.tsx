@@ -5,7 +5,7 @@ import { useState } from 'react';
 import type { JoinLink, ScopeType } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
-import { Empty, Why } from '@/components/ui/kit';
+import { Empty, Switch, Why } from '@/components/ui/kit';
 import { Sheet, Tip, useToast } from '@/components/ui/client-kit';
 import { Qr } from '@/components/ui/qr';
 import { IconLink, IconPlus, IconPrint } from '@/components/ui/icons';
@@ -17,6 +17,7 @@ export default function JoinLinksPage() {
   const links = useAsync(() => (can('joinlinks.manage', null) ? api.joinLinks(org.orgId) : Promise.resolve([])), []);
   const groups = useAsync(() => api.groups(org.orgId), []);
   const [creating, setCreating] = useState(false);
+  const toast = useToast();
   const origin = typeof window === 'undefined' ? '' : window.location.origin;
   const scopeName = (l: JoinLink) => l.scopeType === 'org' ? org.name : l.scopeType === 'group' ? groups.data?.find((g) => g.id === l.scopeId)?.name ?? '' : shops.find((s) => s.id === l.scopeId)?.name ?? '';
 
@@ -40,7 +41,14 @@ export default function JoinLinksPage() {
                 </p>
                 <p className="t-foot t-2 m-0 mt-0.5">{t('links.conversion', { pct: percent(l.confirmed / Math.max(1, l.opens), locale) })}</p>
                 <span className="flex-1" />
-                <Link href={`/admin/print/${l.id}`} className="btn btn-tinted mt-3 self-start"><IconPrint size={18} />{t('links.poster')}</Link>
+                <span className="flex items-center gap-2 mt-3 flex-wrap">
+                  <Link href={`/admin/print/${l.id}`} className="btn btn-tinted" aria-disabled={l.disabled}><IconPrint size={18} />{t('links.poster')}</Link>
+                  <label className="inline-flex items-center gap-2 t-foot t-2 ml-auto">
+                    {l.disabled ? t('links.off') : t('links.on')}
+                    <Switch checked={!l.disabled} label={t('links.activeFor', { label: l.label ?? scopeName(l) })}
+                      onChange={(on) => void api.updateJoinLink(org.orgId, l.id, { disabled: !on }).then(() => links.reload()).catch((e: { code?: string }) => toast(t(`common:error.${e.code ?? 'internal'}`)))} />
+                  </label>
+                </span>
               </div>
             </li>
           ))}

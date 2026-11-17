@@ -82,6 +82,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [state, setState] = useState<Loaded | null>(null);
   const [version, setVersion] = useState(0);
+  const [failed, setFailed] = useState(false);
   const isLogin = pathname === '/admin/login';
   useEffect(() => { session.locale = locale; }, [locale]);
 
@@ -96,10 +97,13 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       if (!loadTokens()) { router.replace('/admin/login'); return; }
       try {
         const loaded = await loadSession(getApi());
-        if (alive) setState(loaded);
-      } catch {
-        saveTokens(null);
-        router.replace('/admin/login');
+        if (alive) { setState(loaded); setFailed(false); }
+      } catch (e) {
+        // only a rejected session signs you out. a network hiccup shows a retry instead
+        if ((e as { status?: number }).status === 401 || (e as { code?: string }).code === 'unauthorized') {
+          saveTokens(null);
+          router.replace('/admin/login');
+        } else if (alive) setFailed(true);
       }
     };
     void go();
@@ -121,6 +125,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   if (isLogin) {
     return <LoginApi.Provider value={{ api: getApi(), onSignedIn: () => setVersion((v) => v + 1) }}>{children}</LoginApi.Provider>;
   }
+  if (!state && failed) return <Retry t={t} onRetry={() => setVersion((v) => v + 1)} />;
   if (!state) return <Splash />;
   const org = state.me.orgs[0];
   if (!org) return <NoOrg t={t} onLogout={logout} />;
@@ -150,6 +155,18 @@ function NoOrg({ t, onLogout }: { t: TFunction; onLogout: () => void }) {
         <p className="t-title2 m-0">{t('admin.noOrgTitle')}</p>
         <p className="t-body t-2 mt-2">{t('admin.noOrgBody')}</p>
         <button className="btn btn-tinted mt-4" type="button" onClick={onLogout}>{t('common:action.signOut')}</button>
+      </div>
+    </div>
+  );
+}
+
+function Retry({ t, onRetry }: { t: TFunction; onRetry: () => void }) {
+  return (
+    <div className="min-h-dvh grid place-items-center px-6 text-center">
+      <div>
+        <p className="t-title3 m-0">{t('admin.offlineTitle')}</p>
+        <p className="t-body t-2 mt-2">{t('admin.offlineBody')}</p>
+        <button className="btn btn-tinted mt-4" type="button" onClick={onRetry}>{t('common:action.retry')}</button>
       </div>
     </div>
   );

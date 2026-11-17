@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import type { ScopeType } from '@custock/core';
+import type { Member, ScopeType } from '@custock/core';
+import { relative } from '@/lib/format';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { Avatar, Group, Row, Why } from '@/components/ui/kit';
@@ -11,9 +12,12 @@ import { IconCheck, IconLock, IconPlus, IconShield } from '@/components/ui/icons
 import { useAsync } from '@/lib/use-async';
 
 export default function TeamPage() {
-  const { api, org, t, can } = useAdmin();
+  const { api, org, t, can, locale } = useAdmin();
   const members = useAsync(() => (can('members.view', null) ? api.members(org.orgId) : Promise.resolve([])), []);
   const [inviting, setInviting] = useState(false);
+  const [managing, setManaging] = useState<Member | null>(null);
+  const toast = useToast();
+  const invites = useAsync(() => (org.orgPerms.includes('members.invite') || org.shops.some((s) => s.perms.includes('members.invite')) ? api.invites(org.orgId) : Promise.resolve([])), [inviting]);
   const canInvite = org.orgPerms.includes('members.invite') || org.shops.some((s) => s.perms.includes('members.invite'));
 
   return (
@@ -39,11 +43,22 @@ export default function TeamPage() {
               </span>
             }
             value={m.status === 'active' ? undefined : t(`team.status.${m.status}`)}
+            onClick={m.canManage ? () => setManaging(m) : undefined}
+            chevron={m.canManage}
           />
         ))}
         {!members.data ? <div className="row"><span className="w-9 h-9 rounded-full skel" /><span className="row-main"><span className="block h-4 w-1/3 skel" /></span></div> : null}
       </Group>
+      {invites.data?.length ? (
+        <Group title={t('team.pending')} footer={t('team.pendingFoot')}>
+          {invites.data.map((i) => (
+            <Row key={i.id} title={i.email} subtitle={`${t(`common:role.${i.roleName}`, { defaultValue: i.roleName })} · ${t('team.expires', { when: relative(i.expiresAt, locale) })}`}
+              trailing={<button type="button" className="btn btn-plain" style={{ color: 'var(--c-error)' }} onClick={() => void api.revokeInvite(org.orgId, i.id).then(() => { toast(t('team.revoked')); void invites.reload(); }).catch((e: { code?: string }) => toast(t(`common:error.${e.code ?? 'internal'}`)))}>{t('team.revoke')}</button>} />
+          ))}
+        </Group>
+      ) : null}
       <InviteSheet open={inviting} onClose={() => setInviting(false)} />
+      {managing ? <MemberSheet member={managing} onClose={() => setManaging(null)} onDone={() => { setManaging(null); void members.reload(); }} /> : null}
     </Page>
   );
 }
@@ -114,6 +129,39 @@ function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
           </section>
         </>
       )}
+    </Sheet>
+  );
+}
+
+// change a member's status. remove asks once more inline. roles change through invite for now.
+function MemberSheet({ member, onClose, onDone }: { member: Member; onClose: () => void; onDone: () => void }) {
+  const { api, org, t } = useAdmin();
+  const toast = useToast();
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  async function set(status: 'active' | 'suspended' | 'removed') {
+    try {
+      await api.updateMember(org.orgId, member.membershipId, { status });
+      toast(t(`team.done.${status}`, { name: member.name ?? '' }));
+      onDone();
+    } catch (e) {
+      toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
+    }
+  }
+  return (
+    <Sheet open onClose={onClose} title={member.name ?? ''}>
+      <div className="list mb-4">
+        {member.assignments.map((a) => (
+          <div key={a.id} className="row"><span className="row-main row-title">{t(`common:role.${a.roleName}`, { defaultValue: a.roleName })}</span><span className="row-value">{a.scopeName}</span></div>
+        ))}
+      </div>
+      <div className="list mb-2">
+        {member.status === 'suspended'
+          ? <button type="button" className="row" style={{ color: 'var(--c-accent)' }} onClick={() => void set('active')}><span className="row-main row-title">{t('team.reactivate')}</span></button>
+          : <button type="button" className="row" onClick={() => void set('suspended')}><span className="row-main"><span className="row-title block">{t('team.suspend')}</span><span className="row-sub block">{t('team.suspendSub')}</span></span></button>}
+        {confirmRemove
+          ? <button type="button" className="row" style={{ color: 'var(--c-error)' }} onClick={() => void set('removed')}><span className="row-main"><span className="row-title block">{t('team.removeConfirm', { name: member.name ?? '' })}</span><span className="row-sub block">{t('team.removeSub')}</span></span></button>
+          : <button type="button" className="row" style={{ color: 'var(--c-error)' }} onClick={() => setConfirmRemove(true)}><span className="row-main row-title">{t('team.remove')}</span></button>}
+      </div>
     </Sheet>
   );
 }

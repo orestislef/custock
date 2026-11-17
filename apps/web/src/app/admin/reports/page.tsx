@@ -5,7 +5,8 @@ import { Page } from '@/components/admin/shell';
 import { BarList, ChartCard, ColumnChart, DataTable, FunnelBars, Legend } from '@/components/admin/charts';
 import { Why } from '@/components/ui/kit';
 import { useAsync } from '@/lib/use-async';
-import { date, money, number } from '@/lib/format';
+import { date, money, number, qtyNumber } from '@/lib/format';
+import type { Uom } from '@custock/core';
 
 export default function ReportsPage() {
   const { api, org, t, locale, can } = useAdmin();
@@ -17,6 +18,10 @@ export default function ReportsPage() {
   const top = useAsync(() => (allowed ? api.topSellers(org.orgId, shopId, 14) : none([])), [shopId, allowed]);
   const wanted = useAsync(() => (allowed ? api.mostWanted(org.orgId, shopId) : none([])), [shopId, allowed]);
   const links = useAsync(() => (allowed && can('customers.view', null) && org.orgPerms.includes('reports.view') ? api.joinLinkStats(org.orgId) : none([])), [allowed]);
+  // top sellers come without a unit for now, so the unit is looked up from the catalog
+  const catalog = useAsync(() => (allowed ? api.products(org.orgId, { limit: 500 }) : Promise.resolve(null)), [allowed]);
+  const uomOf = (variantId: string, row?: { uom?: Uom }): Uom => row?.uom ?? catalog.data?.items.find((p) => p.variants.some((v) => v.id === variantId))?.uom ?? 'piece';
+  const units = (variantId: string, qty: number, row?: { uom?: Uom }) => { const u = uomOf(variantId, row); return u === 'piece' ? number(qty, locale) : `${qtyNumber(qty, u, locale)} ${t(`common:uom.${u}`)}`; };
   const shrink = useAsync(() => (allowed ? api.shrinkage(org.orgId, shopId, 30) : none([])), [shopId, allowed]);
 
   if (!allowed) return <Page title={t('reports.title')}><Why>{t('common:error.forbidden')}</Why></Page>;
@@ -42,12 +47,12 @@ export default function ReportsPage() {
         ) : null}
 
         <ChartCard title={t('reports.top')} subtitle={moneyOk ? t('reports.topSubMoney') : t('reports.topSub')}
-          table={<DataTable head={[t('reports.product'), t('reports.qty'), ...(moneyOk ? [t('reports.value')] : [])]} rows={(top.data ?? []).map((r) => [r.name, number(r.qty, locale), ...(moneyOk && r.valueMinor != null ? [eur(r.valueMinor)] : [])])} />}>
+          table={<DataTable head={[t('reports.product'), t('reports.qty'), ...(moneyOk ? [t('reports.value')] : [])]} rows={(top.data ?? []).map((r) => [r.name, units(r.variantId, r.qty, r as { uom?: Uom }), ...(moneyOk && r.valueMinor != null ? [eur(r.valueMinor)] : [])])} />}>
           {/* with money visible the bars compare sales value, which works across pieces and kilos */}
           <BarList label={t('reports.top')}
             data={(top.data ?? []).map((r) => (moneyOk && r.valueMinor != null
-              ? { key: r.variantId, label: r.name, value: r.valueMinor, note: t('reports.units', { n: number(r.qty, locale) }) }
-              : { key: r.variantId, label: r.name, value: r.qty })).sort((a, b) => b.value - a.value)}
+              ? { key: r.variantId, label: r.name, value: r.valueMinor, note: t('reports.units', { n: units(r.variantId, r.qty, r as { uom?: Uom }) }) }
+              : { key: r.variantId, label: r.name, value: uomOf(r.variantId, r as { uom?: Uom }) === 'piece' ? r.qty : r.qty / 1000, note: uomOf(r.variantId, r as { uom?: Uom }) === 'piece' ? undefined : t(`common:uom.${uomOf(r.variantId, r as { uom?: Uom })}`) })).sort((a, b) => b.value - a.value)}
             format={(n) => (moneyOk ? eur(n) : number(n, locale))} empty={t('reports.empty')} />
         </ChartCard>
 

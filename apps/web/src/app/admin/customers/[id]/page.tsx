@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { use, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Avatar, Group, Row, Why } from '@/components/ui/kit';
 import { useToast } from '@/components/ui/client-kit';
@@ -19,6 +20,8 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
   const [note, setNote] = useState('');
   const [tag, setTag] = useState('');
   const editable = can('customers.edit', null);
+  const [erasing, setErasing] = useState(false);
+  const router = useRouter();
 
   const d = c.data;
   if (!d) return <div className="pt-6"><div className="h-16 w-16 rounded-full skel mb-4" /><div className="h-8 w-1/2 skel" /></div>;
@@ -125,6 +128,18 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
               <Row key={i} title={`${t(`common:channel.${x.channel}`)}: ${x.granted ? t('customer.granted') : t('customer.withdrawn')}`} subtitle={`${dateTime(x.createdAt, locale)} · ${x.source} · ${x.textVersion}`} />
             )) : <Row title={<span className="t-2">{t('customer.noConsents')}</span>} />}
           </Group>
+
+          {can('customers.erase', null) ? (
+            <Group title={t('customer.privacy')} footer={t('customer.eraseFoot')}>
+              {erasing ? (
+                <button type="button" className="row" style={{ color: 'var(--c-error)' }} onClick={() => void api.eraseCustomer(org.orgId, id).then(() => { toast(t('customer.erased')); router.push('/admin/customers'); }).catch((e: { code?: string }) => toast(t(`common:error.${e.code ?? 'internal'}`)))}>
+                  <span className="row-main row-title">{t('customer.eraseConfirm', { name: d.name ?? '' })}</span>
+                </button>
+              ) : (
+                <button type="button" className="row" style={{ color: 'var(--c-error)' }} onClick={() => setErasing(true)}><span className="row-main row-title">{t('customer.erase')}</span></button>
+              )}
+            </Group>
+          ) : null}
 
           <Group title={t('customer.messages')}>
             {d.deliveries.length ? d.deliveries.map((x, i) => (

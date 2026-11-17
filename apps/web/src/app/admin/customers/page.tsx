@@ -2,9 +2,12 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import type { Locale } from '@custock/core';
+import { Sheet, useToast } from '@/components/ui/client-kit';
+import { IconPlus } from '@/components/ui/icons';
 import { useAdmin, useShopFilter } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
-import { Avatar, Empty, Segmented, Why } from '@/components/ui/kit';
+import { Avatar, Empty, Row, Segmented, Switch, Why } from '@/components/ui/kit';
 import { IconBell, IconMail, IconPeople, IconSearch } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { LOCALE_NAMES } from '@custock/i18n';
@@ -17,6 +20,7 @@ export default function CustomersPage() {
   const [q, setQ] = useState('');
   const [debounced, setDebounced] = useState('');
   const [channel, setChannel] = useState<Channel>('all');
+  const [adding, setAdding] = useState(false);
   useEffect(() => { const id = setTimeout(() => setDebounced(q), 180); return () => clearTimeout(id); }, [q]);
 
   const list = useAsync(() => api.customers(org.orgId, { q: debounced || undefined, shopId, channel: channel === 'all' ? undefined : channel, limit: 200 }), [debounced, shopId, channel]);
@@ -28,7 +32,8 @@ export default function CustomersPage() {
   }
 
   return (
-    <Page title={t('customers.title')} subtitle={list.data ? t('customers.count', { count: items.length }) : undefined}>
+    <Page title={t('customers.title')} subtitle={list.data ? t('customers.count', { count: items.length }) : undefined}
+      actions={can('customers.add', null) ? <button type="button" className="btn btn-tinted" onClick={() => setAdding(true)}><IconPlus size={18} />{t('customers.add')}</button> : null}>
       <div className="flex flex-col gap-3 mb-5">
         <div className="search">
           <IconSearch size={18} />
@@ -66,6 +71,59 @@ export default function CustomersPage() {
           {masked ? <p className="group-foot"><Why>{t('customers.maskedWhy')}</Why></p> : null}
         </section>
       )}
+      {adding ? <AddCustomer onClose={() => setAdding(false)} onAdded={() => { setAdding(false); void list.reload(); }} /> : null}
     </Page>
+  );
+}
+
+// adding someone at the counter: they type their own details, nothing is sent until they confirm
+function AddCustomer({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+  const { api, org, t, can, shops, shopId } = useAdmin();
+  const toast = useToast();
+  const allowed = shops.filter((s) => can('customers.add', s.id));
+  const [shop, setShop] = useState(shopId && allowed.some((s) => s.id === shopId) ? shopId : allowed[0]?.id ?? '');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [lang, setLang] = useState<Locale>(org.defaultLocale);
+  const [emailNews, setEmailNews] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await api.addCustomer(org.orgId, { name: name.trim(), ...(email.trim() ? { email: email.trim() } : {}), ...(phone.trim() ? { phone: phone.trim() } : {}), locale: lang, shopId: shop, emailNews, push: false, tags: [] });
+      toast(t('customers.added', { name }));
+      onAdded();
+    } catch (e) {
+      toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Sheet open onClose={onClose} title={t('customers.add')} footer={<button type="button" className="btn btn-primary btn-large" disabled={busy || !name.trim() || !shop} onClick={() => void save()}>{t('common:action.add')}</button>}>
+      <p className="t-sub t-2 mt-0 mb-4">{t('customers.addLead')}</p>
+      <div className="list mb-4">
+        <input className="field" placeholder={t('join.name')} aria-label={t('join.name')} value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
+        <div className="row-sep relative"><input className="field" type="email" inputMode="email" placeholder={t('join.email')} aria-label={t('join.email')} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" /></div>
+        <div className="row-sep relative"><input className="field" type="tel" inputMode="tel" placeholder={t('customer.phone')} aria-label={t('customer.phone')} value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="off" /></div>
+      </div>
+      <div className="list mb-4">
+        <label className="row">
+          <span className="row-main row-title">{t('stockSheet.shop')}</span>
+          <select className="t-body bg-transparent border-0 outline-none text-right" style={{ color: 'var(--c-ink-2)' }} value={shop} onChange={(e) => setShop(e.target.value)}>
+            {allowed.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </label>
+        <label className="row">
+          <span className="row-main row-title">{t('customer.language')}</span>
+          <select className="t-body bg-transparent border-0 outline-none text-right" style={{ color: 'var(--c-ink-2)' }} value={lang} onChange={(e) => setLang(e.target.value as Locale)}>
+            <option value="el">Ελληνικά</option><option value="en">English</option><option value="ru">Русский</option>
+          </select>
+        </label>
+        <Row title={t('join.emailNews')} subtitle={t('customers.addConsent')} trailing={<Switch checked={emailNews} onChange={setEmailNews} label={t('join.emailNews')} disabled={!email.trim()} />} />
+      </div>
+    </Sheet>
   );
 }

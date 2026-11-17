@@ -10,8 +10,11 @@ import { useAdmin } from './admin-context';
 import { Avatar } from '@/components/ui/kit';
 import { LocaleSwitch, Sheet } from '@/components/ui/client-kit';
 import {
-  IconBox, IconChart, IconChevronDown, IconGear, IconHome, IconLink, IconLogout, IconMegaphone, IconMore, IconPeople, IconShield, IconShop,
+  IconBox, IconChart, IconChevronDown, IconGear, IconHome, IconLink, IconLogout, IconMegaphone, IconMore, IconPeople, IconShield, IconShop, IconHistory, IconMail,
 } from '@/components/ui/icons';
+
+// dev tools stay visible unless the build turns them off
+const devTools = process.env.NEXT_PUBLIC_DEV_TOOLS !== '0';
 
 type NavItem = { href: string; key: string; icon: (p: { filled?: boolean; size?: number }) => ReactNode; show: boolean };
 
@@ -27,6 +30,8 @@ export function useNav(): NavItem[] {
     { href: '/admin/team', key: 'team', icon: IconShield, show: anyShop('members.view') },
     { href: '/admin/join-links', key: 'joinLinks', icon: IconLink, show: anyShop('joinlinks.manage') },
     { href: '/admin/settings', key: 'settings', icon: IconGear, show: can('org.settings.manage') || anyShop('shop.settings.manage') },
+    { href: '/admin/audit', key: 'audit', icon: IconHistory, show: can('org.audit.view') },
+    { href: '/admin/dev-outbox', key: 'outbox', icon: IconMail, show: devTools && org.orgPerms.includes('org.settings.manage') },
   ].filter((i) => i.show);
 }
 
@@ -47,6 +52,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[260px_1fr]">
+      <a href="#main" className="skip-link t-sub">{t('admin.skip')}</a>
       {/* sidebar */}
       <aside className="hidden md:flex flex-col sticky top-0 h-dvh px-3 pt-5 pb-4" style={{ background: 'var(--c-shelf)', borderRight: '0.5px solid var(--c-line)' }}>
         <div className="px-3 mb-5">
@@ -62,7 +68,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
-                className="flex items-center gap-3 px-3 min-h-[40px] rounded-[10px] t-body hover:no-underline"
+                className="nav-link flex items-center gap-3 px-3 min-h-[40px] rounded-[10px] t-body"
                 style={{ color: active ? 'var(--c-accent)' : 'var(--c-ink)', background: active ? 'var(--c-accent-tint)' : 'transparent', fontWeight: active ? 600 : 400 }}
               >
                 <Icon size={20} filled={active} />
@@ -72,7 +78,7 @@ export function Shell({ children }: { children: ReactNode }) {
           })}
         </nav>
         <div className="flex-1" />
-        <button type="button" className="flex items-center gap-3 px-3 min-h-[52px] rounded-[10px] text-left hover:bg-[var(--c-fill)]" onClick={() => setUserOpen(true)}>
+        <button type="button" className="nav-link flex items-center gap-3 px-3 min-h-[52px] rounded-[10px] text-left border-0 bg-transparent cursor-pointer" onClick={() => setUserOpen(true)}>
           <Avatar name={me.user.displayName} size={32} />
           <span className="flex-1 min-w-0">
             <span className="t-sub block truncate">{me.user.displayName}</span>
@@ -94,7 +100,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 px-4 md:px-8 pb-[calc(110px+env(safe-area-inset-bottom))] md:pb-12 w-full max-w-[1100px]">{children}</main>
+        <main id="main" tabIndex={-1} className="outline-none flex-1 px-4 md:px-8 pb-[calc(110px+env(safe-area-inset-bottom))] md:pb-12 w-full max-w-[1100px]">{children}</main>
       </div>
 
       {/* phone tab bar, floating glass */}

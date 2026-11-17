@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { use, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Locale } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Group, Row, Segmented, Why } from '@/components/ui/kit';
@@ -18,6 +19,8 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const groups = useAsync(() => api.groups(org.orgId), []);
   const [tab, setTab] = useState<Locale | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
   const p = post.data;
   if (!p) return <div className="pt-6"><div className="h-[220px] skel mb-4" style={{ borderRadius: 16 }} /></div>;
 
@@ -55,6 +58,13 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         {p.status === 'scheduled' && can('posts.publish', null) ? (
           <button type="button" className="btn btn-danger" disabled={busy} onClick={() => void act(() => api.cancelPost(org.orgId, p.id), t('post.cancelled'))}>{t('post.cancel')}</button>
         ) : null}
+        {can('posts.delete', null) ? (deleting ? (
+          <span className="inline-flex items-center gap-2 flex-wrap">
+            <span className="t-sub" style={{ color: 'var(--c-neg-text)' }}>{p.status === 'sent' ? t('post.deleteSent') : t('post.deleteConfirm')}</span>
+            <button type="button" className="btn btn-danger" style={{ background: 'var(--c-neg-tint)' }} disabled={busy} onClick={() => void api.deletePost(org.orgId, p.id).then(() => { toast(t('post.deleted')); router.push('/admin/posts'); }).catch((e: { code?: string }) => toast(t(`common:error.${e.code ?? 'internal'}`)))}>{t('common:action.delete')}</button>
+            <button type="button" className="btn btn-gray" onClick={() => setDeleting(false)}>{t('common:action.cancel')}</button>
+          </span>
+        ) : <button type="button" className="btn btn-danger" onClick={() => setDeleting(true)}>{t('common:action.delete')}</button>) : null}
       </div>
 
       {s ? (

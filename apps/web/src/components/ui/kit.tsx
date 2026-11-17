@@ -107,12 +107,18 @@ export function Switch({ checked, onChange, label, disabled, name }: { checked: 
   );
 }
 
-export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
+export function Segmented<T extends string>({ value, options, onChange, label, doneLabel }: { value: T; options: { value: T; label: string; done?: boolean }[]; onChange: (v: T) => void; label: string; doneLabel?: string }) {
   return (
     <div className="seg" role="group" aria-label={label}>
       {options.map((o) => (
         <button key={o.value} type="button" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>
           {o.label}
+          {o.done ? (
+            <>
+              <span aria-hidden="true" className="inline-block rounded-full ml-1.5 align-middle" style={{ width: 6, height: 6, background: 'var(--c-accent)' }} />
+              {doneLabel ? <span className="sr-only">{doneLabel}</span> : null}
+            </>
+          ) : null}
         </button>
       ))}
     </div>

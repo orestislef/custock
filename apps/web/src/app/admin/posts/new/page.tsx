@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { AudiencePreview, Channel, Locale, PostKind, PostInput, Product, ScopeType, StockLevel } from '@custock/core';
+import type { AudiencePreview, Channel, Locale, PostKind, PostInput, Product, ScopeType } from '@custock/core';
 import { LOCALES } from '@custock/i18n';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { Group, Row, Segmented, Switch, Why } from '@/components/ui/kit';
-import { Photo, Sheet, useToast } from '@/components/ui/client-kit';
-import { IconBell, IconMail, IconPlus, IconSearch, IconClose, IconInfo } from '@/components/ui/icons';
+import { Photo, useToast } from '@/components/ui/client-kit';
+import { ProductPicker } from '@/components/admin/product-picker';
+import { IconBell, IconMail, IconPlus, IconClose, IconInfo } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { productName } from '@/lib/names';
 import { money, number } from '@/lib/format';
@@ -104,7 +105,7 @@ export default function ComposerPage() {
 
           <section className="group">
             <div className="flex items-center gap-3 mb-2 px-1 flex-wrap">
-              <Segmented label={t('composer.language')} value={tab} onChange={setTab} options={LOCALES.map((l) => ({ value: l, label: `${l.toUpperCase()}${texts[l]?.title ? ' ✓' : ''}` }))} />
+              <Segmented label={t('composer.language')} doneLabel={t('composer.written')} value={tab} onChange={setTab} options={LOCALES.map((l) => ({ value: l, label: l.toUpperCase(), done: Boolean(texts[l]?.title) }))} />
               {scopes.length && preview?.byLocale?.[tab] ? <span className="t-foot t-2">{t('composer.readers', { count: preview.byLocale[tab], lang: tab.toUpperCase() })}</span> : null}
             </div>
             <div className="list">
@@ -202,9 +203,8 @@ export default function ComposerPage() {
         </div>
       </div>
 
-      <ProductPicker open={picker} onClose={() => setPicker(false)} onPick={(p) => {
-        const v = p.variants[0];
-        if (v && !lines.some((l) => l.variantId === v.id)) setLines((x) => [...x, { product: p, variantId: v.id, offer: '' }]);
+      <ProductPicker open={picker} title={t('composer.addProduct')} onClose={() => setPicker(false)} onPick={({ product, variantId }) => {
+        if (!lines.some((l) => l.variantId === variantId)) setLines((x) => [...x, { product, variantId, offer: '' }]);
         setPicker(false);
       }} />
     </Page>
@@ -249,21 +249,3 @@ function AudienceExplainer({ preview, push, email }: { preview: AudiencePreview 
   );
 }
 
-function ProductPicker({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (p: Product & { levels: StockLevel[] }) => void }) {
-  const { api, org, t, locale } = useAdmin();
-  const [q, setQ] = useState('');
-  const list = useAsync(() => (open ? api.products(org.orgId, { q: q || undefined, limit: 50 }) : Promise.resolve(null)), [open, q]);
-  return (
-    <Sheet open={open} onClose={onClose} title={t('composer.addProduct')}>
-      <div className="search mb-3"><IconSearch size={18} /><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('stock.search')} aria-label={t('stock.search')} /></div>
-      <div className="list mb-2">
-        {(list.data?.items ?? []).map((p) => (
-          <button key={p.id} type="button" className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties} onClick={() => onPick(p)}>
-            <Photo src={p.images[0]?.url} alt={productName(p, locale)} size={44} />
-            <span className="row-main row-title">{productName(p, locale)}</span>
-          </button>
-        ))}
-      </div>
-    </Sheet>
-  );
-}
