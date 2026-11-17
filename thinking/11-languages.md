@@ -23,28 +23,33 @@ A Russian speaking customer of a Greek shop gets Russian. The Greek manager stil
 
 ## one source of messages
 
-**decided:** one set of message files, in ICU MessageFormat, used by the app, the web and the server.
+**decided (changed when building):** one set of message files in the i18next JSON format,
+used by the app, the web and the server. Plurals use key suffixes resolved with `Intl.PluralRules`,
+which gives the same result as ICU plurals without a parser on the phone.
 
 ```
-packages/i18n/messages/
-  en.json        source of truth, with a description per key for translators
-  el.json
-  ru.json
+packages/i18n/src/locales/
+  en/  el/  ru/
+    common.json   shared words: roles, permissions, stock states, units, error codes
+    server.json   push, email and join page texts built on the server
+    web.json      the next.js app
+    mobile.json   the phone app
 ```
 
-- app and web: i18next with the ICU plugin. server: `intl-messageformat`. same files, same syntax.
+- one namespace per app, so the web and the phone app never edit the same file.
 - keys are grouped by feature: `stock.adjust.title`, `posts.audience.summary`, `email.invite.subject`.
-- if we end up on Flutter (see [08](08-platform-choice.md)), ARB files are ICU too. a small script
-  turns the same JSON into ARB. nothing is lost.
+- `pnpm check` lists keys that exist in English but are missing in Greek or Russian.
+- if we ever go to Flutter (see [08](08-platform-choice.md)), a small script turns these files into ARB.
 
-### plurals, the real reason for ICU
+### plurals
 
 English and Greek have two plural forms. Russian has four.
 
 ```json
-"stock.items_count": "{count, plural, one {# product} other {# products}}"
-"stock.items_count": "{count, plural, one {# προϊόν} other {# προϊόντα}}"
-"stock.items_count": "{count, plural, one {# товар} few {# товара} many {# товаров} other {# товара}}"
+"items_one": "{{count}} product",   "items_other": "{{count}} products"
+"items_one": "{{count}} προϊόν",    "items_other": "{{count}} προϊόντα"
+"items_one": "{{count}} товар",     "items_few": "{{count}} товара",
+"items_many": "{{count}} товаров",  "items_other": "{{count}} товара"
 ```
 
 | count | en | el | ru |
@@ -227,12 +232,12 @@ Email templates are written once and filled per language. the subject line is a 
 
 **decided:**
 
-1. new text starts in `en.json` with a description.
+1. new text starts in the English file of its namespace.
 2. a first Greek and Russian draft may be machine made, marked `needs_review`.
 3. a native speaker reviews every Greek and Russian string before a release. reviewed keys are
    marked as such. nothing ships with `needs_review` on screens customers see.
-4. a local script, `pnpm i18n:check`, run by hand before every build: missing keys, extra keys,
-   broken ICU syntax, placeholders that do not match between languages, `needs_review` count.
+4. a local script, `pnpm check`, run by hand before every build: missing keys and extra keys per
+   language. placeholder and `needs_review` checks get added to the same script.
    no CI, no pipeline, just a script.
 5. screenshots of key screens in all three languages for the reviewer. the demo helps here.
 
