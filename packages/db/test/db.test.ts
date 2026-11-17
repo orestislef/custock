@@ -16,7 +16,7 @@ describe('migrations', () => {
   it('apply once and record themselves', () => {
     expect(migrate(db)).toEqual([]);
     const row = one<{ n: number }>('SELECT count(*) n FROM schema_migrations');
-    expect(row.n).toBe(1);
+    expect(row.n).toBe(2);
   });
   it('turn on foreign keys', () => {
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
