@@ -119,3 +119,10 @@ export function contactMatches(key: string | null | undefined, query: string): b
   if (digits.length < 8) return false;
   return tokens.some((t) => /^\d+$/.test(t) && (t === digits || (digits.length >= 10 && t.endsWith(digits))));
 }
+
+// an FTS5 MATCH expression for the same query: every token, any of its forms, as a prefix
+export function ftsMatch(query: string): string | null {
+  const tokens = queryTokens(query);
+  if (!tokens.length) return null;
+  return tokens.map((forms) => '(' + forms.map((f) => `"${f.replace(/"/g, '""')}"*`).join(' OR ') + ')').join(' AND ');
+}
