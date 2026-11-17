@@ -10,9 +10,10 @@ import { loadTopology, ORG_COLUMNS } from './lib/context';
 import { parseJson, platform, Tenant } from './lib/tenant';
 import { dayKey, localDayStart, quietHoursEnd, inQuietHours } from './lib/time';
 import { devOutboxTransport, type Transport } from './lib/transport';
+import { drainOutbox, type LiveSender } from './lib/live';
 import { unsubKey, unsubToken } from './lib/unsub';
 import { canEmail, canPush, resolveAudience } from './services/audience';
-import { variantLabel } from './services/catalog';
+import { fileUrl, variantLabel } from './services/catalog';
 
 const DAY = 86_400_000;
 
@@ -35,6 +36,8 @@ interface JobRow {
 
 export interface WorkerDeps {
   cfg: Pick<Config, 'db' | 'jwtSecret' | 'publicWebUrl' | 'unsubSecret'>;
+  // only with CUSTOCK_TRANSPORT=live: drains the outbox through FCM and SMTP
+  live?: LiveSender;
   transport?: Transport;
   log?: (line: string) => void;
 }
@@ -67,6 +70,7 @@ export async function runJobs(deps: WorkerDeps, now: number = Date.now()): Promi
       ran++;
     }
   }
+  if (deps.live) await drainOutbox(db, deps.live, now);
   return ran;
 }
 
@@ -183,7 +187,9 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
       const shopName = scope?.scope_type === 'shop' ? t.get<{ name: string }>('SELECT name FROM shops WHERE org_id = @org AND id = @id', { id: scope.scope_id })?.name : null;
       title = d.channel === 'push' ? (shopName ? `${org.name} ${shopName}` : org.name) : text?.title ?? org.name;
       body = d.channel === 'push' ? text?.title ?? '' : text?.body ?? '';
-      payload = { type: 'post', postId: d.post_id, threadId: org.id };
+      const cover = t.get<{ storage_key: string | null }>('SELECT f.storage_key FROM posts p LEFT JOIN files f ON f.id = p.cover_file_id WHERE p.org_id = @org AND p.id = @p', { p: d.post_id });
+      const sender = senderOf(t, org, scope?.scope_type === 'shop' ? scope.scope_id : null);
+      payload = { type: 'post', postId: d.post_id, threadId: org.id, link: `custock://post/${d.post_id}`, image: fileUrl(cover?.storage_key), ...sender };
       if (d.channel === 'email') {
         const token = unsubToken({ customerId: c.id, scopeType: (scope?.scope_type as 'org' | 'group' | 'shop') ?? 'org', scopeId: scope?.scope_id ?? org.id }, unsubKey(deps.cfg));
         const url = `${deps.cfg.publicWebUrl.replace(/\/$/, '')}/unsubscribe/${token}`;
@@ -203,7 +209,10 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
       const key = d.channel === 'push' ? 'push.backInStock' : 'email.backInStock';
       title = tr(d.channel === 'push' ? `${key}.title` : `${key}.subject`, { shop: shopLabel, product });
       body = tr(`${key}.body`, { shop: shopLabel, product });
-      payload = { type: 'back_in_stock', variantId: a?.variant_id, productId: a?.product_id, shopId: a?.shop_id, threadId: org.id };
+      payload = {
+        type: 'back_in_stock', variantId: a?.variant_id, productId: a?.product_id, shopId: a?.shop_id, threadId: org.id,
+        link: a ? `custock://product/${a.product_id}` : null, ...senderOf(t, org, a?.shop_id ?? null),
+      };
     }
     const sent = transport.send({
       channel: d.channel, orgId: org.id, customerId: c.id, userId: c.user_id, to: d.channel === 'email' ? c.email : null,
@@ -346,4 +355,13 @@ export function purgeUnconfirmed(db: Db, now: number) {
     })();
   }
   return old.length;
+}
+
+// emails go out as "<shop> via Custock" and replies reach the shop
+function senderOf(t: Tenant, org: OrgRow, shopId: string | null): { fromName: string; replyTo: string | null } {
+  const shop = shopId
+    ? t.get<{ name: string; email: string | null }>('SELECT name, email FROM shops WHERE org_id = @org AND id = @id', { id: shopId })
+    : t.get<{ name: string; email: string | null }>('SELECT name, email FROM shops WHERE org_id = @org AND email IS NOT NULL AND archived_at IS NULL ORDER BY created_at LIMIT 1');
+  const label = shopId && shop ? `${org.name} ${shop.name}` : org.name;
+  return { fromName: `${label} via Custock`, replyTo: shop?.email ?? null };
 }
