@@ -1,0 +1,62 @@
+{
+  "permissions": [
+    { "key": "org.settings.manage", "level": "org", "group": "org" },
+    { "key": "org.billing.manage", "level": "org", "group": "org" },
+    { "key": "org.audit.view", "level": "org", "group": "org" },
+    { "key": "org.support_access.manage", "level": "org", "group": "org" },
+    { "key": "shops.create", "level": "org", "group": "org" },
+    { "key": "shops.archive", "level": "org", "group": "org" },
+    { "key": "groups.manage", "level": "org", "group": "org" },
+    { "key": "roles.manage", "level": "org", "group": "org" },
+    { "key": "categories.manage", "level": "org", "group": "catalog" },
+    { "key": "products.price.edit", "level": "org", "group": "prices" },
+    { "key": "customers.import", "level": "org", "group": "customers" },
+    { "key": "customers.erase", "level": "org", "group": "customers" },
+
+    { "key": "members.view", "level": "shop", "group": "team" },
+    { "key": "members.invite", "level": "shop", "group": "team" },
+    { "key": "members.manage", "level": "shop", "group": "team" },
+    { "key": "shop.settings.manage", "level": "shop", "group": "team" },
+
+    { "key": "products.view", "level": "any", "group": "catalog" },
+    { "key": "products.create", "level": "any", "group": "catalog" },
+    { "key": "products.edit", "level": "any", "group": "catalog" },
+    { "key": "products.archive", "level": "any", "group": "catalog" },
+    { "key": "products.import", "level": "any", "group": "catalog" },
+    { "key": "products.cost.view", "level": "any", "group": "catalog" },
+    { "key": "products.cost.edit", "level": "any", "group": "catalog" },
+
+    { "key": "prices.shop.edit", "level": "shop", "group": "prices" },
+
+    { "key": "stock.view", "level": "shop", "group": "stock" },
+    { "key": "stock.history.view", "level": "shop", "group": "stock" },
+    { "key": "stock.receive", "level": "shop", "group": "stock" },
+    { "key": "stock.sell", "level": "shop", "group": "stock" },
+    { "key": "stock.return", "level": "shop", "group": "stock" },
+    { "key": "stock.adjust", "level": "shop", "group": "stock" },
+    { "key": "stock.count", "level": "shop", "group": "stock" },
+    { "key": "stock.count.approve", "level": "shop", "group": "stock" },
+    { "key": "stock.transfer.send", "level": "shop", "group": "stock" },
+    { "key": "stock.transfer.receive", "level": "shop", "group": "stock" },
+    { "key": "stock.settings.manage", "level": "shop", "group": "stock" },
+
+    { "key": "customers.view", "level": "shop", "group": "customers" },
+    { "key": "customers.contact.view", "level": "shop", "group": "customers" },
+    { "key": "customers.add", "level": "shop", "group": "customers" },
+    { "key": "customers.edit", "level": "shop", "group": "customers" },
+    { "key": "customers.export", "level": "shop", "group": "customers" },
+
+    { "key": "posts.view", "level": "shop", "group": "comms" },
+    { "key": "posts.create", "level": "shop", "group": "comms" },
+    { "key": "posts.publish", "level": "shop", "group": "comms" },
+    { "key": "posts.channel.push", "level": "shop", "group": "comms" },
+    { "key": "posts.channel.email", "level": "shop", "group": "comms" },
+    { "key": "posts.delete", "level": "shop", "group": "comms" },
+    { "key": "offers.price.set", "level": "shop", "group": "comms" },
+    { "key": "joinlinks.manage", "level": "shop", "group": "comms" },
+
+    { "key": "reports.view", "level": "shop", "group": "reports" },
+    { "key": "reports.financial.view", "level": "shop", "group": "reports" },
+    { "key": "reports.staff.view", "level": "shop", "group": "reports" }
+  ]
+}
