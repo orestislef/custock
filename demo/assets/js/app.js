@@ -72,6 +72,8 @@
     store: '<path d="M4.5 10.5V19a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-8.5"/><path d="M3 9.5 4.8 4.6a1 1 0 0 1 .9-.6h12.6a1 1 0 0 1 .9.6L21 9.5a2.5 2.5 0 0 1-4.5 1.5 2.5 2.5 0 0 1-4.5 0 2.5 2.5 0 0 1-4.5 0A2.5 2.5 0 0 1 3 9.5Z"/><path d="M10 20v-5h4v5"/>',
     'store-f': '<path class="f" d="M3 9.5 4.8 4.6a1 1 0 0 1 .9-.6h12.6a1 1 0 0 1 .9.6L21 9.5a2.5 2.5 0 0 1-4.5 1.5 2.5 2.5 0 0 1-4.5 0 2.5 2.5 0 0 1-4.5 0A2.5 2.5 0 0 1 3 9.5Z"/><path class="f" d="M4.2 12.4c1 .5 2.2.6 3.3.1 1.4.8 3.1.8 4.5 0 1.4.8 3.1.8 4.5 0 1.1.5 2.3.4 3.3-.1V19a1.2 1.2 0 0 1-1.2 1.2h-4.1V15h-5v5.2H5.4A1.2 1.2 0 0 1 4.2 19Z"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 20.5c.8-4 4-6 8-6s7.2 2 8 6"/>',
+    'user-f': '<circle class="f" cx="12" cy="7.8" r="4.4"/><path class="f" d="M3.4 20.3C4.3 15.8 7.7 13.6 12 13.6s7.7 2.2 8.6 6.7a.8.8 0 0 1-.8 1H4.2a.8.8 0 0 1-.8-1Z"/>',
+    'scan-f': '<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M8 8.5v7M11 8.5v7M13.5 8.5v7M16 8.5v7"/>',
     'chev-left': '<path d="M15 4.5 7.5 12l7.5 7.5"/>',
     'chev-right': '<path d="m9 4.5 7.5 7.5L9 19.5"/>',
     'chev-down': '<path d="m5 9 7 7 7-7"/>',
@@ -351,7 +353,8 @@
     { id: 'c-home', icon: 'home', label: 'tab.feed' },
     { id: 'c-offers', icon: 'tag', label: 'tab.offers' },
     { id: 'c-catalog', icon: 'grid', label: 'tab.catalog' },
-    { id: 'c-shops', icon: 'store', label: 'tab.shops' }
+    { id: 'c-shops', icon: 'store', label: 'tab.shops' },
+    { id: 'c-profile', icon: 'user', label: 'tab.profile' }
   ];
   function tabs() { return isCust() ? CUST_TABS : BIZ_TABS.filter((x) => !x.perm || can(x.perm)); }
   function hasScan() { return !isCust() && can('products.view'); }
@@ -464,13 +467,13 @@
   function renderTabs() {
     const bar = $('#bottom-bar');
     const list = tabs();
-    const scanOn = hasScan();
+    const acc = isCust() ? { id: 'c-qr', icon: 'qr', label: 'tab.qr' } : hasScan() ? { id: 'scan', icon: 'scan', label: 'tab.scan' } : null;
     bar.innerHTML = '<nav class="tabbar" aria-label="' + T('a11y.tabs') + '">' + list.map((x) => {
       const on = S.tab === x.id;
       const badgeN = x.id === 'c-home' ? Dt().alerts.filter((a) => a.cid === 'c-anna' && a.status === 'notified' && !a.seen).length : 0;
       return '<button class="tab" data-act="tab" data-id="' + x.id + '"' + (on ? ' aria-current="page"' : '') + '>' + ic(on ? x.icon + '-f' : x.icon) +
         '<span class="tl">' + T(x.label) + '</span>' + (badgeN ? '<span class="tbadge">' + badgeN + '</span>' : '') + '</button>';
-    }).join('') + '</nav>' + (scanOn ? '<button class="accessory" data-act="tab" data-id="scan" aria-label="' + T('tab.scan') + '"' + (S.tab === 'scan' ? ' aria-current="page"' : '') + '>' + ic('scan') + '</button>' : '');
+    }).join('') + '</nav>' + (acc ? '<button class="accessory" data-act="tab" data-id="' + acc.id + '" aria-label="' + T(acc.label) + '"' + (S.tab === acc.id ? ' aria-current="page"' : '') + '>' + ic(acc.icon) + '</button>' : '');
     bar.hidden = !!(cur() && cur().modal);
   }
 
@@ -642,7 +645,7 @@
   function seg(name, options, value) {
     const i = Math.max(0, options.findIndex((o) => o[0] === value));
     return '<div class="seg" role="group" style="--n:' + options.length + '"><span class="seg-thumb" style="width:calc((100% - 4px) / ' + options.length + ');transform:translateX(' + (i * 100) + '%)"></span>' +
-      options.map((o) => '<button data-act="seg" data-name="' + name + '" data-val="' + esc(o[0]) + '" aria-pressed="' + (o[0] === value) + '">' + esc(o[1]) + '</button>').join('') + '</div>';
+      options.map((o) => '<button data-act="seg" data-name="' + name + '" data-val="' + esc(o[0]) + '" aria-pressed="' + (o[0] === value) + '">' + esc(o[1]) + (o[2] || '') + '</button>').join('') + '</div>';
   }
   ACT.seg = (el) => {
     const box = el.closest('.seg');
@@ -678,6 +681,7 @@
   /* ======================= business screens ======================= */
 
   SCREENS.home = () => {
+    if (me().status !== 'active') return { title: t('home.title'), body: '<div class="empty"><span class="e-icon">' + ic('lock') + '</span><h3>' + T('paused.t') + '</h3><p>' + T('paused.b', { name: 'Eleni' }) + '</p></div>' };
     const shops = ctxShops();
     const vis = Dt().products.flatMap((p) => p.variants.map((v) => v.id));
     const low = vis.filter((vid) => { const s = vState(vid, shops); return s === 'few' || s === 'out'; }).length;
@@ -696,6 +700,13 @@
     pend.forEach((p) => { att += cell({ act: 'open-post', data: { id: p.id }, lead: tileI('megaphone', 1), title: T('home.approve', { name: firstName(p.author) }), sub: esc(L(p.title)) }); });
     if (neg.length) att += cell({ act: 'stock-filter', data: { f: 'neg' }, lead: tileI('neg', 1), title: T('home.neg', { n: neg.length }), sub: T('home.neg.sub') });
     unk.forEach((u) => { att += cell({ act: 'unknown-code', data: { code: u.code }, lead: tileI('scan', 4), title: T('home.unknown', { n: u.times }), sub: T('home.unknown.sub', { name: firstName(u.by), code: u.code }) }); });
+    Dt().transfers.filter((x) => x.status === 'sent' && shops.indexOf(x.to) >= 0 && can('stock.transfer.receive', x.to)).forEach((x) => { att += cell({ act: 'open-transfer', data: { id: x.id }, lead: tileI('truck', 2), title: T('home.tr', { n: x.lines.reduce((a, l) => a + l.sent, 0), from: sname(x.from) }), sub: T('home.tr.sub') }); });
+    Dt().counts.filter((c) => c.status === 'review' && shops.indexOf(c.shop) >= 0 && can('stock.count.approve', c.shop)).forEach((c) => { att += cell({ act: 'open-count', data: { id: c.id }, lead: tileI('count', 4), title: T('home.cnt', { shop: sname(c.shop) }), sub: T('home.cnt.sub', { name: firstName(c.submittedBy || c.by) }) }); });
+    let manage = '';
+    if (can('reports.view')) manage += cell({ act: 'go', data: { r: 'reports' }, lead: tileI('chart', 6), title: T('rep.title') });
+    if (can('stock.count')) manage += cell({ act: 'go', data: { r: 'counts' }, lead: tileI('count', 2), title: T('cnt.title') });
+    if (can('members.view')) manage += cell({ act: 'go', data: { r: 'team' }, lead: tileI('people', 3), title: T('team.title') });
+    if (canOrgWide('roles.manage')) manage += cell({ act: 'go', data: { r: 'roles' }, lead: tileI('shield', 1), title: T('roles.title') });
     const staffQuick = !can('stock.adjust') && (can('stock.sell') || can('stock.receive'));
     return {
       title: t('home.title'),
@@ -708,15 +719,17 @@
         kpi('c4', 'calendar', t('kpi.posts'), posts, t('kpi.posts.note'), can('posts.view') ? 'tab' : '', 'posts') +
         '</div>' +
         (staffQuick ? '<div class="section-h">' + T('home.quick') + '</div><div class="btn-row">' +
+          (can('stock.count', actionShop()) ? '<button class="btn tinted" data-act="go" data-r="counts">' + ic('count') + T('mode.count') + '</button>' : '') +
           (can('stock.sell', actionShop()) ? '<button class="btn tinted" data-act="scan-mode" data-mode="sell">' + ic('bag') + T('mode.sell') + '</button>' : '') +
           (can('stock.receive', actionShop()) ? '<button class="btn tinted" data-act="scan-mode" data-mode="receive">' + ic('receive') + T('mode.receive') + '</button>' : '') + '</div>' : '') +
         (att ? '<div class="section-h">' + T('home.attention') + '</div><div class="list with-tiles">' + att + '</div>' : '') +
         '<div class="section-h">' + T('home.today') + '</div><div class="list with-tiles">' +
         cell({ lead: tileI('bag', 3), title: T('home.sold', { n: soldQty }), val: can('reports.financial.view') ? esc(money(soldVal)) : null, sub: can('reports.financial.view') ? '' : T('home.sold.nomoney') }) +
         cell({ lead: tileI('people', 2), title: T('home.visible', { n: custs.length }), sub: canOrgWide('customers.view') ? T('home.visible.all') : T('home.visible.some') }) +
-        '</div>' + '<p class="section-f">' + T('home.foot') + '</p>'
+        '</div>' + (manage ? '<div class="section-h">' + T('home.manage') + '</div><div class="list with-tiles">' + manage + '</div>' : '') + '<p class="section-f">' + T('home.foot') + '</p>'
     };
   };
+  ACT.go = (el) => go(el.dataset.r);
   function kpi(cls, icon, label, val, note, act, arg) {
     const tag = act ? 'button' : 'div';
     return '<' + tag + ' class="kpi ' + cls + '"' + (act ? ' data-act="' + act + '" data-id="' + arg + '" data-f="' + arg + '"' : '') + '><span class="k-label">' + ic(icon) + esc(label) + '</span><span><span class="k-value">' + tally('kpi-' + cls + '-' + S.role, val) + '</span><span class="k-note" style="display:block">' + esc(note) + '</span></span></' + tag + '>';
@@ -740,11 +753,17 @@
       '<div style="text-align:center;margin:6px 0 16px">' + avatar(m.name, 'lg') + '<div class="t-title3 mt12">' + esc(m.name) + '</div><div class="muted t-sub">' + m.assign.map((a) => esc(assignLabel(a))).join(', ') + '</div></div>' +
       '<div class="list with-tiles">' + cell({ lead: tileI('shield', 6), title: T('account.perms', { n: mine.length, total: all.length }), sub: T('account.perms.sub') }) +
       cell({ lead: tileI('store', 2), title: esc(Dt().org.name), sub: T('account.org') }) + '</div>' +
+      '<div class="list with-tiles mt16">' + (can('members.view') ? cell({ act: 'acc-go', data: { r: 'team' }, lead: tileI('people', 3), title: T('team.title') }) : '') +
+      (canOrgWide('roles.manage') ? cell({ act: 'acc-go', data: { r: 'roles' }, lead: tileI('shield', 1), title: T('roles.title') }) : '') +
+      (can('reports.view') ? cell({ act: 'acc-go', data: { r: 'reports' }, lead: tileI('chart', 6), title: T('rep.title') }) : '') +
+      cell({ act: 'lock-show', lead: tileI('phone', 5), title: T('lock.title') }) + '</div>' +
       '<div class="section-h">' + T('account.can') + '</div><div class="list">' + window.CSData.PERM_GROUPS.map((g) => {
         const have = g[1].filter((p) => mine.indexOf(p) >= 0).length;
         return cell({ title: T('pg.' + g[0]), val: have + ' / ' + g[1].length });
       }).join('') + '</div><p class="section-f">' + T('account.foot') + '</p>' });
   };
+
+  ACT['acc-go'] = (el) => { closeSheet(true); go(el.dataset.r); };
 
   /* stock list */
   function stockRows() {
@@ -771,38 +790,49 @@
       const w = p.variants.reduce((s, v) => s + waitingFor(v.id, shops).length, 0);
       const sub = (p.variants.length > 1 ? T('stock.variants', { n: p.variants.length }) : esc(L(Dt().categories.find((c) => c.id === p.cat).name))) + (w ? ' · ' + T('stock.waiting', { n: w }) : '');
       const rowInner = cell({ act: 'open-product', data: { pid: p.id }, lead: img(p.img, pname(p), 'thumb', ''), title: esc(pname(p)), sub: sub + (st !== 'ok' ? '<span style="display:block;margin-top:4px">' + badge(st) + '</span>' : ''), val: '<span class="qty' + (total < 0 ? ' neg' : '') + '">' + tally('q-' + p.id + '-' + shops.join(''), total) + '</span>', chev: false });
-      const swipeOk = single && p.variants.length === 1 && (can('stock.sell', shops[0]) || can('stock.receive', shops[0]));
+      const sellAt = shops.filter((x) => can('stock.sell', x)), recvAt = shops.filter((x) => can('stock.receive', x));
+      const swipeOk = p.variants.length === 1 && (sellAt.length || recvAt.length);
       if (!swipeOk) return rowInner;
-      return '<div class="swipe"><div class="sw-actions">' + (can('stock.receive', shops[0]) ? '<button class="sw-a1" data-act="quick" data-k="receive" data-vid="' + p.variants[0].id + '">' + ic('plus') + T('swipe.plus1') + '</button>' : '') +
-        (can('stock.sell', shops[0]) ? '<button class="sw-a2" data-act="quick" data-k="sale" data-vid="' + p.variants[0].id + '">' + ic('bag') + T('swipe.sell1') + '</button>' : '') + '</div>' + rowInner + '</div>';
+      return '<div class="swipe"><div class="sw-actions">' + (recvAt.length ? '<button class="sw-a1" data-act="quick" data-k="receive" data-vid="' + p.variants[0].id + '">' + ic('plus') + T('swipe.plus1') + '</button>' : '') +
+        (sellAt.length ? '<button class="sw-a2" data-act="quick" data-k="sale" data-vid="' + p.variants[0].id + '">' + ic('bag') + T('swipe.sell1') + '</button>' : '') + '</div>' + rowInner + '</div>';
     }).join('') + '</div>';
   }
   PARTS['stock-list'] = stockRows;
   SCREENS.stock = () => {
     const f = S.ui.stockFilter || 'all';
     const fs = [['all', t('f.all')], ['low', t('f.low')], ['out', t('f.out')], ['neg', t('f.neg')], ['wanted', t('f.wanted')]];
+    const navR = (can('stock.count', actionShop()) ? '<button class="navbtn" data-act="go" data-r="counts" aria-label="' + T('cnt.title') + '">' + ic('count') + '</button>' : '') +
+      (scopesWith('stock.transfer.send').some((x) => x.scope === 'shop') ? '<button class="navbtn" data-act="transfer-new" aria-label="' + T('tr.new') + '">' + ic('truck') + '</button>' : '');
     return {
-      title: t('stock.title'),
+      title: t('stock.title'), right: navR,
       body: shopChips() +
         '<label class="search">' + ic('search') + '<input type="search" inputmode="search" enterkeyhint="search" placeholder="' + T('stock.search') + '" value="' + esc(S.ui.stockQ || '') + '" data-in="stock-q" aria-label="' + T('stock.search') + '"></label>' +
         '<div class="chips" style="margin-bottom:12px">' + fs.map((x) => '<button class="chip" data-act="stock-f" data-f="' + x[0] + '" aria-pressed="' + (f === x[0]) + '">' + esc(x[1]) + '</button>').join('') + '</div>' +
         tip('stock', 'tip.stock.t', 'tip.stock.b') +
         '<div data-part="stock-list">' + stockRows() + '</div>' +
-        (ctxShops().length === 1 ? '<p class="section-f">' + T('stock.swipe.hint') + '</p>' : '')
+        '<p class="section-f">' + T('stock.swipe.hint') + '</p>'
     };
   };
   IN['stock-q'] = (el) => { S.ui.stockQ = el.value; refreshPart('stock-list'); };
   ACT['stock-f'] = (el) => { S.ui.stockFilter = el.dataset.f; $$('[data-act="stock-f"]').forEach((b) => b.setAttribute('aria-pressed', String(b === el))); refreshPart('stock-list'); };
   ACT['open-product'] = (el) => { if (swipedRecently(el)) return; go('product', { pid: el.dataset.pid }); };
   ACT.quick = (el) => {
-    const shop = ctxShops()[0];
-    const vid = el.dataset.vid;
-    const res = applyMove({ vid: vid, shop: shop, delta: el.dataset.k === 'sale' ? -1 : 1, kind: el.dataset.k, price: variant(vid).price });
-    tick();
+    const k = el.dataset.k, vid = el.dataset.vid;
+    const at = ctxShops().filter((x) => can(k === 'sale' ? 'stock.sell' : 'stock.receive', x));
     closeSwipes();
-    refreshPart('stock-list');
-    afterMoveToast(res, el.dataset.k, 1);
+    if (at.length > 1) {
+      openSheet({ title: t(k === 'sale' ? 'quick.where.sell' : 'quick.where.recv'), render: () => '<div class="list">' + at.map((x) => cell({ act: 'quick-at', data: { vid: vid, k: k, shop: x }, title: esc(sname(x)), val: T('scan.instock', { n: qty(vid, x) }), chev: false })).join('') + '</div>' });
+      return;
+    }
+    quickAt(vid, k, at[0]);
   };
+  ACT['quick-at'] = (el) => { closeSheet(true); quickAt(el.dataset.vid, el.dataset.k, el.dataset.shop); };
+  function quickAt(vid, k, shop) {
+    const res = applyMove({ vid: vid, shop: shop, delta: k === 'sale' ? -1 : 1, kind: k, price: variant(vid).price });
+    tick();
+    refreshPart('stock-list');
+    afterMoveToast(res, k, 1);
+  }
   function afterMoveToast(res, kind, n) {
     if (res.told && res.told.length) { moment(res.m.vid, res.m.shop, res.told); return; }
     const v = variant(res.m.vid);
@@ -833,7 +863,8 @@
     const stockRowsH = shops.map((sh) => {
       const q = qty(v.id, sh), rp = v.rp && v.rp[sh];
       const st = stateOf(q, rp);
-      return cell({ title: esc(sname(sh)), sub: (rp != null ? T('pd.rp', { n: rp }) : '') + (st !== 'ok' ? ' ' + badge(st) : ''), val: '<span class="bigqty' + (q < 0 ? ' qty neg' : '') + '">' + tally('pq-' + v.id + '-' + sh, q) + '</span>' });
+      const otw = inTransit(v.id, sh);
+      return cell({ title: esc(sname(sh)), sub: (rp != null ? T('pd.rp', { n: rp }) : '') + (st !== 'ok' ? ' ' + badge(st) : '') + (otw ? ' <span class="badge info">' + ic('truck', 'xs') + T('pd.otw', { n: otw }) + '</span>' : ''), val: '<span class="bigqty' + (q < 0 ? ' qty neg' : '') + '">' + tally('pq-' + v.id + '-' + sh, q) + '</span>' });
     }).join('');
     const hist = can('stock.history.view', ash) ? Dt().ledger.filter((m) => m.vid === v.id && ctxS.indexOf(m.shop) >= 0).slice(0, 8) : null;
     const KI = { sale: 'bag', receive: 'receive', return: 'undo', adjust: 'plusminus', damage: 'alert', reversal: 'undo', count: 'count', transfer_in: 'truck', transfer_out: 'truck' };
@@ -874,6 +905,9 @@
   ACT.step = (el) => {
     const d = +el.dataset.d;
     if (el.dataset.id === 'recv') { S.ui.recvQty = Math.max(1, Math.min(999, S.ui.recvQty + d)); sheetRefresh(); }
+    else if (el.dataset.id.indexOf('cl:') === 0) { const p = el.dataset.id.split(':'); const c = Dt().counts.find((x) => x.id === p[1]); countLine(c, p[2], d); if (cur().name === 'count') refresh(); else refreshPart('scan-list'); }
+    else if (el.dataset.id.indexOf('tr:') === 0) { const vid = el.dataset.id.slice(3); const v = S.ui.trn; v.lines[vid] = Math.max(0, Math.min(qty(vid, v.from), (v.lines[vid] || 0) + d)); sheetRefresh(); }
+    else if (el.dataset.id.indexOf('trr:') === 0) { const p = el.dataset.id.split(':'); const tr = Dt().transfers.find((x) => x.id === p[1]); const l = tr.lines.find((x) => x.vid === p[2]); l.received = Math.max(0, Math.min(l.sent, l.received + d)); refresh(); }
     else if (el.dataset.id.indexOf('line:') === 0) { const vid = el.dataset.id.slice(5); const l = S.ui.recvList.find((x) => x.vid === vid); if (l) { l.n = Math.max(0, l.n + d); if (!l.n) S.ui.recvList = S.ui.recvList.filter((x) => x !== l); } refreshPart('scan-list'); }
     haptic(6);
   };
@@ -929,6 +963,7 @@
     if (can('products.view')) m.push(['lookup', t('mode.lookup')]);
     if (can('stock.receive', sh)) m.push(['receive', t('mode.receive')]);
     if (can('stock.sell', sh)) m.push(['sell', t('mode.sell')]);
+    if (can('stock.count', sh)) m.push(['count', t('mode.count')]);
     return m;
   }
   function scanList() {
@@ -944,6 +979,13 @@
       const l = S.ui.sold || [];
       if (!l.length) return '<p class="section-f" style="margin-top:4px">' + T('scan.sell.empty') + '</p>';
       return '<div class="list with-thumbs scanlist">' + l.slice(0, 6).map((x) => cell({ cls: 'line-' + x.vid, lead: img(product(variant(x.vid).pid).img, vname(variant(x.vid)), 'thumb', ''), title: esc(vname(variant(x.vid))), sub: T('scan.sold.n', { n: x.n }), val: '<span class="qty">' + tally('sq-' + x.vid + '-' + x.shop, qty(x.vid, x.shop)) + '</span>', chev: false })).join('') + '</div><p class="section-f">' + T('scan.sell.note') + '</p>';
+    }
+    if (mode === 'count') {
+      const c = openCount(S.ui.scanShop || actionShop());
+      if (!c) return '<p class="section-f" style="margin-top:4px">' + T('scan.count.empty') + '</p>';
+      const lines = Object.keys(c.lines);
+      return (lines.length ? '<div class="list with-thumbs scanlist">' + lines.map((vid) => cell({ cls: 'line-' + vid, lead: img(product(variant(vid).pid).img, vname(variant(vid)), 'thumb', ''), title: esc(vname(variant(vid))), sub: T('cnt.counted'), val: stepper('cl:' + c.id + ':' + vid, c.lines[vid].counted), chev: false })).join('') + '</div>' : '<p class="section-f" style="margin-top:4px">' + T('scan.count.go') + '</p>') +
+        '<div class="mt16"><button class="btn tinted block" data-act="open-count" data-id="' + c.id + '">' + ic('count') + T('scan.count.open', { a: lines.length, b: countScope(c).length }) + '</button></div>';
     }
     return '<p class="section-f" style="margin-top:4px">' + T('scan.lookup.note') + '</p>';
   }
@@ -992,6 +1034,12 @@
   ACT['scan-item'] = (el) => {
     const vid = el.dataset.vid, mode = S.ui.scanMode, sh = S.ui.scanShop || actionShop();
     if (mode === 'lookup') { tick(); go('product', { pid: variant(vid).pid }); return; }
+    if (mode === 'count') {
+      let c = openCount(sh);
+      if (!c) { c = startCount(sh, 'full'); toast(t('scan.count.started', { shop: sname(sh) }), { icon: 'count' }); }
+      countLine(c, vid, 1);
+      refreshPart('scan-list'); scanFx(el, vid); return;
+    }
     if (mode === 'receive') {
       S.ui.recvList = S.ui.recvList || [];
       const l = S.ui.recvList.find((x) => x.vid === vid);
@@ -1253,7 +1301,8 @@
   }
   function langTabs() {
     const c = S.compose;
-    return seg('clang', [['en', 'EN' + (c.title.en ? ' ✓' : '')], ['el', 'ΕΛ' + (c.title.el ? ' ✓' : '')], ['ru', 'RU' + (c.title.ru ? ' ✓' : '')]], c.lang);
+    const ok = (x) => (x ? ' ' + ic('check', 'xs') : '');
+    return seg('clang', [['en', 'EN', ok(c.title.en)], ['el', '\u0395\u039b', ok(c.title.el)], ['ru', 'RU', ok(c.title.ru)]], c.lang);
   }
   PARTS['lang-tabs'] = langTabs;
   function composeProducts() {
@@ -1480,7 +1529,8 @@
       body: '<div class="section-h">Lemoni</div><div class="list with-thumbs">' + shops.map((s) => { const sh = shopById(s); return cell({ act: 'c-open-shop', data: { id: s }, lead: img(sh.img, sname(s), 'thumb', ''), title: esc(sname(s)), sub: esc(L(sh.addr)) + ' · ' + esc(sh.hours) }); }).join('') + '</div>' +
         (via ? '<p class="section-f">' + T('c.shops.via', { group: L(groupById(via.id).name) }) + '</p>' : '') +
         Dt().otherOrgs.map((o) => '<div class="section-h">' + esc(L(o.name)) + '</div><div class="list with-thumbs">' + cell({ lead: '<span class="logo-tile bakery" style="width:44px;height:44px;font-size:20px;border-radius:9px">' + esc(L(o.letter)) + '</span>', title: esc(L(o.shop)), sub: T('c.shops.other') }) + '</div>').join('') +
-        '<p class="section-f">' + T('c.shops.private') + '</p>'
+        '<p class="section-f">' + T('c.shops.private') + '</p>' +
+        '<div class="mt16"><button class="btn tinted block" data-act="tab" data-id="c-qr">' + ic('qr') + T('c.shops.scan') + '</button></div>'
     };
   };
   ACT['c-open-shop'] = (el) => go('c-shop', { id: el.dataset.id });
@@ -1491,12 +1541,664 @@
       '<div class="mt16"><button class="btn tinted block" data-act="tab" data-id="c-catalog">' + ic('grid') + T('c.shop.browse') + '</button></div>' };
   };
 
+  /* ======================= stage 2: team, roles, reports, counts, transfers, lock screen, join, profile ======================= */
+
+  /* ---------- delegation rules (thinking/02): scope, ceiling, rank ---------- */
+  function rankFor(memberId, sc) {
+    const m = memberById(memberId);
+    let best = 0;
+    m.assign.forEach((a) => {
+      const r = Dt().roles[a.role];
+      const ok = sc.scope === 'org' ? a.scope === 'org' : shopsOfScope(sc).every((s) => covers(a, s));
+      if (ok && r.rank > best) best = r.rank;
+    });
+    return best;
+  }
+  const myRankFor = (sc) => rankFor(S.role, sc);
+  function holds(perm, sc) {
+    const lv = level(perm);
+    if (lv === 'org') return canOrgWide(perm);
+    if (lv === 'any') return can(perm);
+    if (sc.scope === 'org') return canOrgWide(perm);
+    return shopsOfScope(sc).every((s) => can(perm, s));
+  }
+  function grantCheck(roleId, sc) {
+    const r = Dt().roles[roleId];
+    if (r.locked) return { ok: false, why: t('grant.owner') };
+    const mine = myRankFor(sc);
+    if (r.rank >= mine) return { ok: false, why: t('grant.rank', { r: r.rank, mine: mine }) };
+    const missing = Array.from(r.perms).filter((p) => !holds(p, sc));
+    if (missing.length) return { ok: false, why: t('grant.ceiling', { n: missing.length, list: missing.slice(0, 2).map((p) => t('perm.' + p)).join(', ') }) };
+    return { ok: true };
+  }
+  function scopesWith(perm) {
+    const out = [];
+    if (canOrgWide(perm)) out.push({ scope: 'org', id: 'lemoni' });
+    Dt().groups.forEach((g) => { if (canOrgWide(perm) || me().assign.some((a) => a.scope === 'group' && a.id === g.id && Dt().roles[a.role].perms.has(perm))) out.push({ scope: 'group', id: g.id }); });
+    Dt().shops.forEach((s) => { if (can(perm, s.id)) out.push({ scope: 'shop', id: s.id }); });
+    return out;
+  }
+  function visibleMembers() {
+    if (canOrgWide('members.view')) return Dt().members;
+    const shops = myShops('members.view');
+    return Dt().members.filter((m) => m.assign.some((a) => shopsOfScope(a).some((s) => shops.indexOf(s) >= 0)));
+  }
+  function manageCheck(target) {
+    if (target.id === S.role) return { ok: false, why: t('mng.self') };
+    for (const a of target.assign) {
+      if (!holds('members.manage', a)) return { ok: false, why: t('mng.scope', { place: scopeName(a) }) };
+      const mine = myRankFor(a), theirs = Dt().roles[a.role].rank;
+      if (theirs >= mine) return { ok: false, why: t('mng.rank', { r: theirs, mine: mine }) };
+    }
+    return { ok: true };
+  }
+  function accessChanged(id) {
+    Dt().permsVersion[id] = (Dt().permsVersion[id] || 1) + 1;
+    if (PERSONAS.indexOf(id) >= 0 && id !== S.role) {
+      S.pendingAccess[id] = true;
+      S.previews.unshift({ persona: id, silent: true, n: { at: Date.now() } });
+      renderPanel(); pulsePanel();
+    }
+  }
+
+  /* ---------- team ---------- */
+  SCREENS.team = () => {
+    const list = visibleMembers();
+    const canInv = scopesWith('members.invite').length > 0;
+    const row = (m) => cell({
+      act: 'open-member', data: { id: m.id }, lead: avatar(m.name, 'md'),
+      title: esc(m.name) + (m.id === S.role ? ' <span class="muted">' + T('team.you') + '</span>' : ''),
+      sub: esc(m.assign.map(assignLabel).join(', ')),
+      val: m.status !== 'active' ? '<span class="badge ' + (m.status === 'suspended' ? 'few' : 'info') + '">' + T('mstatus.' + m.status) + '</span>' : ''
+    });
+    const act = list.filter((m) => m.status === 'active'), rest = list.filter((m) => m.status !== 'active');
+    return {
+      title: t('team.title'),
+      right: canInv ? '<button class="navbtn" data-act="invite" aria-label="' + T('team.invite') + '">' + ic('plus') + '</button>' : '',
+      body: tip('team', 'tip.team.t', 'tip.team.b') + '<div class="list with-thumbs">' + act.map(row).join('') + '</div>' +
+        (rest.length ? '<div class="section-h">' + T('team.other') + '</div><div class="list with-thumbs">' + rest.map(row).join('') + '</div>' : '') +
+        '<p class="section-f">' + T('team.foot') + '</p>'
+    };
+  };
+  ACT['open-member'] = (el) => go('member', { id: el.dataset.id });
+  SCREENS.member = (pr) => {
+    const m = memberById(pr.id);
+    const chk = manageCheck(m);
+    return {
+      title: m.name, large: false,
+      body: '<div style="text-align:center;margin:8px 0 18px">' + avatar(m.name, 'lg') + '<div class="t-title2 mt12">' + esc(m.name) + '</div><div class="muted t-sub">' + esc(m.email) + (m.status !== 'active' ? ' · ' + T('mstatus.' + m.status) : '') + '</div></div>' +
+        '<div class="section-h">' + T('mem.access') + '</div><div class="list">' + m.assign.map((a, i) => {
+          const r = Dt().roles[a.role];
+          return cell({ act: chk.ok ? 'change-role' : null, data: { id: m.id, i: i }, title: esc(roleName(r)), sub: esc(scopeName(a)) + ' · ' + T('role.rank', { n: r.rank }) });
+        }).join('') + '</div>' +
+        (chk.ok ? '<p class="section-f">' + T('mem.tapchange') + '</p><div class="mt16"><button class="btn gray block" data-act="toggle-suspend" data-id="' + m.id + '">' + (m.status === 'suspended' ? T('mem.reactivate') : T('mem.suspend')) + '</button></div>'
+          : '<div class="mt12">' + why(esc(chk.why)) + '</div>') +
+        '<p class="section-f">' + T('mem.silent') + '</p>'
+    };
+  };
+  function roleChoices(sc, current, act, data) {
+    return '<div class="list">' + Object.values(Dt().roles).sort((x, y) => y.rank - x.rank).map((r) => {
+      const g = grantCheck(r.id, sc);
+      if (!g.ok) return '<div class="cell" aria-disabled="true"><span class="c-main"><span class="c-title muted" style="display:block">' + esc(roleName(r)) + '</span><span class="lock-note">' + ic('lock') + esc(g.why) + '</span></span></div>';
+      return cell({ act: act, data: Object.assign({ role: r.id }, data), title: esc(roleName(r)), sub: T('role.rank', { n: r.rank }) + ' · ' + T('role.nperms', { n: r.perms.size }), val: r.id === current ? '<span style="color:var(--accent-text)">' + ic('check') + '</span>' : '', chev: false });
+    }).join('') + '</div>';
+  }
+  ACT['change-role'] = (el) => {
+    const m = memberById(el.dataset.id), i = +el.dataset.i, a = m.assign[i];
+    openSheet({ title: t('mem.change'), detent: 'medium', render: () => '<p class="section-f" style="margin:0 4px 10px">' + T('mem.change.sub', { name: m.name, place: scopeName(a) }) + '</p>' + roleChoices(a, m.assign[i].role, 'apply-role', { id: m.id, i: i }) });
+  };
+  ACT['apply-role'] = (el) => {
+    const m = memberById(el.dataset.id), a = m.assign[+el.dataset.i];
+    if (a.role === el.dataset.role) { closeSheet(); return; }
+    a.role = el.dataset.role;
+    accessChanged(m.id);
+    closeSheet(); toast(t('mem.changed', { name: firstName(m.id) }), { icon: 'shield' }); refresh();
+  };
+  ACT['toggle-suspend'] = (el) => {
+    const m = memberById(el.dataset.id);
+    m.status = m.status === 'suspended' ? 'active' : 'suspended';
+    accessChanged(m.id);
+    toast(t(m.status === 'suspended' ? 'mem.suspended' : 'mem.reactivated', { name: firstName(m.id) }), { icon: 'shield' }); refresh();
+  };
+  ACT.invite = () => {
+    const scopes = scopesWith('members.invite');
+    S.ui.inv = { email: '', sc: skey(scopes[scopes.length - 1]), role: null };
+    openSheet({ title: t('inv.title'), detent: 'large', noFocus: true, render: inviteHtml });
+  };
+  function inviteHtml() {
+    const v = S.ui.inv, scopes = scopesWith('members.invite');
+    const p = v.sc.split(':'), sc = { scope: p[0], id: p[1] };
+    return '<div class="list"><div class="input-cell"><label for="inv-email">' + T('inv.email') + '</label><input id="inv-email" type="email" inputmode="email" autocomplete="off" data-in="inv-email" value="' + esc(v.email) + '" placeholder="name@example.com"></div></div>' +
+      '<div class="section-h">' + T('inv.where') + '</div><div class="chips">' + scopes.map((s) => '<button class="chip" data-act="inv-sc" data-k="' + skey(s) + '" aria-pressed="' + (v.sc === skey(s)) + '">' + esc(s.scope === 'org' ? t('scope.org.short') : scopeName(s)) + '</button>').join('') + '</div>' +
+      '<div class="section-h">' + T('inv.role') + '</div>' + roleChoices(sc, v.role, 'inv-role', {}) +
+      '<p class="section-f">' + T('inv.rules') + '</p>' +
+      '<div class="mt16"><button class="btn primary block" data-act="inv-send"' + (v.role ? '' : ' disabled') + '>' + ic('send') + T('inv.send') + '</button></div>';
+  }
+  IN['inv-email'] = (el) => { S.ui.inv.email = el.value; };
+  ACT['inv-sc'] = (el) => { S.ui.inv.sc = el.dataset.k; S.ui.inv.role = null; sheetRefresh(); };
+  ACT['inv-role'] = (el) => { S.ui.inv.role = el.dataset.role; sheetRefresh(); };
+  ACT['inv-send'] = () => {
+    const v = S.ui.inv, email = (v.email || '').trim() || 'new.person@example.com';
+    const p = v.sc.split(':');
+    Dt().members.push({ id: 'inv' + Date.now(), name: email, email: email, tile: 5, status: 'invited', assign: [{ role: v.role, scope: p[0], id: p[1] }] });
+    closeSheet(); toast(t('inv.sent', { email: email }), { icon: 'mail' }); refresh();
+  };
+
+  /* ---------- roles ---------- */
+  const roleCount = (rid) => Dt().members.filter((m) => m.status !== 'removed' && m.assign.some((a) => a.role === rid));
+  SCREENS.roles = () => {
+    const roles = Object.values(Dt().roles).sort((a, b) => b.rank - a.rank);
+    return {
+      title: t('roles.title'),
+      right: canOrgWide('roles.manage') ? '<button class="navbtn" data-act="role-new" aria-label="' + T('roles.new') + '">' + ic('plus') + '</button>' : '',
+      body: tip('roles', 'tip.roles.t', 'tip.roles.b') + '<div class="list">' + roles.map((r) => cell({
+        act: 'open-role', data: { id: r.id },
+        title: esc(roleName(r)) + (r.custom ? ' <span class="badge plain">' + T('roles.custom') + '</span>' : '') + (r.locked ? ' <span class="lock-note">' + ic('lock') + '</span>' : ''),
+        sub: T('role.rank', { n: r.rank }) + ' · ' + T('role.nperms', { n: r.perms.size }) + ' · ' + T('roles.people', { n: roleCount(r.id).length })
+      })).join('') + '</div><p class="section-f">' + T('roles.foot') + '</p>'
+    };
+  };
+  ACT['open-role'] = (el) => { S.ui.rd = null; go('role', { id: el.dataset.id }); };
+  ACT['role-new'] = () => {
+    const id = 'custom' + Date.now();
+    const mine = myRankFor({ scope: 'org', id: 'lemoni' });
+    Dt().roles[id] = { id: id, tpl: null, custom: true, rank: Math.max(1, Math.min(35, mine - 1)), locked: false, createdBy: S.role,
+      name: { en: window.I18N.en['roles.newname'], el: window.I18N.el['roles.newname'], ru: window.I18N.ru['roles.newname'] }, perms: new Set(['products.view', 'stock.view']) };
+    S.ui.rd = null; go('role', { id: id });
+  };
+  function roleState(r) {
+    const mine = myRankFor({ scope: 'org', id: 'lemoni' });
+    const reason = r.locked ? t('re.owner') : !canOrgWide('roles.manage') ? t('re.noperm') : r.rank >= mine ? t('re.rankwhy', { r: r.rank, mine: mine }) : '';
+    return { mine: mine, ro: !!reason, reason: reason };
+  }
+  function rankLine() { const d = S.ui.rd; return T('re.rankline', { n: d.rank, mine: roleState(Dt().roles[d.id]).mine }); }
+  PARTS['re-rank'] = rankLine;
+  SCREENS.role = (pr) => {
+    const r = Dt().roles[pr.id];
+    if (!S.ui.rd || S.ui.rd.id !== r.id) S.ui.rd = { id: r.id, rank: r.rank, perms: new Set(r.perms) };
+    const d = S.ui.rd, st = roleState(r);
+    const groups = window.CSData.PERM_GROUPS.map((g) => '<div class="section-h">' + T('pg.' + g[0]) + '</div><div class="list">' + g[1].map((p) => {
+      const have = holds(p, { scope: 'org', id: 'lemoni' });
+      const on = d.perms.has(p);
+      const lock = st.ro || !have;
+      return '<div class="perm-row"><div class="grow"><div class="t-callout">' + T('perm.' + p) + '</div><div class="pk">' + esc(p) + '</div>' +
+        (!have && !st.ro ? '<div class="locked">' + ic('lock') + T('re.nothave') + '</div>' : '') + '</div>' +
+        '<label class="switch"><input type="checkbox" role="switch" data-ch="re-perm" data-p="' + p + '"' + (on ? ' checked' : '') + (lock ? ' disabled' : '') + ' aria-label="' + T('perm.' + p) + '"><span class="track"></span><span class="knob"></span></label></div>';
+    }).join('') + '</div>').join('');
+    return {
+      title: roleName(r), large: false,
+      right: st.ro ? '' : '<button class="navbtn strong" data-act="role-save">' + T('re.save') + '</button>',
+      body: (st.ro ? '<div class="mt8">' + why(esc(st.reason)) + '</div>' : '') +
+        '<div class="section-h">' + T('re.rank') + '</div><div class="list"><div class="cell" style="flex-direction:column;align-items:stretch;gap:4px"><span class="c-title" data-part="re-rank">' + rankLine() + '</span>' +
+        '<input class="range" type="range" min="1" max="' + Math.max(1, st.mine - 1) + '" value="' + Math.min(d.rank, Math.max(1, st.mine - 1)) + '" data-in="re-rank"' + (st.ro ? ' disabled' : '') + ' aria-label="' + T('re.rank') + '"></div></div>' +
+        '<p class="section-f">' + T('re.rank.note') + '</p>' + groups +
+        (st.ro ? '' : '<div class="mt24"><button class="btn primary block" data-act="role-save">' + T('re.save') + '</button></div>')
+    };
+  };
+  IN['re-rank'] = (el) => { S.ui.rd.rank = +el.value; refreshPart('re-rank'); };
+  CH['re-perm'] = (el) => { const d = S.ui.rd; if (el.checked) d.perms.add(el.dataset.p); else d.perms.delete(el.dataset.p); haptic(6); };
+  ACT['role-save'] = () => {
+    const d = S.ui.rd, r = Dt().roles[d.id];
+    const people = roleCount(r.id);
+    const apply = () => {
+      r.perms = new Set(d.perms); r.rank = d.rank;
+      people.forEach((m) => accessChanged(m.id));
+      closeSheet(); toast(t('re.saved', { n: people.length }), { icon: 'shield' }); back();
+    };
+    if (!people.length) return apply();
+    S.ui.roleApply = apply;
+    openSheet({ title: t('re.confirm.t'), render: () => '<div class="t-title3" style="text-align:center;margin:6px 0 6px">' + T('re.confirm', { n: people.length }) + '</div>' +
+      '<p class="section-f" style="text-align:center;margin:0 0 14px">' + T('re.confirm.b') + '</p><div class="list with-thumbs">' + people.map((m) => cell({ lead: avatar(m.name, 'md'), title: esc(m.name), sub: esc(m.assign.map(assignLabel).join(', ')) })).join('') + '</div>' +
+      '<div class="btn-row mt16"><button class="btn gray" data-act="sheet-close">' + T('cancel') + '</button><button class="btn primary" data-act="role-apply">' + T('re.save') + '</button></div>' });
+  };
+  ACT['role-apply'] = () => { if (S.ui.roleApply) S.ui.roleApply(); };
+
+  /* ---------- reports (dataviz rules: one hue, thin marks, 4px data ends, legend only for 2+ series, table view) ---------- */
+  function days14() { const d0 = new Date(); d0.setHours(0, 0, 0, 0); const out = []; for (let i = 13; i >= 0; i--) out.push(d0.getTime() - i * D); return out; }
+  function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); const f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
+  function barPathV(x, y, w, h) { const r = Math.min(4, w / 2, h); return 'M' + x + ',' + (y + h) + 'V' + (y + r) + 'Q' + x + ',' + y + ' ' + (x + r) + ',' + y + 'H' + (x + w - r) + 'Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) + 'V' + (y + h) + 'Z'; }
+  function barPathH(x, y, w, h) { const r = Math.min(4, h / 2, w); return 'M' + x + ',' + y + 'H' + (x + w - r) + 'Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) + 'V' + (y + h - r) + 'Q' + (x + w) + ',' + (y + h) + ' ' + (x + w - r) + ',' + (y + h) + 'H' + x + 'Z'; }
+  const short = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+  function tableView(head, rows) {
+    return '<details class="tableview"><summary>' + T('rep.table') + '</summary><table class="chart-table"><thead><tr>' + head.map((h, i) => '<th' + (i ? ' class="n"' : '') + '>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' +
+      rows.map((r) => '<tr>' + r.map((c, i) => '<td' + (i ? ' class="n"' : '') + '>' + esc(c) + '</td>').join('') + '</tr>').join('') + '</tbody></table></details>';
+  }
+  function columnsChart(vals, labels, fmt) {
+    const W = 340, Hh = 170, pl = 40, pb = 22, pt = 18;
+    const max = niceMax(Math.max.apply(null, vals));
+    const ih = Hh - pb - pt, slot = (W - pl) / vals.length, bw = Math.min(24, slot * 0.62);
+    let g = '';
+    [0, 0.5, 1].forEach((f) => { const y = pt + ih - ih * f; g += '<line class="gridl" x1="' + pl + '" x2="' + W + '" y1="' + y + '" y2="' + y + '"/><text x="' + (pl - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + esc(fmt(max * f, true)) + '</text>'; });
+    const iMax = vals.indexOf(Math.max.apply(null, vals)), iLast = vals.length - 1;
+    vals.forEach((v, i) => {
+      const h = max ? (v / max) * ih : 0, x = pl + i * slot + (slot - bw) / 2, y = pt + ih - h;
+      g += '<g class="hitbar" tabindex="0" data-tip="' + esc(fmt(v) + '|' + labels[i].full) + '"><rect class="hitrect" x="' + (pl + i * slot) + '" y="' + pt + '" width="' + slot + '" height="' + ih + '" fill="transparent"/>' + (h > 0 ? '<path class="bar" d="' + barPathV(x, y, bw, h) + '"/>' : '') + '</g>';
+      if ((i === iMax || i === iLast) && v > 0) g += '<text class="v" x="' + (x + bw / 2) + '" y="' + (y - 5) + '" text-anchor="middle">' + esc(fmt(v, true)) + '</text>';
+      if (i % 2 === 1 || i === iLast) g += '<text x="' + (x + bw / 2) + '" y="' + (Hh - 6) + '" text-anchor="middle">' + esc(labels[i].tick) + '</text>';
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + Hh + '" role="img">' + g + '</svg>';
+  }
+  function barsChart(rows, fmt, two) {
+    const W = 340, rowH = two ? 40 : 30, lw = 112, bx = lw + 8, bmax = W - bx - 52, bh = two ? 11 : 14;
+    const max = niceMax(Math.max.apply(null, rows.map((r) => Math.max(r.a, two ? r.b : 0))));
+    const Hh = rows.length * rowH + 4;
+    let g = '';
+    rows.forEach((r, i) => {
+      const y0 = i * rowH + 4;
+      g += '<text x="0" y="' + (y0 + rowH / 2 + 2) + '">' + esc(short(r.label, 19)) + '</text>';
+      const series = two ? [['soft', r.a, y0 + (rowH - 2 * bh - 2) / 2], ['', r.b, y0 + (rowH - 2 * bh - 2) / 2 + bh + 2]] : [['', r.a, y0 + (rowH - bh) / 2]];
+      series.forEach((s) => {
+        const w = Math.max(2, (s[1] / max) * bmax);
+        g += '<g class="hitbar" tabindex="0" data-tip="' + esc(fmt(s[1]) + '|' + r.label + (r.tipExtra ? ' · ' + r.tipExtra : '')) + '"><rect class="hitrect" x="' + bx + '" y="' + (s[2] - 3) + '" width="' + (bmax + 40) + '" height="' + (bh + 6) + '" fill="transparent"/><path class="bar ' + s[0] + '" d="' + barPathH(bx, s[2], w, bh) + '"/></g>' +
+          '<text class="v" x="' + (bx + w + 6) + '" y="' + (s[2] + bh / 2 + 4) + '">' + esc(fmt(s[1], true)) + '</text>';
+      });
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + Hh + '" role="img">' + g + '</svg>';
+  }
+  function chartCard(title, sub, svg, table, legend) {
+    return '<section class="chart-card"><h3>' + esc(title) + '</h3><div class="c-sub">' + esc(sub) + '</div>' + (legend || '') + svg + table + '</section>';
+  }
+  SCREENS.reports = () => {
+    const shops = ctxShops().filter((s) => can('reports.view', s));
+    const fin = shops.every((s) => can('reports.financial.view', s));
+    const days = days14(), qtyD = days.map(() => 0), valD = days.map(() => 0);
+    const byProd = {}, shrink = {};
+    Dt().ledger.forEach((m) => {
+      if (shops.indexOf(m.shop) < 0) return;
+      if (m.kind === 'sale') {
+        const i = Math.floor((m.at - days[0]) / D);
+        if (i >= 0 && i < 14) { qtyD[i] += -m.delta; valD[i] += -m.delta * (m.price || 0); const pid = variant(m.vid).pid; byProd[pid] = (byProd[pid] || 0) + -m.delta; }
+      }
+      if ((m.kind === 'damage' || (m.kind === 'adjust' && m.delta < 0)) && m.at > Date.now() - 30 * D) {
+        const k = m.reason || 'lost'; shrink[k] = shrink[k] || { q: 0, v: 0 }; shrink[k].q += -m.delta; shrink[k].v += -m.delta * (m.cost || variant(m.vid).cost);
+      }
+    });
+    const totalQ = qtyD.reduce((a, b) => a + b, 0), totalV = valD.reduce((a, b) => a + b, 0);
+    const stockVal = Dt().products.reduce((s, p) => s + p.variants.reduce((x, v) => x + Math.max(0, qtyIn(v.id, shops)) * v.cost, 0), 0);
+    const fmtQ = (v) => num(Math.round(v));
+    const fmtM = (v, tick) => (tick ? new Intl.NumberFormat(LOC[S.lang], { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v / 100) : money(v));
+    const labels = days.map((d) => ({ tick: String(new Date(d).getDate()), full: dt(d, { weekday: 'short', day: 'numeric', month: 'short' }) }));
+    const sales = chartCard(t(fin ? 'rep.sales.v' : 'rep.sales.q'), t(fin ? 'rep.sales.v.sub' : 'rep.sales.q.sub'), columnsChart(fin ? valD : qtyD, labels, fin ? fmtM : fmtQ),
+      tableView([t('rep.day'), fin ? t('rep.revenue') : t('rep.items')], days.map((d, i) => [labels[i].full, fin ? money(valD[i]) : num(qtyD[i])])));
+    const top = Object.keys(byProd).sort((a, b) => byProd[b] - byProd[a]).slice(0, 6).map((pid) => ({ label: pname(product(pid)), a: byProd[pid] }));
+    const topC = chartCard(t('rep.top'), t('rep.top.sub'), barsChart(top, fmtQ), tableView([t('rep.product'), t('rep.items')], top.map((r) => [r.label, num(r.a)])));
+    const wantMap = {};
+    Dt().alerts.filter((a) => a.status === 'waiting' && (a.shop === null || shops.indexOf(a.shop) >= 0)).forEach((a) => { wantMap[a.vid] = (wantMap[a.vid] || 0) + 1; });
+    const want = Object.keys(wantMap).sort((a, b) => wantMap[b] - wantMap[a]).slice(0, 6).map((vid) => ({ label: vname(variant(vid)), a: wantMap[vid], tipExtra: t('st.' + (vState(vid, shops) === 'ok' ? 'ok' : vState(vid, shops))) }));
+    const wantC = want.length ? chartCard(t('rep.want'), t('rep.want.sub'), barsChart(want, fmtQ), tableView([t('rep.product'), t('rep.waiting')], want.map((r) => [r.label, num(r.a)])))
+      : chartCard(t('rep.want'), t('rep.want.none'), '', '');
+    const links = Dt().links.filter((l) => shopsOfScope({ scope: l.scope, id: l.sid }).some((s) => shops.indexOf(s) >= 0));
+    const lrows = links.map((l) => ({ label: L(l.label) + (l.scope === 'shop' ? ', ' + sname(l.sid) : ''), a: l.opens, b: l.signups }));
+    const legend = '<div class="legend"><span><i style="background:var(--data-1-soft)"></i>' + T('rep.opens') + '</span><span><i style="background:var(--data-1)"></i>' + T('rep.signups') + '</span></div>';
+    const linkC = chartCard(t('rep.links'), t('rep.links.sub'), barsChart(lrows, fmtQ, true), tableView([t('rep.link'), t('rep.opens'), t('rep.signups'), t('rep.conv')], links.map((l) => [L(l.label) + (l.scope === 'shop' ? ', ' + sname(l.sid) : ''), num(l.opens), num(l.signups), pct(l.signups / l.opens)])), legend);
+    const srows = Object.keys(shrink).sort((a, b) => (fin ? shrink[b].v - shrink[a].v : shrink[b].q - shrink[a].q)).map((k) => ({ label: t('r.' + k), a: fin ? shrink[k].v : shrink[k].q }));
+    const shrinkC = chartCard(t('rep.shrink'), t(fin ? 'rep.shrink.v' : 'rep.shrink.q'), barsChart(srows, fin ? fmtM : fmtQ), tableView([t('rep.reason'), fin ? t('rep.cost') : t('rep.items')], srows.map((r) => [r.label, fin ? money(r.a) : num(r.a)])));
+    const tiles = '<div class="kpis" style="margin-bottom:14px">' +
+      kpi('c3', 'bag', t('rep.k.sold'), totalQ, t('rep.k.14')) +
+      (fin ? '<div class="kpi c4"><span class="k-label">' + ic('chart') + T('rep.k.rev') + '</span><span class="k-value" style="font-size:24px">' + esc(money(totalV)) + '</span><span class="k-note">' + T('rep.k.14') + '</span></div>' +
+        '<div class="kpi c2"><span class="k-label">' + ic('box') + T('rep.k.value') + '</span><span class="k-value" style="font-size:24px">' + esc(money(stockVal)) + '</span><span class="k-note">' + T('rep.k.atcost') + '</span></div>' : '') +
+      kpi('c1', 'bell', t('kpi.waiting'), Object.values(wantMap).reduce((a, b) => a + b, 0), t('kpi.waiting.note')) + '</div>';
+    return {
+      title: t('rep.title'),
+      body: shopChips() + (fin ? '' : '<div class="why" style="margin-bottom:12px">' + ic('lock') + '<span>' + T('rep.nofin') + '</span></div>') + tiles + sales + topC + wantC + linkC + shrinkC + '<p class="section-f">' + T('rep.foot') + '</p>'
+    };
+  };
+  function chartTip(target) {
+    const card = target.closest('.chart-card'); if (!card) return;
+    let tipEl = card.querySelector('.chart-tip');
+    if (!tipEl) { tipEl = document.createElement('div'); tipEl.className = 'chart-tip'; tipEl.setAttribute('role', 'status'); card.appendChild(tipEl); }
+    const parts = (target.dataset.tip || '').split('|');
+    tipEl.textContent = '';
+    const b = document.createElement('b'); b.textContent = parts[0]; tipEl.appendChild(b);
+    tipEl.appendChild(document.createTextNode(parts.slice(1).join('|')));
+    const cr = card.getBoundingClientRect(), r = (target.querySelector('.bar') || target).getBoundingClientRect();
+    tipEl.style.opacity = '1';
+    const x = Math.min(cr.width - tipEl.offsetWidth - 6, Math.max(6, r.left - cr.left + r.width / 2 - tipEl.offsetWidth / 2));
+    tipEl.style.left = x + 'px';
+    tipEl.style.top = Math.max(4, r.top - cr.top - tipEl.offsetHeight - 8) + 'px';
+  }
+  function chartTipHide(target) { const card = target.closest('.chart-card'); const tp = card && card.querySelector('.chart-tip'); if (tp) tp.style.opacity = '0'; }
+  document.addEventListener('pointerover', (e) => { const h = e.target.closest && e.target.closest('.hitbar'); if (h) chartTip(h); });
+  document.addEventListener('pointerout', (e) => { const h = e.target.closest && e.target.closest('.hitbar'); if (h && !h.contains(e.relatedTarget)) chartTipHide(h); });
+  document.addEventListener('focusin', (e) => { const h = e.target.closest && e.target.closest('.hitbar'); if (h) chartTip(h); });
+  document.addEventListener('focusout', (e) => { const h = e.target.closest && e.target.closest('.hitbar'); if (h) chartTipHide(h); });
+
+  /* ---------- stock counts ---------- */
+  function countScope(c) { return Dt().products.filter((p) => c.kind === 'full' || p.cat === c.cat).flatMap((p) => p.variants.map((v) => v.id)); }
+  function openCount(shop) { return Dt().counts.find((c) => c.shop === shop && c.status === 'open'); }
+  function startCount(shop, kind, cat) {
+    const c = { id: 'cnt' + Date.now(), shop: shop, kind: kind, cat: cat || null, status: 'open', lines: {}, by: S.role, at: Date.now() };
+    Dt().counts.unshift(c); return c;
+  }
+  function countLine(c, vid, d) {
+    const l = c.lines[vid] || (c.lines[vid] = { counted: 0, expected: qty(vid, c.shop), by: S.role, at: Date.now() });
+    l.counted = Math.max(0, l.counted + d); l.by = S.role; l.at = Date.now();
+  }
+  SCREENS.counts = () => {
+    const sh = actionShop();
+    const list = Dt().counts.filter((c) => ctxShops().indexOf(c.shop) >= 0);
+    return {
+      title: t('cnt.title'),
+      body: tip('counts', 'tip.counts.t', 'tip.counts.b') +
+        (can('stock.count', sh) ? '<button class="btn primary block" data-act="count-start">' + ic('count') + T('cnt.start', { shop: sname(sh) }) + '</button>' : why(T('cnt.cannot'))) +
+        (list.length ? '<div class="section-h">' + T('cnt.list') + '</div><div class="list with-tiles">' + list.map((c) => cell({ act: 'open-count', data: { id: c.id }, lead: tileI('count', c.status === 'applied' ? 3 : c.status === 'review' ? 4 : 2), title: esc(sname(c.shop)) + ' · ' + (c.kind === 'full' ? T('cnt.full') : esc(L(Dt().categories.find((x) => x.id === c.cat).name))), sub: T('cnt.status.' + c.status) + ' · ' + esc(rel(c.at)) })).join('') + '</div>' : '')
+    };
+  };
+  ACT['count-start'] = () => {
+    const sh = actionShop();
+    if (openCount(sh)) { go('count', { id: openCount(sh).id }); return; }
+    openSheet({ title: t('cnt.new'), render: () => '<p class="section-f" style="margin:0 4px 10px">' + T('cnt.new.sub', { shop: sname(sh) }) + '</p><div class="list with-tiles">' +
+      cell({ act: 'count-go', data: { kind: 'full' }, lead: tileI('box', 2), title: T('cnt.full'), sub: T('cnt.full.sub') }) +
+      Dt().categories.map((c) => cell({ act: 'count-go', data: { kind: 'cat', cat: c.id }, lead: tileI('grid', 6), title: esc(L(c.name)), sub: T('cnt.cat.sub') })).join('') + '</div>' });
+  };
+  ACT['count-go'] = (el) => { const c = startCount(actionShop(), el.dataset.kind, el.dataset.cat); closeSheet(true); go('count', { id: c.id }); };
+  ACT['open-count'] = (el) => go('count', { id: el.dataset.id });
+  SCREENS.count = (pr) => {
+    const c = Dt().counts.find((x) => x.id === pr.id);
+    const vids = countScope(c);
+    const counted = vids.filter((v) => c.lines[v]).length;
+    const approve = can('stock.count.approve', c.shop);
+    const head = '<div class="lsub" style="margin-top:0">' + esc(sname(c.shop)) + ' · ' + (c.kind === 'full' ? T('cnt.full') : esc(L(Dt().categories.find((x) => x.id === c.cat).name))) + ' · ' + T('cnt.status.' + c.status) + '</div>';
+    if (c.status === 'open') {
+      return {
+        title: t('cnt.one'), large: false,
+        body: head + '<div class="card" style="margin-bottom:12px"><div class="t-headline">' + T('cnt.progress', { a: counted, b: vids.length }) + '</div><p class="muted t-sub" style="margin:4px 0 12px">' + T('cnt.blind') + '</p>' +
+          '<button class="btn tinted block" data-act="count-scan" data-id="' + c.id + '">' + ic('scan') + T('cnt.byscan') + '</button></div>' +
+          '<div class="list with-thumbs">' + vids.map((vid) => { const v = variant(vid), l = c.lines[vid]; return cell({ cls: 'cl-' + vid, lead: img(product(v.pid).img, vname(v), 'thumb', ''), title: esc(vname(v)), sub: l ? T('cnt.countedby', { name: firstName(l.by) }) : T('cnt.notyet'), val: l ? stepper('cl:' + c.id + ':' + vid, l.counted) : '<button class="btn small tinted" data-act="step" data-id="cl:' + c.id + ':' + vid + '" data-d="1">' + T('cnt.count1') + '</button>', chev: false }); }).join('') + '</div>' +
+          '<div class="mt16"><button class="btn primary block" data-act="count-submit" data-id="' + c.id + '"' + (counted ? '' : ' disabled') + '>' + (approve ? T('cnt.review') : T('cnt.submit')) + '</button></div>'
+      };
+    }
+    const lines = vids.filter((v) => c.lines[v]);
+    const unc = vids.filter((v) => !c.lines[v] && qty(v, c.shop) !== 0);
+    const fin = can('products.cost.view');
+    let totalV = 0;
+    const rows = lines.map((vid) => {
+      const l = c.lines[vid], d = l.counted - l.expected, v = variant(vid);
+      totalV += d * v.cost;
+      return cell({ title: esc(vname(v)), sub: T('cnt.expcount', { e: l.expected, c: l.counted }) + (fin && d ? ' · ' + esc(money(d * v.cost)) : ''), val: d === 0 ? '<span class="muted">' + T('cnt.match') + '</span>' : '<span class="badge ' + (d < 0 ? 'neg' : 'info') + '">' + (d > 0 ? '+' : '−') + Math.abs(d) + '</span>', chev: false });
+    }).join('');
+    return {
+      title: t('cnt.one'), large: false,
+      body: head + '<div class="section-h">' + T('cnt.diffs') + '</div><div class="list">' + rows + '</div>' +
+        (fin ? '<p class="section-f">' + T('cnt.total', { v: money(totalV) }) + '</p>' : '') +
+        '<p class="section-f">' + T('cnt.expected.note') + '</p>' +
+        (c.status === 'review' && c.kind === 'full' && unc.length ? '<p class="section-f">' + T('cnt.unc', { n: unc.length }) + '</p>' : '') +
+        (c.status === 'review' ? (approve ? '<div class="mt16"><button class="btn primary block" data-act="count-apply" data-id="' + c.id + '">' + T('cnt.apply') + '</button></div>' : '<div class="mt16">' + why(T('cnt.waiting')) + '</div>')
+          : '<div class="mt16"><div class="why">' + ic('check') + '<span>' + T('cnt.applied', { n: c.diffs || 0, name: firstName(c.appliedBy) }) + '</span></div></div>')
+    };
+  };
+  ACT['count-scan'] = (el) => { const c = Dt().counts.find((x) => x.id === el.dataset.id); S.ui.scanMode = 'count'; S.ui.scanShop = c.shop; S.tab = 'scan'; S.stacks.scan = [{ name: 'scan', params: {} }]; renderApp('tab'); };
+  ACT['count-submit'] = (el) => {
+    const c = Dt().counts.find((x) => x.id === el.dataset.id);
+    c.status = 'review'; c.submittedBy = S.role;
+    if (!can('stock.count.approve', c.shop)) toast(t('cnt.sent', { name: 'Maria' }), { icon: 'send' });
+    refresh();
+  };
+  ACT['count-apply'] = (el) => {
+    const c = Dt().counts.find((x) => x.id === el.dataset.id);
+    const unc = countScope(c).filter((v) => !c.lines[v] && qty(v, c.shop) !== 0);
+    if (c.kind === 'full' && unc.length) {
+      openSheet({ title: t('cnt.q.t'), render: () => '<div class="t-title3" style="text-align:center;margin:8px 0">' + T('cnt.q', { n: unc.length }) + '</div><p class="section-f" style="text-align:center;margin:0 0 16px">' + T('cnt.q.b') + '</p>' +
+        '<button class="btn gray block" data-act="count-do" data-id="' + c.id + '" data-p="ignore">' + T('cnt.q.leave') + '</button><div class="mt8"><button class="btn danger block" data-act="count-do" data-id="' + c.id + '" data-p="zero">' + T('cnt.q.zero') + '</button></div>' });
+      return;
+    }
+    applyCount(c, 'ignore');
+  };
+  ACT['count-do'] = (el) => { closeSheet(true); applyCount(Dt().counts.find((x) => x.id === el.dataset.id), el.dataset.p); };
+  function applyCount(c, policy) {
+    let diffs = 0;
+    Object.keys(c.lines).forEach((vid) => { const l = c.lines[vid], d = l.counted - l.expected; if (d) { applyMove({ vid: vid, shop: c.shop, delta: d, kind: 'count', reason: 'correction', ref: c.id, cost: variant(vid).cost }); diffs += 1; } });
+    if (policy === 'zero') countScope(c).forEach((vid) => { if (!c.lines[vid]) { const q = qty(vid, c.shop); if (q) { applyMove({ vid: vid, shop: c.shop, delta: -q, kind: 'count', reason: 'correction', ref: c.id, cost: variant(vid).cost }); diffs += 1; } } });
+    c.status = 'applied'; c.policy = policy; c.appliedBy = S.role; c.diffs = diffs;
+    tick(); toast(t('cnt.done', { n: diffs }), { icon: 'check' }); refresh();
+  }
+
+  /* ---------- transfers ---------- */
+  function inTransit(vid, shop) { return Dt().transfers.filter((x) => x.status === 'sent' && x.to === shop).reduce((s, x) => s + x.lines.filter((l) => l.vid === vid).reduce((a, l) => a + l.sent, 0), 0); }
+  function createTransfer(from, to, lines, by) {
+    const tr = { id: 'tr' + Date.now(), from: from, to: to, status: 'sent', by: by, at: Date.now(), lines: lines.map((l) => ({ vid: l.vid, sent: l.n, received: l.n })) };
+    tr.lines.forEach((l) => applyMove({ vid: l.vid, shop: from, delta: -l.sent, kind: 'transfer_out', ref: tr.id, by: by }));
+    Dt().transfers.unshift(tr);
+    const n = tr.lines.reduce((s, l) => s + l.sent, 0);
+    if (to === 'kif') ['dimitris', 'maria'].forEach((who, i) => deliver(who, { org: 'lemoni', merchant: { en: 'Lemoni Kifisia', el: 'Lemoni Κηφισιά', ru: 'Lemoni Кифисия' }, tk: 'push.tr.title', bk: 'push.tr.body', v: { n: n, from: from }, img: null, route: { role: who, tab: 'home', name: 'transfer', params: { id: tr.id } } }, 900 + i * 300));
+    return tr;
+  }
+  const TR_DEFAULT = [{ vid: 'olive-oil', n: 5 }, { vid: 'greek-coffee', n: 4 }, { vid: 'tahini', n: 3 }];
+  ACT['transfer-new'] = () => {
+    const from = scopesWith('stock.transfer.send').filter((s) => s.scope === 'shop').map((s) => s.id);
+    const f = from.indexOf('mar') >= 0 ? 'mar' : from[0];
+    S.ui.trn = { from: f, to: f === 'kif' ? 'mar' : 'kif', lines: {} };
+    TR_DEFAULT.forEach((l) => { if (qty(l.vid, f) >= l.n) S.ui.trn.lines[l.vid] = l.n; });
+    openSheet({ title: t('tr.new'), detent: 'large', render: trnHtml });
+  };
+  function trnHtml() {
+    const v = S.ui.trn;
+    const from = scopesWith('stock.transfer.send').filter((s) => s.scope === 'shop').map((s) => s.id);
+    const total = Object.values(v.lines).reduce((a, b) => a + b, 0);
+    const items = Dt().products.flatMap((p) => p.variants).filter((x) => qty(x.id, v.from) > 0);
+    return '<div class="section-h" style="margin-top:4px">' + T('tr.from') + '</div><div class="chips">' + from.map((s) => '<button class="chip" data-act="trn-from" data-id="' + s + '" aria-pressed="' + (v.from === s) + '">' + esc(sname(s)) + '</button>').join('') + '</div>' +
+      '<div class="section-h">' + T('tr.to') + '</div><div class="chips">' + Dt().shops.filter((s) => s.id !== v.from).map((s) => '<button class="chip" data-act="trn-to" data-id="' + s.id + '" aria-pressed="' + (v.to === s.id) + '">' + esc(sname(s.id)) + '</button>').join('') + '</div>' +
+      '<div class="section-h">' + T('tr.items') + '</div><div class="list with-thumbs">' + items.map((x) => cell({ lead: img(product(x.pid).img, vname(x), 'thumb', ''), title: esc(vname(x)), sub: T('tr.have', { n: qty(x.id, v.from) }), val: stepper('tr:' + x.id, v.lines[x.id] || 0), chev: false })).join('') + '</div>' +
+      '<div class="mt16"><button class="btn primary block" data-act="trn-send"' + (total ? '' : ' disabled') + '>' + ic('truck') + T('tr.send', { n: total }) + '</button></div><p class="section-f">' + T('tr.note') + '</p>';
+  }
+  ACT['trn-from'] = (el) => { S.ui.trn.from = el.dataset.id; if (S.ui.trn.to === el.dataset.id) S.ui.trn.to = Dt().shops.find((s) => s.id !== el.dataset.id).id; S.ui.trn.lines = {}; sheetRefresh(); };
+  ACT['trn-to'] = (el) => { S.ui.trn.to = el.dataset.id; sheetRefresh(); };
+  ACT['trn-send'] = () => {
+    const v = S.ui.trn;
+    const lines = Object.keys(v.lines).filter((k) => v.lines[k] > 0).map((k) => ({ vid: k, n: v.lines[k] }));
+    const tr = createTransfer(v.from, v.to, lines, S.role);
+    closeSheet(); tick(); toast(t('tr.sent', { n: lines.reduce((s, l) => s + l.n, 0), to: sname(v.to) }), { icon: 'truck' }); refresh();
+    return tr;
+  };
+  ACT['open-transfer'] = (el) => go('transfer', { id: el.dataset.id });
+  SCREENS.transfer = (pr) => {
+    const tr = Dt().transfers.find((x) => x.id === pr.id);
+    const canRecv = tr.status === 'sent' && can('stock.transfer.receive', tr.to);
+    const sent = tr.lines.reduce((s, l) => s + l.sent, 0), got = tr.lines.reduce((s, l) => s + l.received, 0);
+    return {
+      title: t('tr.one'), large: false,
+      body: '<div class="card" style="margin-bottom:14px"><div class="row-flex" style="gap:10px">' + tileI('truck', 2) + '<div class="grow"><div class="t-headline">' + T('tr.route', { from: sname(tr.from), to: sname(tr.to) }) + '</div><div class="muted t-foot">' + T('tr.by', { name: firstName(tr.by), when: rel(tr.at) }) + '</div></div>' +
+        '<span class="badge ' + (tr.status === 'sent' ? 'info' : 'ok') + '">' + T('tr.status.' + tr.status) + '</span></div></div>' +
+        (canRecv ? tip('trrecv', 'tip.tr.t', 'tip.tr.b') : '') +
+        '<div class="list with-thumbs">' + tr.lines.map((l) => { const v = variant(l.vid); return cell({ lead: img(product(v.pid).img, vname(v), 'thumb', ''), title: esc(vname(v)), sub: T('tr.sentn', { n: l.sent }) + (tr.status === 'received' && l.received < l.sent ? ' · ' + badge('neg', t('tr.lost', { n: l.sent - l.received })) : ''), val: canRecv ? stepper('trr:' + tr.id + ':' + l.vid, l.received) : '<span class="qty">' + num(l.received) + '</span>', chev: false }); }).join('') + '</div>' +
+        (canRecv ? '<div class="mt16"><button class="btn primary block" data-act="tr-receive" data-id="' + tr.id + '">' + ic('receive') + T('tr.receive', { n: got }) + '</button></div>' :
+          tr.status === 'sent' ? '<div class="mt12">' + why(T('tr.cannot', { shop: sname(tr.to) })) + '</div>' :
+            '<p class="section-f">' + (got < sent ? T('tr.short', { n: sent - got }) : T('tr.allgood')) + '</p>')
+    };
+  };
+  ACT['tr-receive'] = (el) => {
+    const tr = Dt().transfers.find((x) => x.id === el.dataset.id);
+    let told = null;
+    tr.lines.forEach((l) => { if (l.received > 0) { const r = applyMove({ vid: l.vid, shop: tr.to, delta: l.received, kind: 'transfer_in', ref: tr.id }); if (r.told.length && !told) told = r; } });
+    tr.status = 'received'; tr.receivedBy = S.role; tr.receivedAt = Date.now();
+    const lost = tr.lines.reduce((s, l) => s + (l.sent - l.received), 0);
+    tick(); refresh();
+    if (told) moment(told.m.vid, tr.to, told.told);
+    else toast(lost ? t('tr.done.short', { n: lost }) : t('tr.done'), { icon: lost ? 'alert' : 'check' });
+  };
+
+  /* ---------- lock screen ---------- */
+  function orgName(k) { if (k === 'lemoni') return 'Lemoni'; const o = Dt().otherOrgs.find((x) => x.id === k); return o ? L(o.name) : k; }
+  function notifCard(n, act) {
+    const x = nText(n);
+    return '<button class="notif" data-act="' + act + '" data-nid="' + esc(n.id) + '" data-k="' + esc(n.org || 'lemoni') + '"><img class="p-icon" src="' + APP_ICON + '" alt=""><span class="p-main"><span class="p-head"><span>Custock</span><span>' + esc(rel(n.at)) + '</span></span><span class="p-title" style="display:block">' + esc(x.merchant) + '</span><span class="p-body"><b>' + esc(x.title) + '</b> ' + esc(x.body) + '</span></span>' + (n.img ? img(n.img, x.title, 'p-thumb', '') : '') + '</button>';
+  }
+  function lockHtml() {
+    const list = (Dt().notifs[S.role] || []).slice().sort((a, b) => b.at - a.at);
+    const groups = {}; const order = [];
+    list.forEach((n) => { const k = n.org || 'lemoni'; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(n); });
+    const now = new Date();
+    const g = order.map((k) => {
+      const items = groups[k], open = S.ui.lockOpen === k;
+      return '<div class="l-group"><div class="l-group-h"><span>' + esc(orgName(k)) + '</span>' + (items.length > 1 ? '<button data-act="lock-toggle" data-k="' + k + '">' + (open ? T('lock.less') : T('lock.count', { n: items.length })) + '</button>' : '') + '</div>' +
+        (open ? items.map((n) => notifCard(n, 'lock-open')).join('') : '<div class="l-stack">' + notifCard(items[0], items.length > 1 ? 'lock-toggle' : 'lock-open') + (items.length > 1 ? '<span class="l-behind"></span>' : '') + (items.length > 2 ? '<span class="l-behind two"></span>' : '') + '</div>') + '</div>';
+    }).join('');
+    return '<div class="l-date">' + esc(dt(now, { weekday: 'long', day: 'numeric', month: 'long' })) + '</div><div class="l-time">' + esc(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(now)) + '</div>' +
+      (list.length ? '<div class="l-list">' + g + '</div>' : '<div class="l-empty">' + T('lock.empty') + '</div>') +
+      '<button class="l-unlock" data-act="lock-close">' + T('lock.open') + '</button>';
+  }
+  function openLock() {
+    let el = $('#lock');
+    if (!el) {
+      el = document.createElement('div'); el.className = 'lock'; el.id = 'lock';
+      el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', t('lock.title'));
+      el.style.backgroundImage = 'url("' + imgSrc('hero-shop', 'shop') + '")';
+      $('#overlays').appendChild(el); void el.offsetWidth;
+      requestAnimationFrame(() => el.classList.add('show'));
+    }
+    el.innerHTML = lockHtml();
+    $('#statusbar').classList.add('on-dark');
+  }
+  function closeLock() {
+    const el = $('#lock'); if (!el) return;
+    el.classList.remove('show'); setTimeout(() => el.remove(), 360);
+    const scr = $$('.screen').pop();
+    $('#statusbar').classList.toggle('on-dark', !!(scr && scr._spec && scr._spec.dark));
+  }
+  ACT['lock-show'] = () => { closePanel(); S.ui.lockOpen = null; openLock(); };
+  ACT['lock-close'] = () => closeLock();
+  ACT['lock-toggle'] = (el) => { S.ui.lockOpen = S.ui.lockOpen === el.dataset.k ? null : el.dataset.k; openLock(); };
+  ACT['lock-open'] = (el) => {
+    const n = (Dt().notifs[S.role] || []).find((x) => x.id === el.dataset.nid);
+    closeLock();
+    if (n && n.route) setTimeout(() => openRoute(n.route), 200);
+  };
+
+  /* ---------- customer: join from a qr poster ---------- */
+  function qrSvg(seed) {
+    let h = hash(seed) || 7;
+    const rnd = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return (h >>> 0) / 4294967296; };
+    let r = '';
+    for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++) {
+      const inF = (x < 8 && y < 8) || (x > 12 && y < 8) || (x < 8 && y > 12);
+      if (!inF && rnd() > 0.5) r += '<rect x="' + x + '" y="' + y + '" width="1" height="1"/>';
+    }
+    const f = (x, y) => '<rect x="' + x + '" y="' + y + '" width="7" height="7" fill="#111"/><rect x="' + (x + 1) + '" y="' + (y + 1) + '" width="5" height="5" fill="#fff"/><rect x="' + (x + 2) + '" y="' + (y + 2) + '" width="3" height="3" fill="#111"/>';
+    return '<svg viewBox="0 0 21 21" aria-hidden="true" shape-rendering="crispEdges"><g fill="#111">' + r + '</g>' + f(0, 0) + f(14, 0) + f(0, 14) + '</svg>';
+  }
+  SCREENS['c-qr'] = () => ({
+    title: t('qr.title'), large: false, cls: 'scan-screen', navCls: 'on-camera', dark: true,
+    body: '<div class="viewfinder" id="vf" style="background-image:url(\'' + esc(imgSrc('hero-shop', 'shop')) + '\')"><div class="vf-frame"><span class="vf-c tl"></span><span class="vf-c tr"></span><span class="vf-c bl"></span><span class="vf-c br"></span><span class="vf-line"></span></div><div class="vf-hint">' + T('qr.hint') + '</div></div>' +
+      '<div class="scan-pad"><button class="qr-poster" data-act="qr-scan" aria-label="' + T('qr.poster.a') + '">' + qrSvg('gly-window') + '<span><span class="qp-t" style="display:block">Lemoni ' + esc(sname('gly')) + '</span><span style="display:block;margin-top:4px">' + T('qr.poster') + '</span></span></button>' +
+      '<p class="section-f">' + T('qr.note') + '</p></div>'
+  });
+  ACT['qr-scan'] = () => {
+    const vf = $('#vf'); if (vf) { vf.classList.remove('flash'); void vf.offsetWidth; vf.classList.add('flash'); }
+    tick();
+    S.ui.join = { name: 'Anna Sokolova', email: 'anna.sokolova@example.com', email_ok: false, push_ok: false, age: false, interests: [] };
+    setTimeout(() => go('c-join', { code: 'gly-window' }), S.reduce ? 0 : 260);
+  };
+  function joinCta() { const j = S.ui.join; return '<button class="btn primary block" data-act="join-go"' + (j.age && j.name.trim() && j.email.trim() ? '' : ' disabled') + '>' + T('join.cta') + '</button>' + (j.age ? '' : '<p class="section-f" style="text-align:center">' + T('join.age.need') + '</p>'); }
+  PARTS['join-cta'] = joinCta;
+  SCREENS['c-join'] = () => {
+    const j = S.ui.join;
+    const already = ANNA().subs.some((s) => s.scope === 'shop' && s.id === 'gly' && s.status === 'subscribed');
+    return {
+      title: t('join.title'), large: false,
+      body: '<div class="browser"><div class="b-bar"><span class="b-url">' + ic('lock', 'xs') + 'custock.app/j/gly-window</span></div><div class="b-body">' +
+        '<div class="brand-head"><span class="logo-tile">L</span><div><div class="t-title3">Lemoni ' + esc(sname('gly')) + '</div><div class="muted t-foot">' + esc(L(shopById('gly').addr)) + '</div></div></div>' +
+        (already ? '<div class="why">' + ic('check') + '<span>' + T('join.already') + '</span></div>' :
+          '<p class="t-callout" style="margin:0 0 12px">' + T('join.lead') + '</p>' +
+          '<label class="t-foot muted" for="j-name">' + T('join.name') + '</label><input class="join-input" id="j-name" data-in="j-name" value="' + esc(j.name) + '" autocomplete="name">' +
+          '<label class="t-foot muted" for="j-email" style="display:block;margin-top:10px">' + T('join.email') + '</label><input class="join-input" id="j-email" type="email" inputmode="email" data-in="j-email" value="' + esc(j.email) + '" autocomplete="email">' +
+          '<div class="t-foot muted" style="margin:14px 0 6px">' + T('join.interests') + '</div><div class="chips" style="margin:0 -16px 6px">' + Dt().categories.map((c) => '<button class="chip" data-act="j-int" data-id="' + c.id + '" aria-pressed="' + (j.interests.indexOf(c.id) >= 0) + '">' + esc(L(c.name)) + '</button>').join('') + '</div>' +
+          '<div class="checkrow"><input type="checkbox" id="j-em" data-ch="j-em"' + (j.email_ok ? ' checked' : '') + '><label for="j-em">' + T('join.c.email') + '</label></div>' +
+          '<div class="checkrow"><input type="checkbox" id="j-pu" data-ch="j-pu"' + (j.push_ok ? ' checked' : '') + '><label for="j-pu">' + T('join.c.push') + '</label></div>' +
+          '<div class="checkrow"><input type="checkbox" id="j-age" data-ch="j-age"' + (j.age ? ' checked' : '') + '><label for="j-age">' + T('join.c.age') + '</label></div>' +
+          '<p class="section-f" style="margin:4px 0 14px">' + T('join.none') + '</p>' +
+          '<div data-part="join-cta">' + joinCta() + '</div>' +
+          '<p class="section-f" style="margin:14px 0 0">' + T('join.privacy') + '</p>') +
+        '<div class="mt16">' + seg('lang', [['en', 'English'], ['el', 'Ελληνικά'], ['ru', 'Русский']], S.lang) + '</div><p class="section-f" style="margin:6px 0 0">' + T('join.lang') + '</p>' +
+        '</div></div>'
+    };
+  };
+  IN['j-name'] = (el) => { S.ui.join.name = el.value; refreshPart('join-cta'); };
+  IN['j-email'] = (el) => { S.ui.join.email = el.value; refreshPart('join-cta'); };
+  CH['j-em'] = (el) => { S.ui.join.email_ok = el.checked; };
+  CH['j-pu'] = (el) => { S.ui.join.push_ok = el.checked; };
+  CH['j-age'] = (el) => { S.ui.join.age = el.checked; refreshPart('join-cta'); };
+  ACT['j-int'] = (el) => { const j = S.ui.join, k = el.dataset.id; j.interests = j.interests.indexOf(k) >= 0 ? j.interests.filter((x) => x !== k) : j.interests.concat([k]); el.setAttribute('aria-pressed', String(j.interests.indexOf(k) >= 0)); };
+  ACT['join-go'] = () => { if (S.ui.join.email_ok) go('c-email'); else { finishJoin(false); go('c-welcome'); } };
+  function finishJoin(confirmed) {
+    const a = ANNA(), j = S.ui.join, now = Date.now();
+    if (!a.subs.some((s) => s.scope === 'shop' && s.id === 'gly')) a.subs.push({ scope: 'shop', id: 'gly', status: 'subscribed', at: now });
+    if (j.email_ok && confirmed) a.consents.push({ ch: 'email', granted: true, at: now, src: 'double_opt_in', text: S.lang + '-2026-09' });
+    if (j.push_ok) a.consents.push({ ch: 'push', granted: true, at: now, src: 'join_page', text: S.lang + '-2026-09' });
+    j.interests.forEach((c) => { a.interests = a.interests || []; if (a.interests.indexOf(c) < 0) a.interests.push(c); });
+    const l = Dt().links.find((x) => x.id === 'jl-gly-window'); if (l) { l.opens += 1; l.signups += 1; if (confirmed) l.confirmed += 1; }
+  }
+  SCREENS['c-email'] = () => ({
+    title: t('mail.title'), large: false,
+    body: '<p class="t-callout muted" style="margin:6px 4px 14px">' + T('mail.lead', { email: S.ui.join.email }) + '</p>' +
+      '<div class="email-card"><div class="e-head"><b>Lemoni ' + esc(sname('gly')) + ' via Custock</b>' + T('mail.subject', { shop: 'Lemoni ' + sname('gly') }) + '</div><div class="e-body"><p style="margin:0 0 12px">' + T('mail.hi', { name: S.ui.join.name.split(' ')[0] }) + '</p><p style="margin:0 0 16px">' + T('mail.body') + '</p>' +
+      '<button class="btn primary block" data-act="join-confirm">' + T('mail.cta') + '</button><p class="section-f" style="margin:14px 0 0">' + T('mail.foot') + '</p></div></div>'
+  });
+  ACT['join-confirm'] = () => { finishJoin(true); go('c-welcome'); };
+  SCREENS['c-welcome'] = () => {
+    const j = S.ui.join;
+    const items = ['<li>' + ic('home') + '<span>' + T('wel.feed') + '</span></li>'].concat(j.push_ok ? ['<li>' + ic('bell') + '<span>' + T('wel.push') + '</span></li>'] : []).concat(j.email_ok ? ['<li>' + ic('mail') + '<span>' + T('wel.email') + '</span></li>'] : []);
+    return {
+      title: t('wel.title'), large: false, left: '<span></span>',
+      body: '<div class="welcome-check"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></svg></div><div class="t-title2" style="text-align:center">' + T('wel.head', { shop: 'Lemoni ' + sname('gly') }) + '</div>' +
+        '<div class="audience" style="margin-top:18px"><ul style="margin:0">' + items.join('') + '</ul></div><p class="section-f">' + T('wel.note') + '</p>' +
+        '<div class="mt24"><button class="btn primary block" data-act="wel-done">' + T('wel.done') + '</button></div>'
+    };
+  };
+  ACT['wel-done'] = () => { S.stacks['c-qr'] = null; S.stacks['c-shops'] = null; S.tab = 'c-shops'; renderApp('fade'); };
+
+  /* ---------- customer: profile ---------- */
+  function annaFlags(org) {
+    const a = ANNA();
+    if (org === 'lemoni') return { push: a.pushOk, email: a.emailOk };
+    const o = Dt().otherOrgs.find((x) => x.id === org);
+    if (o.annaPush == null) { o.annaPush = true; o.annaEmail = false; }
+    return { push: o.annaPush, email: o.annaEmail };
+  }
+  SCREENS['c-profile'] = () => {
+    const a = ANNA();
+    const alerts = Dt().alerts.filter((x) => x.cid === 'c-anna' && x.status !== 'cancelled');
+    const favs = Array.from(Dt().favorites).filter((k) => k.indexOf('c-anna|') === 0).map((k) => product(k.split('|')[1])).filter(Boolean);
+    const orgs = [['lemoni', 'Lemoni']].concat(Dt().otherOrgs.map((o) => [o.id, L(o.name)]));
+    return {
+      title: t('prof.title'),
+      body: '<div class="list with-thumbs">' + cell({ lead: avatar(a.name, 'md'), title: esc(a.name), sub: esc(a.email) }) + '</div>' +
+        '<div class="section-h">' + T('prof.lang') + '</div>' + seg('lang', [['en', 'English'], ['el', 'Ελληνικά'], ['ru', 'Русский']], S.lang) +
+        '<p class="section-f">' + T('prof.lang.note') + '</p>' +
+        orgs.map((o) => { const f = annaFlags(o[0]); return '<div class="section-h">' + esc(o[1]) + '</div><div class="list with-tiles">' +
+          cell({ lead: tileI('bell', 1), title: T('ch.push'), val: '<label class="switch"><input type="checkbox" role="switch" data-ch="c-ch" data-org="' + o[0] + '" data-c="push"' + (f.push ? ' checked' : '') + ' aria-label="' + T('ch.push') + ', ' + esc(o[1]) + '"><span class="track"></span><span class="knob"></span></label>' }) +
+          cell({ lead: tileI('mail', 2), title: T('ch.email'), val: '<label class="switch"><input type="checkbox" role="switch" data-ch="c-ch" data-org="' + o[0] + '" data-c="email"' + (f.email ? ' checked' : '') + ' aria-label="' + T('ch.email') + ', ' + esc(o[1]) + '"><span class="track"></span><span class="knob"></span></label>' }) + '</div>'; }).join('') +
+        '<p class="section-f">' + T('prof.ch.note') + '</p>' +
+        '<div class="section-h">' + T('prof.alerts') + '</div>' + (alerts.length ? '<div class="list with-thumbs">' + alerts.map((x) => { const v = variant(x.vid); return '<div class="swipe"><div class="sw-actions"><button class="sw-a2" data-act="c-alert-cancel" data-id="' + x.id + '">' + ic('x') + T('prof.alert.cancel') + '</button></div>' +
+          cell({ act: 'c-open-product', data: { pid: v.pid }, lead: img(product(v.pid).img, vname(v), 'thumb', ''), title: esc(vname(v)), sub: esc(x.shop ? sname(x.shop) : t('shop.any')) + ' · ' + T('alert.' + x.status) }) + '</div>'; }).join('') + '</div><p class="section-f">' + T('prof.alerts.note') + '</p>' : '<p class="section-f">' + T('prof.alerts.none') + '</p>') +
+        '<div class="section-h">' + T('prof.saved') + '</div>' + (favs.length ? '<div class="list with-thumbs">' + favs.map((p) => cell({ act: 'c-open-product', data: { pid: p.id }, lead: img(p.img, pname(p), 'thumb', ''), title: esc(pname(p)) })).join('') + '</div>' : '<p class="section-f">' + T('prof.saved.none') + '</p>') +
+        '<div class="section-h">' + T('prof.data') + '</div><div class="list with-tiles">' +
+        cell({ act: 'c-export', lead: tileI('receive', 2), title: T('prof.export'), sub: T('prof.export.sub') }) +
+        cell({ act: 'c-delete', cls: 'danger', lead: '<span class="tile" style="background:var(--error)">' + ic('x') + '</span>', title: T('prof.delete'), chev: false }) + '</div><p class="section-f">' + T('prof.data.note') + '</p>'
+    };
+  };
+  CH['c-ch'] = (el) => {
+    const org = el.dataset.org, c = el.dataset.c, on = el.checked, a = ANNA();
+    if (org === 'lemoni') { if (c === 'push') a.pushOk = on; else a.emailOk = on; a.consents.push({ ch: c, granted: on, at: Date.now(), src: 'app', text: S.lang + '-2026-09' }); }
+    else { const o = Dt().otherOrgs.find((x) => x.id === org); if (c === 'push') o.annaPush = on; else o.annaEmail = on; }
+    haptic(6); toast(t('prof.saved.toast'), { icon: 'check' });
+  };
+  ACT['c-alert-cancel'] = (el) => { const x = Dt().alerts.find((y) => y.id === el.dataset.id); if (x) x.status = 'cancelled'; toast(t('prof.alert.cancelled'), { icon: 'bell' }); refresh(); };
+  ACT['c-export'] = () => toast(t('prof.export.toast'), { icon: 'mail', ms: 4200 });
+  ACT['c-delete'] = () => openSheet({ title: t('del.title'), render: () => '<div class="t-title3" style="text-align:center;margin:6px 0 8px">' + T('del.head') + '</div><p class="section-f" style="text-align:center;margin:0 0 16px">' + T('del.body') + '</p>' +
+    '<button class="btn danger block" data-act="c-delete-do">' + T('del.cta') + '</button><div class="mt8"><button class="btn gray block" data-act="sheet-close">' + T('cancel') + '</button></div>' });
+  ACT['c-delete-do'] = () => { closeSheet(); toast(t('del.demo'), { icon: 'info', ms: 4200 }); };
+
   /* ---------------- swipe rows ---------------- */
   function closeSwipes(except) { $$('.swipe.open').forEach((r) => { if (r !== except) { r.classList.remove('open'); $('.cell', r).style.transform = ''; } }); }
-  function swipedRecently(el) { const r = el.closest('.swipe'); return !!(r && r.dataset.swiped && Date.now() - +r.dataset.swiped < 350); }
+  let SWALLOW = 0;
+  function swipedRecently(el) { const r = el.closest('.swipe'); return Date.now() - SWALLOW < 400 || !!(r && r.dataset.swiped && Date.now() - +r.dataset.swiped < 350); }
   document.addEventListener('pointerdown', (e) => {
     const row = e.target.closest('.swipe');
-    if (!row || e.button > 0 || e.target.closest('.sw-actions')) { if (!e.target.closest('.swipe')) closeSwipes(); return; }
+    const openRows = $$('.swipe.open');
+    if (openRows.length && !(row && e.target.closest('.sw-actions'))) {
+      if (!row || row.classList.contains('open') || openRows.indexOf(row) < 0) { closeSwipes(); SWALLOW = Date.now(); return; }
+    }
+    if (!row || e.button > 0 || e.target.closest('.sw-actions')) return;
     const c = $('.cell', row), w = $('.sw-actions', row).offsetWidth;
     const x0 = e.clientX, y0 = e.clientY, base = row.classList.contains('open') ? -w : 0;
     let drag = false, x = base;
@@ -1529,6 +2231,7 @@
     S.previews = S.previews.filter((p) => p.persona !== id);
     closeSheet(true);
     hideToast();
+    closeLock();
     if (!silent) renderApp('fade');
     renderPanel();
     if (S.pendingAccess[id]) { delete S.pendingAccess[id]; setTimeout(() => toast(t('toast.access'), { icon: 'shield' }), 700); }
@@ -1542,7 +2245,7 @@
     if (meta) meta.setAttribute('content', S.theme === 'dark' ? '#0F0F12' : '#F3F3F0');
     document.title = t('doc.title');
     const foot = $('.demo-foot');
-    if (foot) foot.innerHTML = T('foot.demo') + ' <a href="https://github.com/orestislef/custock" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/orestislef/custock/tree/main/thinking" target="_blank" rel="noopener">' + T('foot.thinking') + '</a>';
+    if (foot) foot.innerHTML = T('foot.demo') + ' <a href="https://github.com/orestislef/custock" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/orestislef/custock/tree/main/thinking" target="_blank" rel="noopener">' + T('foot.thinking') + '</a> · <a href="../status/">' + T('foot.progress') + '</a>';
     const pill = $('#demo-pill');
     if (pill) { pill.lastChild.textContent = t('panel.pill'); pill.setAttribute('aria-label', t('a11y.panel')); }
     const panel = $('#panel');
@@ -1565,7 +2268,15 @@
     customer: [['customers.contact.view', 'hid.contact'], ['customers.edit', 'hid.edit']],
     posts: [['posts.create', 'hid.compose'], ['posts.publish', 'hid.publish']],
     post: [['posts.publish', 'hid.publish']],
-    compose: [['posts.publish', 'hid.publish'], ['posts.channel.push', 'hid.push'], ['posts.channel.email', 'hid.email']]
+    compose: [['posts.publish', 'hid.publish'], ['posts.channel.push', 'hid.push'], ['posts.channel.email', 'hid.email']],
+    team: [['members.invite', 'hid.invite'], ['members.manage', 'hid.manage']],
+    member: [['members.manage', 'hid.manage']],
+    roles: [['roles.manage', 'hid.roles']],
+    role: [['roles.manage', 'hid.roles']],
+    reports: [['reports.financial.view', 'hid.money'], ['reports.staff.view', 'hid.staff']],
+    counts: [['stock.count', 'hid.count'], ['stock.count.approve', 'hid.approvecount']],
+    count: [['stock.count.approve', 'hid.approvecount'], ['products.cost.view', 'hid.cost']],
+    transfer: [['stock.transfer.receive', 'hid.trrecv'], ['stock.transfer.send', 'hid.trsend']]
   };
   function renderNarration() {
     const box = $('#narr'); if (!box) return;
@@ -1590,7 +2301,7 @@
       (pv.length ? '<div class="p-sec"><h2>' + T('panel.phones') + '</h2><div class="p-box">' + Object.keys(pv.reduce((m, x) => { m[x.persona] = 1; return m; }, {})).map((who) => {
         const items = pv.filter((x) => x.persona === who);
         return '<div class="phone-prev"><div class="pp-h"><span>' + T('panel.phone.of', { name: firstName(who) }) + '</span><button class="btn small tinted" data-act="role-open" data-id="' + who + '">' + T('panel.switch', { name: firstName(who) }) + '</button></div>' +
-          items.slice(0, 3).map((x) => { const n = nText(x.n); return '<div class="pp-item"><b>' + esc(n.merchant) + '</b><span class="muted">' + esc(n.title) + '. ' + esc(n.body) + '</span></div>'; }).join('') + '</div>';
+          items.slice(0, 3).map((x) => { if (x.silent) return '<div class="pp-item"><b>' + T('panel.silent.t') + '</b><span class="muted">' + T('panel.silent.b') + '</span></div>'; const n = nText(x.n); return '<div class="pp-item"><b>' + esc(n.merchant) + '</b><span class="muted">' + esc(n.title) + '. ' + esc(n.body) + '</span></div>'; }).join('') + '</div>';
       }).join('') + '</div></div>' : '') +
       '<div class="p-sec"><h2>' + T('panel.look') + '</h2><div class="p-box">' +
       '<div class="p-stack"><span class="p-l">' + T('panel.lang') + '</span>' + seg('lang', [['en', 'English'], ['el', 'Ελληνικά'], ['ru', 'Русский']], S.lang) + '</div>' +
@@ -1607,9 +2318,11 @@
       '<button class="preset" data-act="preset" data-id="post">' + ic('megaphone') + T('preset.post') + '</button>' +
       '<button class="preset" data-act="preset" data-id="back">' + ic('bell') + T('preset.back') + '</button>' +
       '<button class="preset" data-act="preset" data-id="low">' + ic('few') + T('preset.low') + '</button>' +
+      '<button class="preset" data-act="preset" data-id="transfer">' + ic('truck') + T('preset.transfer') + '</button>' +
+      '<button class="preset" data-act="lock-show">' + ic('phone') + T('preset.lock') + '</button>' +
       '</div></div><p class="section-f" style="margin:6px 6px 0">' + T('panel.push.note') + '</p></div>' +
       '<div class="p-sec"><div class="p-actions"><button class="btn gray" data-act="reset">' + ic('undo') + T('panel.reset') + '</button></div></div>' +
-      '<p class="p-links">' + T('panel.foot') + ' <a href="https://github.com/orestislef/custock" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/orestislef/custock/tree/main/thinking" target="_blank" rel="noopener">' + T('panel.thinking') + '</a></p>';
+      '<p class="p-links">' + T('panel.foot') + ' <a href="https://github.com/orestislef/custock" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/orestislef/custock/tree/main/thinking" target="_blank" rel="noopener">' + T('panel.thinking') + '</a> · <a href="../status/">' + T('foot.progress') + '</a></p>';
     renderNarration();
   }
   function pulsePanel() {
@@ -1636,6 +2349,7 @@
     const id = el.dataset.id;
     if (id === 'post') { const p = Dt().posts[0]; deliver('anna', { org: 'lemoni', merchant: { en: 'Lemoni Kifisia', el: 'Lemoni Κηφισιά', ru: 'Lemoni Кифисия' }, title: p.title, body: p.body, img: p.img, route: { role: 'anna', tab: 'c-home', name: 'c-post', params: { id: p.id } } }, 400); }
     if (id === 'back') deliver('anna', { org: 'lemoni', merchant: { en: 'Lemoni Kifisia', el: 'Lemoni Κηφισιά', ru: 'Lemoni Кифисия' }, tk: 'push.back.title', bk: 'push.back.body', v: { vid: 'mountain-tea', shop: 'kif' }, img: 'p-mountain-tea', route: { role: 'anna', tab: 'c-catalog', name: 'c-product', params: { pid: 'mountain-tea' } } }, 400);
+    if (id === 'transfer') createTransfer('mar', 'kif', TR_DEFAULT.filter((l) => qty(l.vid, 'mar') >= l.n), 'petros');
     if (id === 'low') deliver('maria', { org: 'lemoni', merchant: { en: 'Lemoni Kifisia', el: 'Lemoni Κηφισιά', ru: 'Lemoni Кифисия' }, tk: 'push.low.title', bk: 'push.low.body', v: { vid: 'thyme-honey', shop: 'kif', n: 4, rp: 5 }, img: 'p-thyme-honey', route: { role: 'maria', tab: 'stock', name: 'product', params: { pid: 'thyme-honey' } } }, 400);
     if (window.matchMedia('(max-width: 1060px)').matches) closePanel();
   };
@@ -1654,6 +2368,7 @@
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-act]');
     if (!el || el.disabled) return;
+    if (Date.now() - SWALLOW < 400 && el.closest('#screens')) { e.preventDefault(); return; }
     const fn = ACT[el.dataset.act];
     if (fn) { e.preventDefault(); fn(el, e); }
   });
