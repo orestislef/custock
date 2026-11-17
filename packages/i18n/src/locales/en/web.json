@@ -105,13 +105,17 @@
     "noResults": "No matches",
     "noResultsBody": "Nothing found for \"{{q}}\". Try fewer words, or Greeklish.",
     "closedTitle": "Catalog not shared",
-    "closedBody": "{{org}} does not share its catalog. Join to get their offers."
+    "closedBody": "{{org}} does not share its catalog. Join to get their offers.",
+    "followersTitle": "{{org}} shows its products to followers",
+    "followersBody": "Join to browse them. It takes a few seconds and you choose what you hear about.",
+    "joinToBrowse": "Join {{org}}"
   },
   "offers": {
     "title": "Offers",
     "lead": "Running now, ending soonest first.",
     "emptyTitle": "No offers right now",
-    "emptyBody": "Follow the shop to hear about the next one."
+    "emptyBody": "Follow the shop to hear about the next one.",
+    "join": "Join {{org}} for offers"
   },
   "unsubscribe": {
     "title": "Stop emails",
@@ -143,7 +147,8 @@
     "noOrgBody": "You are not a member of any business. Ask for an invite.",
     "skip": "Skip to content",
     "offlineTitle": "Cannot reach the server",
-    "offlineBody": "Your session is fine. Check the connection and try again."
+    "offlineBody": "Your session is fine. Check the connection and try again.",
+    "businessSection": "Business"
   },
   "nav": {
     "home": "Home",
@@ -185,7 +190,8 @@
       "transfers_other": "{{count}} transfers on the way"
     },
     "recent": "Latest stock changes",
-    "tipQr": "Print the window QR from QR codes. People join in 30 seconds, no app needed."
+    "tipQr": "Print the window QR from QR codes. People join in 30 seconds, no app needed.",
+    "atAGlance": "At a glance"
   },
   "stock": {
     "title": "Stock",
@@ -229,7 +235,14 @@
     },
     "attach": "Add to product",
     "attachTo": "Which product is this code for?",
-    "attached": "Code added to the product"
+    "attached": "Code added to the product",
+    "searchKey": "Press / to search",
+    "col": {
+      "product": "Product",
+      "category": "Category",
+      "total": "Total",
+      "state": "State"
+    }
   },
   "stockSheet": {
     "receiveTitle": "Receive stock",
@@ -255,7 +268,14 @@
     "received_other": "Received {{count}} of {{name}}",
     "adjusted": "{{qty}} {{name}}",
     "undone": "Undone. A reversal line was added.",
-    "onlyYourShops": "Only the shops where your role allows this"
+    "onlyYourShops": "Only the shops where your role allows this",
+    "sellTitle": "Quick sale",
+    "sellButton_one": "Sell {{count}} item",
+    "sellButton_other": "Sell {{count}} items",
+    "sold_one": "Sold {{count}} of {{name}}",
+    "sold_other": "Sold {{count}} of {{name}}",
+    "noShop": "Your role cannot do this in any shop.",
+    "needQty": "Set a quantity first."
   },
   "customers": {
     "title": "Customers",
@@ -277,7 +297,13 @@
     "add": "Add customer",
     "addLead": "Hand the phone over so they type their own details. They get a confirmation email, nothing else until they confirm.",
     "addConsent": "Asked and agreed at the counter",
-    "added": "{{name}} added. A confirmation email is on its way."
+    "added": "{{name}} added. A confirmation email is on its way.",
+    "col": {
+      "name": "Name",
+      "follows": "Follows",
+      "joined": "Joined"
+    },
+    "needName": "Add a name first."
   },
   "customer": {
     "since": "Customer since {{date}}",
@@ -333,7 +359,9 @@
     "erase": "Erase this customer",
     "eraseConfirm": "Erase {{name}} for good",
     "eraseFoot": "For a GDPR request. Personal details are wiped, counts in reports stay.",
-    "erased": "Customer erased"
+    "erased": "Customer erased",
+    "eraseConsequence": "This wipes {{name}}'s name, email, phone, tags and notes for good. Counts in reports stay. It cannot be undone.",
+    "eraseButton": "Erase {{name}}"
   },
   "posts": {
     "title": "Posts",
@@ -391,7 +419,12 @@
     "scheduled": "Scheduled",
     "submitted": "Sent for approval. The approver got a notification.",
     "savedDraft": "Draft saved",
-    "written": "written"
+    "written": "written",
+    "readersOf_one": "{{count}} follower reads {{lang}}",
+    "readersOf_other": "{{count}} followers read {{lang}}",
+    "needTitle": "Write a title in {{lang}} first.",
+    "needAudience": "Pick who gets it.",
+    "needTime": "Pick a date and time."
   },
   "post": {
     "approve": "Approve and publish",
@@ -464,7 +497,10 @@
       "active": "{{name}} is active again",
       "suspended": "{{name}} is suspended",
       "removed": "{{name}} was removed"
-    }
+    },
+    "needEmail": "Add their email.",
+    "needRole": "Pick a role.",
+    "cantGive": "Roles you can't give"
   },
   "roles": {
     "title": "Roles",
@@ -474,15 +510,23 @@
     "foot": "Roles at or above your rank are locked for you.",
     "lockedOwner": "The owner role cannot change",
     "lockedRank": "At or above your rank",
-    "summary_one": "{{count}} permission · {{people}} people",
-    "summary_other": "{{count}} permissions · {{people}} people",
-    "rank": "Rank {{rank}}",
     "name": "Role name",
-    "rankLabel": "Rank",
-    "rankSub": "Up to {{max}}, below your own",
     "affects_one": "This changes access for {{count}} person right away.",
     "affects_other": "This changes access for {{count}} people right away.",
-    "saved": "Role saved"
+    "saved": "Role saved",
+    "perms_one": "{{count}} permission",
+    "perms_other": "{{count}} permissions",
+    "people_one": "{{count}} person",
+    "people_other": "{{count}} people",
+    "canManage": "Can manage: {{list}}",
+    "managesNobody": "Manages nobody",
+    "youGive": "You can give roles below {{role}}.",
+    "manageLabel": "Can manage",
+    "nobody": "Nobody",
+    "andBelow": "{{role}} and below",
+    "manageFoot": "People with this role can invite and manage the roles they sit above.",
+    "diff": "{{added}} added, {{removed}} removed",
+    "save": "Save role"
   },
   "reports": {
     "title": "Reports",
@@ -523,7 +567,7 @@
     "title": "Settings",
     "saved": "Saved",
     "customerPage": "What customers see",
-    "customerPageLead": "Your choice, for the whole business. The preview shows a customer's screen.",
+    "customerPageLead": "Your choice, for the whole business. The preview shows what a customer sees.",
     "catalog": "Catalog",
     "catalogMode": {
       "off": "Off",
@@ -571,7 +615,8 @@
     "previewFoot": "A product with 7, 2 and 0 in three shops.",
     "previewProduct": "Thyme honey 450g",
     "previewNoPrice": "Ask in the shop",
-    "previewOff": "Catalog is off, so customers only see posts."
+    "previewOff": "Catalog is off, so customers only see posts.",
+    "hiddenShop": "Hidden from customers"
   },
   "links": {
     "title": "QR codes",
@@ -590,7 +635,9 @@
     "created": "QR code ready",
     "on": "Active",
     "off": "Off",
-    "activeFor": "{{label}} active"
+    "activeFor": "{{label}} active",
+    "copy": "Copy {{url}}",
+    "copied": "Link copied"
   },
   "poster": {
     "line": "Scan for news and offers from {{org}}"
@@ -615,7 +662,7 @@
     "noCategory": "No category",
     "barcode": "Barcode",
     "barcodePh": "Scan or type a barcode",
-    "ownCode": "Make our own label code",
+    "ownCode": "Make a shop barcode",
     "barcodeFoot": "Leave it empty and add one later, or make our own code for products without one.",
     "barcodeAddFoot_one": "This product has {{count}} barcode. A new one is added, the old ones keep working.",
     "barcodeAddFoot_other": "This product has {{count}} barcodes. A new one is added, the old ones keep working.",
@@ -636,13 +683,21 @@
     "variantsCount_other": "{{count}} variants will be created.",
     "photos": "Photos",
     "photoPh": "Photo link (https)",
-    "photoFoot": "Paste a link for now. Uploading from the phone comes with the app.",
+    "photoFoot": "Up to 10 photos, the first one is the cover. We shrink them before they upload.",
     "priceFoot": "With VAT, as on the shelf.",
     "vatFoot": "Rates for {{country}}.",
     "track": "Track stock",
     "trackFoot": "Off for services and things nobody counts.",
     "create": "Create product",
-    "saved": "Product saved"
+    "saved": "Product saved",
+    "vatFor": "VAT rates for {{country}}",
+    "pricePh": "{{zero}} with VAT",
+    "costPh": "{{zero}} without VAT",
+    "needName": "Add a name to create the product.",
+    "upload": "Add photos",
+    "uploading": "Uploading",
+    "uploadFailed": "That photo did not upload. Try another one.",
+    "newPhoto": "New photo"
   },
   "shopSettings": {
     "open": "Settings for {{shop}}",
@@ -747,7 +802,8 @@
     "sentGot": "sent {{sent}}, arrived {{got}}",
     "lost": "{{n}} lost",
     "lostFoot": "Lost items count as shrinkage in reports.",
-    "onlyReceiving": "Only the receiving shop can confirm this."
+    "onlyReceiving": "Only the receiving shop can confirm this.",
+    "needLines": "Add at least one product."
   },
   "audit": {
     "title": "Audit log",
@@ -796,6 +852,15 @@
       "stock.movement_on_archived": "moved stock of an archived product",
       "stock.negative_accepted_offline": "synced an offline sale below zero",
       "stock.transfer_shortage": "recorded a transfer shortage"
+    },
+    "aProduct": "a product",
+    "s": {
+      "priceChanged": "{{actor}} changed the price of {{name}} from {{from}} to {{to}}",
+      "on": "turned on {{setting}}",
+      "off": "turned off {{setting}}",
+      "set": "set {{setting}} to {{value}}",
+      "withName": "{{actor}} {{verb}}: {{name}}",
+      "plain": "{{actor}} {{verb}}"
     }
   },
   "outbox": {
@@ -811,5 +876,16 @@
     "emptyBody": "Messages show up here as soon as something fans out.",
     "offTitle": "Not available",
     "offBody": "The outbox only exists when the api runs in development mode."
+  },
+  "today": {
+    "title": "Today",
+    "sell": "Sell",
+    "receive": "Receive",
+    "count": "Count",
+    "mine": "What you did",
+    "mineFoot": "Undo works for an hour. After that, ask a manager.",
+    "nothingYet": "Nothing yet today",
+    "fromShop": "From {{shop}}",
+    "fromOther": "From another shop"
   }
 }
