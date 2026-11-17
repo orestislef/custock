@@ -31,8 +31,32 @@ receive, post an offer and watch the push land on a customer's phone. Works on a
 
 ## Status
 
-Planning. No real code yet. The thinking behind the project lives in [thinking/](thinking/README.md),
-start there.
+**[orestislef.github.io/custock/status](https://orestislef.github.io/custock/status/)** shows how far
+each part is.
+
+The thinking behind the project lives in [thinking/](thinking/README.md), start there. The code is
+a pnpm monorepo:
+
+```
+apps/api        hono api on sqlite, dev logins, tests
+apps/web        next.js: customer pages (join, shelf product, catalog) and /admin
+apps/mobile     expo app: staff side with scanning, customer side with feed and offers
+packages/core   api contract, permissions and delegation rules, search, barcodes, money
+packages/db     migrations, seed data, database helpers
+packages/i18n   english, greek and russian for every app and the server
+packages/tokens colors, type, spacing and motion for web and phone
+```
+
+Run it locally (Node 22+, pnpm 10):
+
+```
+pnpm install
+pnpm db:reset
+pnpm dev:api      # http://localhost:8787
+pnpm dev:web      # http://localhost:3000
+pnpm dev:mobile   # expo
+pnpm check        # typecheck, tests and missing translations
+```
 
 ## What it does
 

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F3F3F0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F0F12" media="(prefers-color-scheme: dark)">
+  <title>Custock progress</title>
+  <style>
+    :root {
+      --shelf: #F3F3F0; --surface: #FFFFFF; --ink: #16171B; --ink2: #5E6068; --line: #E3E3DE;
+      --accent: #B0234F; --fill: rgba(118,118,128,.12); --done: #1E7A44;
+      --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --shelf: #0F0F12; --surface: #1A1A1F; --ink: #F2F1EE; --ink2: #A3A3AD; --line: #2E2E35; --accent: #FF6B8E; --fill: rgba(118,118,128,.24); --done: #5BD08A; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--shelf); color: var(--ink); font: 17px/1.3 var(--ui); -webkit-font-smoothing: antialiased; }
+    main { max-width: 720px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 40px) 20px calc(env(safe-area-inset-bottom) + 48px); }
+    .eyebrow { color: var(--ink2); font-size: 15px; margin: 0 0 4px; }
+    h1 { font-size: 34px; line-height: 41px; letter-spacing: .4px; margin: 0; font-weight: 700; }
+    .sub { color: var(--ink2); font-size: 15px; margin: 6px 0 0; }
+    .overall { margin: 28px 0 8px; display: flex; align-items: center; gap: 16px; }
+    .ring { width: 72px; height: 72px; flex: none; }
+    .ring circle { fill: none; stroke-width: 7; }
+    .ring .track { stroke: var(--fill); }
+    .ring .value { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset .8s cubic-bezier(.32,.72,0,1); }
+    .overall b { font-size: 28px; font-variant-numeric: tabular-nums; display: block; }
+    .overall span { color: var(--ink2); font-size: 15px; }
+    h2 { font-size: 13px; font-weight: 400; color: var(--ink2); text-transform: none; margin: 28px 16px 8px; }
+    .group { background: var(--surface); border-radius: 12px; overflow: hidden; }
+    .row { padding: 12px 16px; position: relative; }
+    .row + .row::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: .5px solid var(--line); }
+    .row-top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+    .row-top b { font-weight: 600; font-size: 17px; }
+    .pct { font-variant-numeric: tabular-nums; color: var(--ink2); font-size: 15px; white-space: nowrap; }
+    .bar { height: 6px; border-radius: 3px; background: var(--fill); margin: 8px 0 6px; overflow: hidden; }
+    .bar i { display: block; height: 100%; border-radius: 3px; background: var(--accent); width: 0; transition: width .8s cubic-bezier(.32,.72,0,1); }
+    .row.done .bar i { background: var(--done); }
+    .state { font-size: 13px; color: var(--ink2); }
+    .state .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
+    .row.done .state .dot { background: var(--done); }
+    .note { font-size: 13px; color: var(--ink2); margin: 2px 0 0; line-height: 18px; }
+    .links a { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; color: var(--accent); text-decoration: none; min-height: 44px; position: relative; }
+    .links a + a::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: .5px solid var(--line); }
+    .links a span { color: var(--ink2); }
+    .log .row { font-size: 15px; }
+    .log time { display: block; color: var(--ink2); font-size: 13px; }
+    footer { color: var(--ink2); font-size: 13px; text-align: center; margin-top: 32px; }
+    a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+    @media (prefers-reduced-motion: reduce) { .bar i, .ring .value { transition: none; } }
+  </style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Custock</p>
+  <h1>How it is going</h1>
+  <p class="sub" id="updated">Loading</p>
+
+  <div class="overall" aria-live="polite">
+    <svg class="ring" viewBox="0 0 72 72" aria-hidden="true">
+      <circle class="track" cx="36" cy="36" r="31"></circle>
+      <circle class="value" id="ringValue" cx="36" cy="36" r="31" stroke-dasharray="194.8" stroke-dashoffset="194.8"></circle>
+    </svg>
+    <div><b id="overall">0%</b><span>of the first version</span></div>
+  </div>
+
+  <h2>Parts</h2>
+  <div class="group" id="areas"></div>
+
+  <h2>Open</h2>
+  <div class="group links">
+    <a href="../demo/">Clickable demo <span>made up data</span></a>
+    <a href="https://github.com/orestislef/custock/tree/main/thinking">Thinking docs <span>18 files</span></a>
+    <a href="https://github.com/orestislef/custock">Source on GitHub <span>MIT</span></a>
+  </div>
+
+  <h2>Log</h2>
+  <div class="group log" id="log"></div>
+
+  <footer>Updated by hand as work lands. No CI/CD.</footer>
+</main>
+<script>
+  const fmt = (iso) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  fetch('status.json', { cache: 'no-store' }).then((r) => r.json()).then((s) => {
+    document.getElementById('updated').textContent = 'Last update ' + fmt(s.updated);
+    document.getElementById('overall').textContent = s.overall + '%';
+    requestAnimationFrame(() => {
+      document.getElementById('ringValue').style.strokeDashoffset = String(194.8 * (1 - s.overall / 100));
+    });
+    const areas = document.getElementById('areas');
+    for (const a of s.areas) {
+      const row = el('div', 'row' + (a.state === 'done' ? ' done' : ''));
+      const top = el('div', 'row-top');
+      top.append(el('b', null, a.name), el('span', 'pct', a.percent + '%'));
+      const bar = el('div', 'bar'); const fill = el('i'); bar.append(fill);
+      bar.setAttribute('role', 'progressbar'); bar.setAttribute('aria-valuenow', a.percent); bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', '100'); bar.setAttribute('aria-label', a.name);
+      const state = el('div', 'state'); state.append(el('span', 'dot'), document.createTextNode(a.state === 'done' ? 'Done' : 'In progress'));
+      row.append(top, bar, state, el('p', 'note', a.note));
+      areas.append(row);
+      requestAnimationFrame(() => { fill.style.width = a.percent + '%'; });
+    }
+    const log = document.getElementById('log');
+    for (const l of [...s.log].reverse()) {
+      const row = el('div', 'row'); const t = el('time', null, fmt(l.at)); t.dateTime = l.at;
+      row.append(t, document.createTextNode(l.text)); log.append(row);
+    }
+  }).catch(() => { document.getElementById('updated').textContent = 'Could not load the status file.'; });
+</script>
+</body>
+</html>
