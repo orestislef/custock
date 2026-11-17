@@ -1,12 +1,12 @@
 // customers (read side) and join links
 
 import type { Hono } from 'hono';
-import { effectiveAtScope, followsShop, matches, type CustomerDetail, type JoinLink } from '@custock/core';
+import { contactMatches, effectiveAtScope, followsShop, matches, type CustomerDetail, type JoinLink } from '@custock/core';
 import type { AppEnv } from '../types';
 import { cfgOf, need, orgOf } from '../lib/context';
 import { notFound } from '../lib/problem';
 import { clampLimit, decodeCursor, page } from '../lib/tenant';
-import { CUSTOMER_COLUMNS, canSee, customerVisibility, loadSubscriptions, loadTags, reachedShops, toCustomer, type CustomerRow } from '../services/customers';
+import { CUSTOMER_COLUMNS, canSee, canSeeContact, customerVisibility, loadSubscriptions, loadTags, reachedShops, toCustomer, type CustomerRow } from '../services/customers';
 import { variantLabel } from '../services/catalog';
 
 export function customerRoutes(app: Hono<AppEnv>) {
@@ -32,7 +32,7 @@ export function customerRoutes(app: Hono<AppEnv>) {
       const reached = reachedShops(c, s);
       if (!canSee(v, reached)) return false;
       if (q.shopId && !followsShop(s, topology, q.shopId, true)) return false;
-      if (q.q && !matches(r.search_key ?? '', q.q)) return false;
+      if (q.q && !matches(r.search_key ?? '', q.q) && !(canSeeContact(v, reached) && contactMatches(r.contact_key, q.q))) return false;
       return true;
     });
     const slice = visible.slice(offset, offset + limit + 1);

@@ -73,7 +73,7 @@ export function publicRoutes(app: Hono<AppEnv>) {
   // shelf qr: /p/<code> or /p/<org slug>:<code> when the same barcode lives in two businesses
   app.get('/v1/public/p/:code', (c) => {
     const db = cfgOf(c).db;
-    const raw = decodeURIComponent(c.req.param('code'));
+    const raw = c.req.param('code');
     const sep = raw.indexOf(':');
     const slug = sep > 0 && !/^https?$/i.test(raw.slice(0, sep)) ? raw.slice(0, sep) : null;
     const code = slug ? raw.slice(sep + 1) : raw;

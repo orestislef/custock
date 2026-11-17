@@ -102,3 +102,20 @@ export function searchSql(column: string, query: string): { sql: string; params:
   }
   return { sql: parts.join(' AND '), params };
 }
+
+// contact details are kept apart from the searchable key: exact email, or the full phone number
+export function contactKey(email: string | null | undefined, phone: string | null | undefined): string | null {
+  const parts = [email?.trim().toLowerCase() || null, phone ? phone.replace(/\D/g, '') || null : null].filter(Boolean);
+  return parts.length ? parts.join(' ') : null;
+}
+
+export function contactMatches(key: string | null | undefined, query: string): boolean {
+  if (!key) return false;
+  const q = query.trim().toLowerCase();
+  if (!q) return false;
+  const tokens = key.split(' ');
+  if (q.includes('@')) return tokens.includes(q);
+  const digits = q.replace(/\D/g, '');
+  if (digits.length < 8) return false;
+  return tokens.some((t) => /^\d+$/.test(t) && (t === digits || (digits.length >= 10 && t.endsWith(digits))));
+}

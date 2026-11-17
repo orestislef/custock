@@ -2,7 +2,7 @@
 // kinds: send_post (fan out into deliveries), send_deliveries (through the dev transport, in each
 // recipient's language), rollup_day (daily stats from the ledger).
 
-import { uuidv7, type Audience, type Channel } from '@custock/core';
+import { followsShop, shopsInScope, uuidv7, type Audience, type Channel } from '@custock/core';
 import { translator, pickLocale } from '@custock/i18n';
 import type { Db } from '@custock/db';
 import type { Config, OrgRow } from './types';
@@ -10,7 +10,7 @@ import { loadTopology, ORG_COLUMNS } from './lib/context';
 import { parseJson, platform, Tenant } from './lib/tenant';
 import { dayKey, localDayStart, quietHoursEnd, inQuietHours } from './lib/time';
 import { devOutboxTransport, type Transport } from './lib/transport';
-import { unsubToken } from './lib/unsub';
+import { unsubKey, unsubToken } from './lib/unsub';
 import { canEmail, canPush, resolveAudience } from './services/audience';
 import { variantLabel } from './services/catalog';
 
@@ -34,7 +34,7 @@ interface JobRow {
 }
 
 export interface WorkerDeps {
-  cfg: Pick<Config, 'db' | 'jwtSecret' | 'publicWebUrl'>;
+  cfg: Pick<Config, 'db' | 'jwtSecret' | 'publicWebUrl' | 'unsubSecret'>;
   transport?: Transport;
   log?: (line: string) => void;
 }
@@ -77,7 +77,9 @@ async function handle(deps: WorkerDeps, kind: string, payload: Record<string, un
     case 'send_deliveries':
       return sendDeliveries(deps, now);
     case 'rollup_day':
-      return rollup(deps.cfg.db, now);
+      rollup(deps.cfg.db, now, deps.log);
+      purgeUnconfirmed(deps.cfg.db, now);
+      return;
     default:
       throw new Error(`unknown job ${kind}`);
   }
@@ -143,6 +145,7 @@ function sendPost(deps: WorkerDeps, postId: string, now: number) {
 function sendDeliveries(deps: WorkerDeps, now: number) {
   const db = deps.cfg.db;
   const transport = deps.transport ?? devOutboxTransport(db, deps.log ?? (() => {}));
+  topologyCache.clear();
   const rows = platform(db).all<{ id: string; org_id: string; post_id: string | null; alert_id: string | null; customer_id: string; channel: 'push' | 'email' }>(
     `SELECT id, org_id, post_id, alert_id, customer_id, channel FROM deliveries
       WHERE status = 'queued' OR (status = 'held' AND send_after <= @now) ORDER BY created_at LIMIT 1000`,
@@ -157,6 +160,11 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
     );
     if (!c) {
       t.run("UPDATE deliveries SET status = 'skipped', skip_reason = 'erased', updated_at = @now WHERE org_id = @org AND id = @id", { now, id: d.id });
+      continue;
+    }
+    const still = stillAllowed(db, t, d);
+    if (still !== 'ok') {
+      t.run("UPDATE deliveries SET status = 'skipped', skip_reason = @r, updated_at = @now WHERE org_id = @org AND id = @id", { r: still, now, id: d.id });
       continue;
     }
     const locale = pickLocale(c.locale);
@@ -177,7 +185,7 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
       body = d.channel === 'push' ? text?.title ?? '' : text?.body ?? '';
       payload = { type: 'post', postId: d.post_id, threadId: org.id };
       if (d.channel === 'email') {
-        const token = unsubToken({ customerId: c.id, scopeType: (scope?.scope_type as 'org' | 'group' | 'shop') ?? 'org', scopeId: scope?.scope_id ?? org.id }, deps.cfg.jwtSecret);
+        const token = unsubToken({ customerId: c.id, scopeType: (scope?.scope_type as 'org' | 'group' | 'shop') ?? 'org', scopeId: scope?.scope_id ?? org.id }, unsubKey(deps.cfg));
         const url = `${deps.cfg.publicWebUrl.replace(/\/$/, '')}/unsubscribe/${token}`;
         body = `${body}\n\n${tr('email.footer', { scope: shopName ? `${org.name} ${shopName}` : org.name, unsubscribeUrl: url })}`;
         payload = { ...payload, listUnsubscribe: url, listUnsubscribePost: 'List-Unsubscribe=One-Click' };
@@ -211,9 +219,19 @@ function ensureNightly(db: Db, now: number) {
 }
 
 // rebuilds daily_shop_stats for the last three days of every org from the ledger
-export function rollup(db: Db, now: number) {
+export function rollup(db: Db, now: number, log?: (line: string) => void) {
   const orgs = platform(db).all<OrgRow>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE archived_at IS NULL`);
   for (const org of orgs) {
+    try {
+      rollupOrg(db, org, now);
+    } catch (err) {
+      log?.(`[worker] rollup for ${org.id} failed: ${String(err)}`);
+    }
+  }
+}
+
+function rollupOrg(db: Db, org: OrgRow, now: number) {
+  {
     const t = new Tenant(db, org.id);
     const since = localDayStart(now - 2 * DAY, org.timezone);
     const moves = t.all<{ shop_id: string; kind: string; qty_delta: number; uom: string; price: number | null; cost: number | null; recorded_at: number }>(
@@ -268,4 +286,64 @@ export function startWorker(deps: WorkerDeps, everyMs = 5_000): () => void {
       });
   }, everyMs);
   return () => clearInterval(timer);
+}
+
+const topologyCache = new Map<string, ReturnType<typeof loadTopology>['topology']>();
+
+// a delivery may only go out if the customer still allows it and still follows a shop the post reaches
+function stillAllowed(db: Db, t: Tenant, d: { post_id: string | null; alert_id: string | null; customer_id: string; channel: 'push' | 'email' }): string {
+  const c = t.get<{ email: string | null; email_ok: number; email_verified_at: number | null; push_ok: number; user_id: string | null }>(
+    'SELECT email, email_ok, email_verified_at, push_ok, user_id FROM customers WHERE org_id = @org AND id = @c AND erased_at IS NULL',
+    { c: d.customer_id },
+  );
+  if (!c) return 'erased';
+  const suppressed = c.email ? !!platform(db).get('SELECT 1 FROM email_suppressions WHERE email = @e', { e: c.email }) : false;
+  if (d.alert_id) {
+    // notify me was asked for this one product: an address or a device is enough
+    if (d.channel === 'email' && (!c.email || !c.email_verified_at || suppressed)) return 'no_consent';
+    return 'ok';
+  }
+  if (d.channel === 'push' && !c.push_ok) return 'no_consent';
+  if (d.channel === 'email' && (!c.email_ok || !c.email_verified_at)) return 'no_consent';
+  if (d.channel === 'email' && suppressed) return 'suppressed';
+  if (d.post_id) {
+    const post = t.get<{ status: string }>('SELECT status FROM posts WHERE org_id = @org AND id = @p AND deleted_at IS NULL', { p: d.post_id });
+    if (!post || post.status === 'cancelled') return 'cancelled';
+    const topology = topologyCache.get(t.orgId) ?? loadTopology(db, t.orgId).topology;
+    topologyCache.set(t.orgId, topology);
+    const scopes = t.all<{ scope_type: 'org' | 'group' | 'shop'; scope_id: string }>('SELECT scope_type, scope_id FROM post_scopes WHERE org_id = @org AND post_id = @p', { p: d.post_id });
+    const shops = new Set(scopes.flatMap((x) => shopsInScope(topology, { scopeType: x.scope_type, scopeId: x.scope_id })));
+    const subs = t.all<{ scope_type: 'org' | 'group' | 'shop'; scope_id: string; status: 'pending' | 'subscribed' | 'unsubscribed' }>(
+      'SELECT scope_type, scope_id, status FROM customer_subscriptions WHERE org_id = @org AND customer_id = @c',
+      { c: d.customer_id },
+    );
+    const follows = [...shops].some((shop) => followsShop(subs.map((x) => ({ scopeType: x.scope_type, scopeId: x.scope_id, status: x.status })), topology, shop));
+    if (!follows) return 'unsubscribed';
+  }
+  return 'ok';
+}
+
+// unconfirmed signups are erased after 30 days (thinking/06)
+export function purgeUnconfirmed(db: Db, now: number) {
+  const old = platform(db).all<{ id: string; org_id: string; email: string | null }>(
+    `SELECT c.id, c.org_id, c.email FROM customers c
+      WHERE c.erased_at IS NULL AND c.email_verified_at IS NULL AND c.user_id IS NULL AND c.created_at < @cut
+        AND NOT EXISTS (SELECT 1 FROM customer_subscriptions s WHERE s.customer_id = c.id AND s.status = 'subscribed')`,
+    { cut: now - 30 * DAY },
+  );
+  for (const r of old) {
+    const t = new Tenant(db, r.org_id);
+    db.transaction(() => {
+      t.run(
+        `UPDATE customers SET name = NULL, email = NULL, phone = NULL, birthday = NULL, search_key = NULL, contact_key = NULL,
+           email_ok = 0, push_ok = 0, sms_ok = 0, erased_at = @now, updated_at = @now WHERE org_id = @org AND id = @c`,
+        { now, c: r.id },
+      );
+      t.run("UPDATE customer_subscriptions SET status = 'unsubscribed', updated_at = @now WHERE org_id = @org AND customer_id = @c", { now, c: r.id });
+      t.run('DELETE FROM join_confirmations WHERE org_id = @org AND customer_id = @c', { c: r.id });
+      t.run('UPDATE consents SET ip = NULL, user_agent = NULL WHERE org_id = @org AND customer_id = @c', { c: r.id });
+      platform(db).run('DELETE FROM dev_outbox WHERE customer_id = @c', { c: r.id });
+    })();
+  }
+  return old.length;
 }

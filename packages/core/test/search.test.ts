@@ -42,3 +42,18 @@ describe('search', () => {
     expect(params).toContain('%meli%');
   });
 });
+
+describe('contact keys', () => {
+  it('match a whole email or a whole phone number only', async () => {
+    const { contactKey, contactMatches } = await import('../src/index');
+    const key = contactKey(' Maria@Example.com ', '+30 691 234 5123');
+    expect(key).toBe('maria@example.com 306912345123');
+    expect(contactMatches(key, 'maria@example.com')).toBe(true);
+    expect(contactMatches(key, 'maria@')).toBe(false);
+    expect(contactMatches(key, 'example.com')).toBe(false);
+    expect(contactMatches(key, '+306912345123')).toBe(true);
+    expect(contactMatches(key, '6912345123')).toBe(true);
+    expect(contactMatches(key, '12345')).toBe(false);
+    expect(contactMatches(key, '2345123')).toBe(false);
+  });
+});

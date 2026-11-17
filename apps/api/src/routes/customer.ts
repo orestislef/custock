@@ -60,9 +60,10 @@ function feedItems(c: Context<AppEnv>, kind?: 'offer'): FeedItem[] {
       { kind: kind ?? null, now },
     );
     const posts = loadPosts(t, rows.map((r) => r.id), { withStats: false, showPrices: !!f.org.customer_prices, publicAudience: true });
-    for (const post of posts) {
-      const reach = postShops(t, post, f.topology).filter((s) => f.shops.includes(s));
+    for (const full of posts) {
+      const reach = postShops(t, full, f.topology).filter((s) => f.shops.includes(s));
       if (!reach.length) continue;
+      const post = { ...full, authorId: '', authorName: null, approvedBy: null, recipientsCount: null, stats: null };
       items.push({
         post,
         orgName: f.org.name,

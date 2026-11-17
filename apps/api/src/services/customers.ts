@@ -17,10 +17,11 @@ export interface CustomerRow {
   sms_ok: number;
   source: 'join_link' | 'app' | 'staff' | 'import';
   search_key: string | null;
+  contact_key?: string | null;
   created_at: number;
 }
 
-export const CUSTOMER_COLUMNS = 'id, user_id, name, email, phone, locale, email_ok, push_ok, sms_ok, source, search_key, created_at';
+export const CUSTOMER_COLUMNS = 'id, user_id, name, email, phone, locale, email_ok, push_ok, sms_ok, source, search_key, contact_key, created_at';
 
 export function loadSubscriptions(c: Context<AppEnv>, customerIds?: string[]): Map<string, Subscription[]> {
   const { t } = orgOf(c);
@@ -57,6 +58,10 @@ export function customerVisibility(c: Context<AppEnv>): Visibility {
 export function reachedShops(c: Context<AppEnv>, subs: Subscription[]): string[] {
   const { topology } = orgOf(c);
   return topology.shops.filter((s) => followsShop(subs, topology, s, true));
+}
+
+export function canSeeContact(v: Visibility, reached: string[]): boolean {
+  return v.contactAll || reached.some((s) => v.contactShops.includes(s));
 }
 
 export function canSee(v: Visibility, reached: string[]): boolean {
