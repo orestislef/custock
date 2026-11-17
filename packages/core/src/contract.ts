@@ -179,7 +179,9 @@ export const Product = z.object({
   orgId: z.string(),
   categoryId: z.string().nullable(),
   categoryName: z.string().nullable(),
-  name: z.string(),
+  name: z.string(), // the org default language, the one to edit
+  // the name in the reader's language (Accept-Language, else the user's language, else the org default)
+  displayName: z.string().optional(),
   description: z.string().nullable(),
   brand: z.string().nullable(),
   uom: Uom,
@@ -197,6 +199,18 @@ export type Product = z.infer<typeof Product>;
 export const Category = z.object({ id: z.string(), parentId: z.string().nullable(), name: z.string() });
 export type Category = z.infer<typeof Category>;
 
+// one variant in a product form. with an id it updates that variant, without one it adds a variant.
+// barcodes are the full list for that variant.
+export const VariantInput = z.object({
+  id: z.string().max(64).optional(),
+  sku: z.string().max(64).nullable().optional(),
+  options: z.record(z.string().max(40), z.string().max(80)).nullable().optional(),
+  priceMinor: z.number().int().min(0).nullable().optional(),
+  costMinor: z.number().int().min(0).nullable().optional(),
+  barcodes: z.array(z.object({ code: z.string().min(1).max(200), packQty: z.number().int().positive().max(10000).default(1) })).max(20).optional(),
+});
+export type VariantInput = z.infer<typeof VariantInput>;
+
 export const ProductInput = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(5000).nullable().optional(),
@@ -208,6 +222,11 @@ export const ProductInput = z.object({
   priceMinor: z.number().int().nullable().optional(),
   costMinor: z.number().int().nullable().optional(),
   barcode: z.string().max(200).optional(),
+  // the full list of variants. leave it out to keep the variants as they are (or one default variant on create).
+  // variants left out of the list are archived when they have history, deleted otherwise.
+  variants: z.array(VariantInput).min(1).max(50).optional(),
+  // the full list of photos, in order. https, or an upload url from presignUpload.
+  imageUrls: z.array(z.string().url().max(2000)).max(10).optional(),
 });
 export type ProductInput = z.infer<typeof ProductInput>;
 
@@ -243,6 +262,8 @@ export type MovementInput = z.infer<typeof MovementInput>;
 
 export const Movement = MovementInput.extend({
   orgId: z.string(),
+  // product and variant name in the reader's language
+  productName: z.string().nullable().optional(),
   createdBy: z.string(),
   createdByName: z.string().nullable(),
   recordedAt: z.number(),
@@ -682,3 +703,26 @@ export const UnsubscribePage = z.object({
   locale: Locale,
 });
 export type UnsubscribePage = z.infer<typeof UnsubscribePage>;
+
+// ---------------------------------------------------------------- uploads
+
+export const UploadPurpose = z.enum(['product', 'post', 'logo', 'shop']);
+export type UploadPurpose = z.infer<typeof UploadPurpose>;
+
+export const PresignInput = z.object({
+  purpose: UploadPurpose,
+  mime: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  bytes: z.number().int().positive().max(5_000_000),
+});
+export type PresignInput = z.infer<typeof PresignInput>;
+
+// PUT the file to uploadUrl with these headers, then use publicUrl (in imageUrls, coverUrl).
+export const PresignResult = z.object({
+  fileId: z.string(),
+  uploadUrl: z.string(),
+  method: z.literal('PUT'),
+  headers: z.record(z.string(), z.string()),
+  publicUrl: z.string(),
+  expiresAt: z.number(),
+});
+export type PresignResult = z.infer<typeof PresignResult>;

@@ -9,7 +9,7 @@ import type {
   ProductInput, PublicProduct, Role, ScanResult, SeriesPoint, Shop, ShopGroup, StockLevel,
   Tokens, ScopeType, Uom,
   AddCustomerInput, AuditEntry, DevOutboxItem, Invite, ShopVariantSettingsInput, StockAlertItem, StockCount,
-  StockCountLine, SyncResult, Transfer, TransferInput, UncountedPolicy, UnsubscribePage,
+  StockCountLine, SyncResult, Transfer, TransferInput, UncountedPolicy, UnsubscribePage, PresignInput, PresignResult,
 } from './contract';
 
 export interface Page<T> { items: T[]; nextCursor: string | null }
@@ -184,5 +184,7 @@ export interface CustockApi {
   confirmEmailChange(newEmail: string, code: string): Promise<void>;
   detachBarcode(orgId: string, variantId: string, barcodeId: string): Promise<void>;
   // movements accepted offline that pushed stock below zero in strict mode
+  // a signed upload slot for a photo. in dev the api stores the file itself and serves it under /files.
+  presignUpload(orgId: string, input: PresignInput): Promise<PresignResult>;
   negativeReview(orgId: string, shopId?: string): Promise<{ movementId: string; shopId: string; variantId: string; name: string; qtyDelta: number; onHandAfter: number; createdByName: string | null; recordedAt: number }[]>;
 }

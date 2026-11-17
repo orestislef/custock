@@ -224,6 +224,7 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     requestEmailChange: (newEmail) => post('/v1/me/email', { email: newEmail }),
     confirmEmailChange: (newEmail, code) => post('/v1/me/email/verify', { email: newEmail, code }),
     detachBarcode: (orgId, variantId, barcodeId) => del(`${org(orgId)}/variants/${enc(variantId)}/barcodes/${enc(barcodeId)}`),
+    presignUpload: (orgId, input) => post(`${org(orgId)}/uploads/presign`, input),
     negativeReview: (orgId, shopId) => get(`${org(orgId)}/review/negative`, { shopId }),
   };
 }
