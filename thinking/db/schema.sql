@@ -708,6 +708,18 @@ CREATE TABLE join_link_stats_daily (
   PRIMARY KEY (join_link_id, day)
 );
 
+-- a few product funnel events for me (first scan, first post, onboarding done). no customer tracking.
+CREATE TABLE app_events (
+  id          TEXT PRIMARY KEY,
+  org_id      TEXT,
+  user_id     TEXT,
+  name        TEXT NOT NULL,                           -- onboarding_done, first_scan, first_post, first_join
+  platform    TEXT,
+  app_version TEXT,
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX app_events_name_time ON app_events(name, created_at);
+
 -- =====================================================================
 -- audit and jobs
 -- =====================================================================
