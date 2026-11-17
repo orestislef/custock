@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-17T19:20:00+02:00",
-  "overall": 36,
+  "updated": "2026-11-17T19:45:00+02:00",
+  "overall": 45,
   "areas": [
     {
       "key": "thinking",
@@ -26,16 +26,16 @@
     {
       "key": "shared",
       "name": "Shared packages (contract, tokens, translations)",
-      "percent": 80,
+      "percent": 90,
       "state": "building",
       "note": "API contract and client interface, design tokens, en/el/ru common translations with tested plurals."
     },
     {
       "key": "backend",
       "name": "Backend (permissions engine, database, API)",
-      "percent": 15,
+      "percent": 50,
       "state": "building",
-      "note": "Permissions and delegation rules, search and barcode normalisation, SQLite schema and seed, Hono API with tests."
+      "note": "Permissions and delegation rules, search for greek, greeklish and russian, barcode normalisation, SQLite schema (54 tables) with Lemoni seed data, Hono API with dev logins and every read endpoint. 103 tests passing, including cross business isolation. Next: write endpoints, job worker, posts sending, counts and transfers."
     },
     {
       "key": "web",
@@ -76,6 +76,10 @@
     {
       "at": "2026-11-17T19:20:00+02:00",
       "text": "Demo stage 2 live: team and roles, reports, counts, transfers, lock screen, customer join flow and profile."
+    },
+    {
+      "at": "2026-11-17T19:45:00+02:00",
+      "text": "Backend stage 1 done: core rules, database with seed data, read API, 103 tests passing."
     }
   ]
 }
