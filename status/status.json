@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-17T21:50:00+02:00",
+  "updated": "2026-11-17T22:10:00+02:00",
   "overall": 72,
   "areas": [
     {
@@ -35,7 +35,7 @@
       "name": "Backend (permissions engine, database, API)",
       "percent": 85,
       "state": "building",
-      "note": "Done: permissions and delegation, search for greek, greeklish and russian, barcodes, SQLite with Lemoni seed data, every read and write endpoint, stock ledger with idempotency, back in stock and low stock rules, counts, transfers, posts with audience preview, approval, quiet hours and caps, double opt in, invites, audit log, job worker, dev outbox instead of real sending. 142 tests passing. Now: independent security review."
+      "note": "Every read and write endpoint, ledger, counts, transfers, posts sending, invites, audit log, job worker, 142 tests. An independent security review found 31 issues (1 critical: dev mode on by default). All being fixed now, each with a regression test."
     },
     {
       "key": "web",
@@ -96,6 +96,10 @@
     {
       "at": "2026-11-17T21:50:00+02:00",
       "text": "Demo design review fixes live. Screens from the real web and phone apps added here."
+    },
+    {
+      "at": "2026-11-17T22:10:00+02:00",
+      "text": "Security review of the backend done: 31 findings, all being fixed with regression tests."
     }
   ],
   "screens": [
