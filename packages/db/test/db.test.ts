@@ -1,5 +1,7 @@
 import { describe, expect, it, beforeAll } from 'vitest';
-import { migrate, openDb, seed, hashPassword, verifyPassword, type Db, type SeedResult } from '../src/index';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { migrate, openDb, seed, hashPassword, verifyPassword, MIGRATIONS_DIR, type Db, type SeedResult } from '../src/index';
 
 let db: Db;
 let s: SeedResult;
@@ -16,7 +18,7 @@ describe('migrations', () => {
   it('apply once and record themselves', () => {
     expect(migrate(db)).toEqual([]);
     const row = one<{ n: number }>('SELECT count(*) n FROM schema_migrations');
-    expect(row.n).toBe(2);
+    expect(row.n).toBe(3);
   });
   it('turn on foreign keys', () => {
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
@@ -65,5 +67,33 @@ describe('ledger', () => {
   it('is append only', () => {
     expect(() => db.prepare('UPDATE stock_movements SET qty_delta = 99').run()).toThrow(/append only/);
     expect(() => db.prepare('DELETE FROM stock_movements').run()).toThrow(/append only/);
+  });
+});
+
+describe('security fixes', () => {
+  it('keeps contact details out of the searchable key', () => {
+    const c = one<{ search_key: string; contact_key: string; email: string }>("SELECT search_key, contact_key, email FROM customers WHERE email = 'anna@example.com'");
+    expect(c.search_key).not.toContain('example');
+    expect(c.contact_key).toContain('anna@example.com');
+  });
+  it('the 0003 fixup moves contacts out of old search keys', () => {
+    const old = openDb(':memory:');
+    const dir = MIGRATIONS_DIR;
+    // apply the first two files, plant an old style key, then the rest
+    old.exec('CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)');
+    for (const f of ['0001_init.sql', '0002_writes.sql']) {
+      old.exec(readFileSync(join(dir, f), 'utf8'));
+      old.prepare('INSERT INTO schema_migrations VALUES (?, ?)').run(f, 1);
+    }
+    old.prepare("INSERT INTO organizations (id, name, slug, created_at) VALUES ('o', 'O', 'o', 1)").run();
+    old.prepare("INSERT INTO customers (id, org_id, name, email, phone, source, search_key, created_at, updated_at) VALUES ('c', 'o', 'Μαρία', 'm@example.com', '+306900000001', 'staff', 'μαρια m example com 306900000001', 1, 1)").run();
+    migrate(old);
+    const row = old.prepare("SELECT search_key, contact_key FROM customers WHERE id = 'c'").get() as { search_key: string; contact_key: string };
+    expect(row.search_key).not.toContain('306900000001');
+    expect(row.contact_key).toBe('m@example.com 306900000001');
+  });
+  it('seeds even when two image keys share a url', () => {
+    const n = one<{ n: number; d: number }>('SELECT count(*) n, count(DISTINCT storage_key) d FROM files');
+    expect(n.n).toBe(n.d);
   });
 });

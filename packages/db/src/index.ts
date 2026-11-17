@@ -6,7 +6,7 @@ import * as schema from './schema';
 
 export { openDb, migrate, MIGRATIONS_DIR, type Db } from './open';
 export { seed, type SeedResult } from './seed';
-export { hashPassword, verifyPassword, sha256, randomToken } from './password';
+export { hashPassword, verifyPassword, burnPasswordCheck, sha256, randomToken } from './password';
 export { schema };
 
 export function orm(db: Db) {

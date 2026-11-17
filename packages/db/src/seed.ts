@@ -4,7 +4,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_ROLES, ean13, gtinCheckDigit, makeInternalEan13, normalize, searchKey, toGtin14, transliterate, uuidv7, followsShop, type Topology } from '@custock/core';
+import { DEFAULT_ROLES, contactKey, ean13, gtinCheckDigit, makeInternalEan13, normalize, searchKey, toGtin14, transliterate, uuidv7, followsShop, type Topology } from '@custock/core';
 import type { Db } from './open';
 import { hashPassword } from './password';
 
@@ -87,14 +87,8 @@ export function seed(db: Db, opts: { now?: number; passwordHash?: string } = {})
   db.transaction(() => {
     // ------------------------------------------------------------ files
     const fileIds: Record<string, string> = {};
-    const file = (key: string, purpose: string) => {
-      const url = images[key];
-      if (!url) return null;
-      if (fileIds[key]) return fileIds[key]!;
-      const fid = id(now - 61 * DAY);
-      fileIds[key] = fid;
-      return fid;
-    };
+    // two image keys can point at the same url, storage keys are unique, so one file row per url
+    const fileByUrl = new Map<string, string>();
 
     // ------------------------------------------------------------ org
     const orgId = id(now - 62 * DAY);
@@ -107,8 +101,13 @@ export function seed(db: Db, opts: { now?: number; passwordHash?: string } = {})
     });
     const insertFile = (key: string, purpose: string) => {
       if (fileIds[key]) return fileIds[key]!;
-      const fid = file(key, purpose);
-      if (!fid) return null;
+      const url = images[key];
+      if (!url) return null;
+      const known = fileByUrl.get(url);
+      if (known) return (fileIds[key] = known);
+      const fid = id(now - 61 * DAY);
+      fileIds[key] = fid;
+      fileByUrl.set(url, fid);
       ins('files', {
         id: fid, org_id: orgId, storage_key: images[key]!, purpose, is_public: 1, mime: 'image/jpeg', bytes: 0,
         width: purpose === 'product' ? 500 : 960, height: null, created_at: now - 61 * DAY,
@@ -493,7 +492,7 @@ export function seed(db: Db, opts: { now?: number; passwordHash?: string } = {})
         id: cid, org_id: orgId, user_id: userId, name: c.name, email, email_verified_at: pending ? null : created + 600_000,
         phone, phone_verified_at: null, locale: c.locale, birthday: i % 9 === 0 ? `0${1 + (i % 9)}-1${i % 9}` : null,
         email_ok: emailOk ? 1 : 0, push_ok: pushOk ? 1 : 0, sms_ok: 0, source: i === 0 ? 'app' : 'join_link',
-        join_link_id: joinLinks[link] ?? null, search_key: searchKey(c.name, email, phone), created_at: created, updated_at: created,
+        join_link_id: joinLinks[link] ?? null, search_key: searchKey(c.name), contact_key: contactKey(email, phone), created_at: created, updated_at: created,
       });
       for (const s of sub) {
         ins('customer_subscriptions', {

@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { contactKey, searchKey } from '@custock/core';
 import { fileURLToPath } from 'node:url';
 
 export type Db = Database.Database;
@@ -17,6 +18,16 @@ export function openDb(path: string): Db {
   return db;
 }
 
+// data fixes that need code, run right after the matching sql file
+const FIXUPS: Record<string, (db: Db) => void> = {
+  // contact details leave the searchable key and move to an exact match key
+  '0003_security.sql': (db) => {
+    const rows = db.prepare('SELECT id, name, email, phone FROM customers WHERE erased_at IS NULL').all() as { id: string; name: string | null; email: string | null; phone: string | null }[];
+    const upd = db.prepare('UPDATE customers SET search_key = ?, contact_key = ? WHERE id = ?');
+    for (const r of rows) upd.run(searchKey(r.name), contactKey(r.email, r.phone), r.id);
+  },
+};
+
 // forward only. each file runs once, in name order, inside a transaction.
 export function migrate(db: Db, dir: string = MIGRATIONS_DIR): string[] {
   db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)');
@@ -28,6 +39,7 @@ export function migrate(db: Db, dir: string = MIGRATIONS_DIR): string[] {
     const sql = readFileSync(join(dir, file), 'utf8');
     db.transaction(() => {
       db.exec(sql);
+      FIXUPS[file]?.(db);
       db.prepare('INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)').run(file, Date.now());
     })();
     applied.push(file);
