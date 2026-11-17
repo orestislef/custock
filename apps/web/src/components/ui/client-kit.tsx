@@ -1,6 +1,6 @@
 'use client';
 
-// interactive pieces: sheets, toasts, tips, the language switch, images with a fallback.
+// interactive pieces: sheets, toasts, tips, pickers, the language switch, images with a fallback.
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,14 +8,15 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { LOCALES, LOCALE_NAMES, type AppLocale } from '@custock/i18n';
 import { setLocaleCookie, useLocale, useT } from '@/lib/i18n-client';
-import { IconClose, IconGlobe } from './icons';
+import { IconChevronDown, IconClose, IconGlobe, IconInfo } from './icons';
 
 // ---------------------------------------------------------------- sheet
 
-// open sheets, newest last. only the top one answers escape and keeps the tab focus.
+// open sheets, newest last. only the top one answers escape, keeps the tab focus and takes
+// ctrl or cmd + enter as its primary button.
 const sheetStack: object[] = [];
 
-export function Sheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode }) {
+export function Sheet({ open, onClose, title, children, footer, error }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode; error?: ReactNode }) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const start = useRef<number | null>(null);
@@ -26,10 +27,15 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
     const me = {};
     sheetStack.push(me);
     const onKey = (e: KeyboardEvent) => {
-      if (sheetStack[sheetStack.length - 1] !== me) return;
+      if (sheetStack[sheetStack.length - 1] !== me || !ref.current) return;
       if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        const primary = ref.current.querySelector<HTMLButtonElement>('[data-sheet-footer] .btn-primary:not([disabled])');
+        if (primary) { e.preventDefault(); primary.click(); }
+        return;
+      }
       // keep tab inside the sheet while it is open
-      if (e.key !== 'Tab' || !ref.current) return;
+      if (e.key !== 'Tab') return;
       const items = [...ref.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')];
       if (!items.length) return;
       const first = items[0]!, last = items[items.length - 1]!;
@@ -79,7 +85,13 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
           </div>
         </div>
         <div className="px-4">{children}</div>
-        {footer ? <div className="px-4 pt-3">{footer}</div> : null}
+        {footer || error ? (
+          <div className="px-4 pt-3" data-sheet-footer>
+            {/* errors sit right above the button they belong to, and stay until the next try */}
+            {error ? <p className="sheet-error" role="alert">{error}</p> : null}
+            {footer}
+          </div>
+        ) : null}
       </div>
     </>,
     document.body,
@@ -88,30 +100,47 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
 
 // ---------------------------------------------------------------- toasts
 
-interface ToastItem { id: number; text: ReactNode; action?: { label: string; run: () => void } }
+interface ToastItem { id: number; text: ReactNode; action?: { label: string; run: () => void }; ms: number }
 const ToastCtx = createContext<(text: ReactNode, action?: ToastItem['action'], ms?: number) => void>(() => {});
 
+// one toast at a time, the rest wait their turn. a toast with an action stays 8 seconds, and the
+// clock stops while the pointer or the keyboard focus is on it.
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<ToastItem[]>([]);
-  const show = useCallback((text: ReactNode, action?: ToastItem['action'], ms = 4000) => {
-    const id = Date.now() + Math.random();
-    setItems((x) => [...x.slice(-1), { id, text, action }]);
-    window.setTimeout(() => setItems((x) => x.filter((i) => i.id !== id)), ms);
+  const [queue, setQueue] = useState<ToastItem[]>([]);
+  const [paused, setPaused] = useState(false);
+  const show = useCallback((text: ReactNode, action?: ToastItem['action'], ms?: number) => {
+    setQueue((q) => [...q, { id: Date.now() + Math.random(), text, action, ms: Math.max(ms ?? 0, action ? 8000 : 4000) }]);
   }, []);
+  const current = queue[0];
+  const dismiss = useCallback((id: number) => setQueue((q) => q.filter((x) => x.id !== id)), []);
+
+  useEffect(() => {
+    if (!current || paused) return;
+    const timer = window.setTimeout(() => dismiss(current.id), current.ms);
+    return () => clearTimeout(timer);
+  }, [current, paused, dismiss]);
+
   return (
     <ToastCtx.Provider value={show}>
       {children}
       <div aria-live="polite" role="status">
-        {items.slice(-1).map((i) => (
-          <div key={i.id} className="toast">
-            <span className="flex-1">{i.text}</span>
-            {i.action ? (
-              <button type="button" className="btn btn-plain" onClick={() => { i.action!.run(); setItems((x) => x.filter((y) => y.id !== i.id)); }}>
-                {i.action.label}
+        {current ? (
+          <div
+            key={current.id}
+            className="toast"
+            onPointerEnter={() => setPaused(true)}
+            onPointerLeave={() => setPaused(false)}
+            onFocus={() => setPaused(true)}
+            onBlur={() => setPaused(false)}
+          >
+            <span className="flex-1">{current.text}</span>
+            {current.action ? (
+              <button type="button" className="btn btn-plain" onClick={() => { current.action!.run(); dismiss(current.id); setPaused(false); }}>
+                {current.action.label}
               </button>
             ) : null}
           </div>
-        ))}
+        ) : null}
       </div>
     </ToastCtx.Provider>
   );
@@ -133,10 +162,12 @@ export function Tip({ id, children }: { id: string; children: ReactNode }) {
   if (hidden) return null;
   return (
     <div className="tip mb-4">
-      <span className="t-sub flex-1 pt-0.5">{children}</span>
+      <IconInfo size={18} />
+      <span className="t-sub flex-1">{children}</span>
       <button
         type="button"
         className="icon-btn -m-2"
+        style={{ color: 'var(--c-ink-2)' }}
         aria-label={t('tip.dismiss')}
         onClick={() => { localStorage.setItem(`tip.${id}`, '1'); window.dispatchEvent(new Event('custock-tips')); }}
       >
@@ -146,27 +177,62 @@ export function Tip({ id, children }: { id: string; children: ReactNode }) {
   );
 }
 
+// ---------------------------------------------------------------- pickers
+
+// the value as readable text with a native select laid over it: the whole pill is the target,
+// the system menu opens on every platform, and screen readers get a real combobox.
+export function Picker<T extends string>({ value, options, onChange, label, icon, variant = 'filled', disabled, className }: {
+  value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string;
+  icon?: ReactNode; variant?: 'filled' | 'plain' | 'quiet'; disabled?: boolean; className?: string;
+}) {
+  const current = options.find((o) => o.value === value)?.label ?? '';
+  return (
+    <span className={`picker ${variant === 'filled' ? 'filled' : variant === 'plain' ? 'plain' : ''} ${className ?? ''}`} aria-disabled={disabled}>
+      {icon}
+      <span className="truncate">{current}</span>
+      <IconChevronDown size={14} />
+      <select aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value as T)}>
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------- language switch
 
-export function LocaleSwitch({ compact }: { compact?: boolean }) {
+export function LocaleSwitch() {
   const locale = useLocale();
   const router = useRouter();
   const t = useT();
   return (
-    <label className={`inline-flex items-center gap-1.5 ${compact ? '' : 'min-h-[44px]'}`} style={{ color: 'var(--c-ink-2)' }}>
-      <IconGlobe size={18} />
-      <span className="sr-only">{t('locale.label')}</span>
-      <select
-        className="t-sub bg-transparent border-0 outline-none cursor-pointer"
-        style={{ color: 'var(--c-ink-2)' }}
-        value={locale}
-        onChange={(e) => { setLocaleCookie(e.target.value as AppLocale); router.refresh(); }}
-      >
-        {LOCALES.map((l) => <option key={l} value={l}>{LOCALE_NAMES[l]}</option>)}
-      </select>
-    </label>
+    <Picker
+      variant="quiet"
+      className="min-h-[44px]"
+      label={t('locale.label')}
+      icon={<IconGlobe size={18} />}
+      value={locale}
+      onChange={(l: AppLocale) => { setLocaleCookie(l); router.refresh(); }}
+      options={LOCALES.map((l) => ({ value: l, label: LOCALE_NAMES[l] }))}
+    />
   );
 }
+
+// ---------------------------------------------------------------- keyboard shortcuts
+
+// "/" focuses the page search, ctrl or cmd + n runs the page's new item action
+export function useShortcuts({ search, create }: { search?: () => void; create?: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = (e.target as HTMLElement)?.closest?.('input, textarea, select, [contenteditable="true"]');
+      if (e.key === '/' && !typing && search) { e.preventDefault(); search(); return; }
+      if ((e.key === 'n' || e.key === 'N') && (e.metaKey || e.ctrlKey) && !e.shiftKey && create) { e.preventDefault(); create(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [search, create]);
+}
+
+export const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 // ---------------------------------------------------------------- product images with a fallback tile
 
@@ -178,7 +244,7 @@ export function Photo({ src, alt, className, size, rounded = 9 }: { src: string 
       <span
         aria-hidden="true"
         className={`inline-grid place-items-center flex-none t-display font-semibold ${className ?? ''}`}
-        style={{ width: size, height: size, borderRadius: rounded, background: 'var(--c-accent-tint)', color: 'var(--c-accent)', fontSize: (size ?? 44) * 0.42 }}
+        style={{ width: size, height: size, borderRadius: rounded, background: 'var(--c-fill)', color: 'var(--c-ink-2)', fontSize: (size ?? 44) * 0.42 }}
       >
         {letter}
       </span>

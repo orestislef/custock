@@ -5,14 +5,23 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { IconChevronRight, IconHalf, IconLock, IconSlash, IconTruck, IconWarning } from './icons';
 
+// a group is a real list (ul role=list), each Row inside renders as its li
 export function Group({ title, footer, children, className }: { title?: ReactNode; footer?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`group ${className ?? ''}`}>
-      {title ? <h2 className="group-head">{title}</h2> : null}
-      <div className="list">{children}</div>
-      {footer ? <p className="group-foot">{footer}</p> : null}
+    <section className={`inset-group ${className ?? ''}`}>
+      {title ? <h2 className="inset-group-head">{title}</h2> : null}
+      <ul className="list" role="list">{wrapRows(children)}</ul>
+      {footer ? <p className="inset-group-foot">{footer}</p> : null}
     </section>
   );
+}
+
+function wrapRows(children: ReactNode): ReactNode {
+  const items = Array.isArray(children) ? children.flat(3) : [children];
+  return items.filter((c) => c != null && c !== false).map((c, i) => {
+    const key = (c as { key?: string | null })?.key ?? i;
+    return <li key={key}>{c}</li>;
+  });
 }
 
 interface RowProps {
@@ -39,7 +48,7 @@ export function Row({ title, subtitle, value, leading, trailing, href, onClick, 
       </span>
       {value != null ? <span className="row-value tnum">{value}</span> : null}
       {trailing}
-      {(chevron ?? Boolean(href)) ? <IconChevronRight size={16} className="chev" /> : null}
+      {(chevron ?? Boolean(href || onClick)) ? <IconChevronRight size={16} className="chev" /> : null}
     </>
   );
   const cls = `row ${iconInset || leading ? 'has-icon' : ''}`;
@@ -48,8 +57,8 @@ export function Row({ title, subtitle, value, leading, trailing, href, onClick, 
   return <div className={cls}>{inner}</div>;
 }
 
-export function IconTile({ children, color }: { children: ReactNode; color?: string }) {
-  return <span className="icon-tile" style={color ? { background: color } : undefined}>{children}</span>;
+export function IconTile({ children, tone }: { children: ReactNode; tone?: 'neg' | 'ok' }) {
+  return <span className={`icon-tile ${tone ?? ''}`}>{children}</span>;
 }
 
 export type StockState = 'in' | 'few' | 'out' | 'negative' | 'onTheWay';
@@ -125,12 +134,24 @@ export function Segmented<T extends string>({ value, options, onChange, label, d
   );
 }
 
+// a scrollable row of choices, for options that do not fit a segmented control on a phone
+export function Chips<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
+  return (
+    <div className="scroll-x flex gap-2" role="group" aria-label={label}>
+      {options.map((o) => (
+        <button key={o.value} type="button" className="chip" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>{o.label}</button>
+      ))}
+    </div>
+  );
+}
+
 export function initials(name: string | null | undefined): string {
   if (!name) return '?';
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('');
 }
 
-const AVATAR = ['#B0234F', '#2F5BC8', '#C98A1B', '#5E7D3A', '#1F8A8A', '#7B4FA0', '#6B7280'];
+// avatar colors carry no meaning, so the brand accent is not one of them. white text passes on each
+const AVATAR = ['#2F5BC8', '#8F5E0F', '#5E7D3A', '#17706F', '#7B4FA0', '#6B7280'];
 
 export function Avatar({ name, size = 36 }: { name: string | null | undefined; size?: number }) {
   const n = name ?? '';
@@ -144,4 +165,9 @@ export function Avatar({ name, size = 36 }: { name: string | null | undefined; s
       {initials(n)}
     </span>
   );
+}
+
+// a true minus sign for quantities that went down
+export function signed(n: number, text: string): string {
+  return n > 0 ? `+${text}` : n < 0 ? `−${text.replace(/^[-−]/, '')}` : text;
 }

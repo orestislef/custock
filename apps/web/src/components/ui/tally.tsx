@@ -1,7 +1,8 @@
 'use client';
 
 // the signature: stock numbers roll like a mechanical tally counter when they change.
-// screen readers get the plain number, reduced motion gets no roll (css handles it).
+// screen readers read the plain number from a visually hidden copy, the rolling digits are hidden
+// from them. reduced motion gets no roll (css handles it).
 
 import { useEffect, useRef, useState } from 'react';
 
@@ -20,18 +21,21 @@ export function Tally({ value, format, className }: { value: number; format?: (n
   }, [text]);
 
   return (
-    <span className={`tally ${className ?? ''}`} aria-label={text} role="text">
-      {shown.split('').map((ch, i) => {
-        const d = DIGITS.indexOf(ch);
-        if (d < 0) return <span key={`s${i}`} aria-hidden="true">{ch}</span>;
-        return (
-          <span key={`d${shown.length - i}`} className="tally-digit" aria-hidden="true">
-            <span className="tally-strip" style={{ transform: `translateY(-${d * 1.25}em)` }}>
-              {DIGITS.map((x) => <span key={x}>{x}</span>)}
+    <span className={`tally ${className ?? ''}`}>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true" className="inline-flex">
+        {shown.split('').map((ch, i) => {
+          const d = DIGITS.indexOf(ch);
+          if (d < 0) return <span key={`s${i}`}>{ch === '-' ? '−' : ch}</span>;
+          return (
+            <span key={`d${shown.length - i}`} className="tally-digit">
+              <span className="tally-strip" style={{ transform: `translateY(-${d * 1.25}em)` }}>
+                {DIGITS.map((x) => <span key={x}>{x}</span>)}
+              </span>
             </span>
-          </span>
-        );
-      })}
+          );
+        })}
+      </span>
     </span>
   );
 }

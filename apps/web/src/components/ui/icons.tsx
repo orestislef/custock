@@ -209,3 +209,27 @@ export const IconArrowIn = make(() => (
     <path d="M12 3.5v11M8 10.5l4 4 4-4" />
   </>
 ));
+export const IconMailOff = make(() => (
+  <>
+    <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+    <path d="m4.5 7 7.5 6 7.5-6M3 3l18 18" />
+  </>
+));
+export const IconBellOff = make(() => (
+  <>
+    <path d="M6 16.5V11a6 6 0 0 1 9.6-4.8M18 11v5.5l1.5 2h-15z" />
+    <path d="M10 20.5a2 2 0 0 0 4 0M3 3l18 18" fill="none" />
+  </>
+));
+export const IconClipboard = make(() => (
+  <>
+    <rect x="5" y="4.5" width="14" height="16" rx="2" />
+    <path d="M9 4.5V3.5h6v1M8.5 10h7M8.5 13.5h7M8.5 17h4" />
+  </>
+));
+export const IconCopy = make(() => (
+  <>
+    <rect x="8.5" y="8.5" width="11" height="11" rx="2" />
+    <path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" />
+  </>
+));
