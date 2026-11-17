@@ -2,6 +2,7 @@ import type { AccessAssignment, OrgAccess, Topology } from '@custock/core';
 import type { AppLocale } from '@custock/i18n';
 import type { Db } from '@custock/db';
 import type { Tenant } from './lib/tenant';
+import type { ExternalAuth } from './lib/external-auth';
 
 export interface Config {
   db: Db;
@@ -19,6 +20,12 @@ export interface Config {
   trustedProxy?: boolean;
   // bot check secret for join pages. without it and outside dev, public signups are refused.
   turnstileSecret?: string;
+  // the api's own public address, for upload links and files it serves itself
+  apiPublicUrl?: string;
+  // where dev uploads are stored
+  uploadDir?: string;
+  // who issues tokens: our dev login (default) or the real login server through its JWKS
+  auth?: { mode: 'local' } | ExternalAuth;
 }
 
 export interface AuthUser {
@@ -66,6 +73,10 @@ export type AppEnv = {
     cfg: Config;
     requestId: string;
     locale: AppLocale;
+    // true when the request said which language it wants (Accept-Language)
+    localeFromHeader: boolean;
+    // names in reports, set once per report request
+    localeName: AppLocale;
     user: AuthUser;
     org: OrgContext;
   };

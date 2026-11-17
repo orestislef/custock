@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { bodyLimit } from 'hono/body-limit';
 import { ZodError } from 'zod';
@@ -21,6 +21,9 @@ import { teamWriteRoutes } from './routes/team-writes';
 import { peopleWriteRoutes } from './routes/people-writes';
 import { devRoutes } from './routes/dev';
 import { stockExtraRoutes } from './routes/stock-extra';
+import { MAX_UPLOAD_BYTES, uploadRoutes } from './routes/uploads';
+import { buildOpenApi } from './openapi';
+import { setFileBase } from './services/catalog';
 
 export function createApp(cfg: Config) {
   const app = new Hono<AppEnv>();
@@ -41,7 +44,12 @@ export function createApp(cfg: Config) {
       credentials: true,
     }),
   );
-  app.use('*', bodyLimit({ maxSize: 1024 * 1024, onError: (c) => c.json(new ApiProblem(413 as 400, 'validation', 'body too large').toJSON(), 413) }));
+  // 1 MB for json, photo uploads have their own 5 MB slot
+  const tooLarge = (c: Context<AppEnv>) => c.json(new ApiProblem(413 as 400, 'validation', 'body too large').toJSON(), 413);
+  const jsonLimit = bodyLimit({ maxSize: 1024 * 1024, onError: tooLarge });
+  const uploadLimit = bodyLimit({ maxSize: MAX_UPLOAD_BYTES, onError: tooLarge });
+  app.use('*', (c, next) => (c.req.path.startsWith('/v1/uploads/') ? uploadLimit(c, next) : jsonLimit(c, next)));
+  setFileBase(cfg.apiPublicUrl);
   app.use('*', localeMiddleware);
 
   app.get('/health', (c) => c.json({ ok: true, name: 'custock-api' }));
@@ -65,6 +73,10 @@ export function createApp(cfg: Config) {
   peopleWriteRoutes(app);
   devRoutes(app);
   stockExtraRoutes(app);
+  uploadRoutes(app);
+
+  let openapi: Record<string, unknown> | null = null;
+  app.get('/v1/openapi.json', (c) => c.json((openapi ??= buildOpenApi(app))));
 
   app.notFound((c) => c.json(new ApiProblem(404, 'not_found', `${c.req.method} ${c.req.path}`).toJSON(), 404));
 
