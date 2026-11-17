@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-17T18:45:00+02:00",
-  "overall": 30,
+  "updated": "2026-11-17T19:20:00+02:00",
+  "overall": 36,
   "areas": [
     {
       "key": "thinking",
@@ -12,9 +12,9 @@
     {
       "key": "demo",
       "name": "Clickable demo (GitHub Pages)",
-      "percent": 75,
+      "percent": 95,
       "state": "building",
-      "note": "Live. Roles, languages, search in greek, greeklish and russian, scanning, back in stock moment, posts with push banners, customer feed, offers and catalog. Next: team and roles, reports, counts, transfers, lock screen, customer join flow."
+      "note": "Live with every planned flow: roles and delegation, team and role editor, scanning, back in stock, counts, transfers, reports with charts, posts and push, lock screen, customer join flow, feed, offers, catalog and profile. English, Greek and Russian. Works on phones."
     },
     {
       "key": "setup",
@@ -72,6 +72,10 @@
     {
       "at": "2026-11-17T18:45:00+02:00",
       "text": "Demo stage 1 is live on GitHub Pages. Stage 2 started."
+    },
+    {
+      "at": "2026-11-17T19:20:00+02:00",
+      "text": "Demo stage 2 live: team and roles, reports, counts, transfers, lock screen, customer join flow and profile."
     }
   ]
 }
