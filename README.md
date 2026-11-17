@@ -5,7 +5,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
 ![Languages](https://img.shields.io/badge/i18n-EN%20%7C%20EL%20%7C%20RU-B0234F)
-![Status](https://img.shields.io/badge/status-planning-orange)
+![Status](https://img.shields.io/badge/status-building-B0234F)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 A clean blend of Customer and Stock.
@@ -57,6 +57,14 @@ pnpm dev:web      # http://localhost:3000
 pnpm dev:mobile   # expo
 pnpm check        # typecheck, tests and missing translations
 ```
+
+`pnpm dev:api` runs in dev mode: demo data, logins like `maria@example.com` with password
+`custock`, codes shown on screen instead of emailed, and a dev outbox at `/admin/dev-outbox` that
+shows every email and push that would have gone out. Nothing is ever sent from a dev setup. The API
+describes itself at `http://localhost:8787/v1/openapi.json`.
+
+Putting it on a server (Docker or systemd, litestream backups to R2) is in [deploy/](deploy/README.md).
+Real sending (FCM, SMTP) stays off unless it is explicitly allowed, see [apps/api](apps/api/README.md).
 
 ## What it does
 
