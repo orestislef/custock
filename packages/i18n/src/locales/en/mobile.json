@@ -1,1 +1,480 @@
-{}
+{
+  "tabs": {
+    "home": "Home",
+    "today": "Today",
+    "stock": "Stock",
+    "scan": "Scan",
+    "customers": "Customers",
+    "posts": "Posts",
+    "more": "More",
+    "offers": "Offers",
+    "catalog": "Catalog",
+    "shops": "Shops",
+    "profile": "Profile"
+  },
+  "signIn": {
+    "staffHeader": "Work account",
+    "staffFooter": "Use the email your business invited.",
+    "email": "Email",
+    "password": "Password",
+    "passwordPlaceholder": "Required",
+    "customerLink": "I shop here, sign in with an email code",
+    "demoHeader": "Demo accounts",
+    "demoFooter": "Made up people at Lemoni, a deli with three shops. Each one sees what their role allows.",
+    "emailCode": "Email code"
+  },
+  "customerSignIn": {
+    "title": "Sign in",
+    "heading": "No password needed",
+    "body": "We send a 6 digit code to your email. Type it here and you are in.",
+    "noPassword": "Use the email you joined a shop with.",
+    "sentTo": "We sent a code to {{email}}. It works for 10 minutes.",
+    "code": "Code",
+    "send": "Send code",
+    "verify": "Sign in",
+    "devCode": "Development: the code is {{code}}. Nothing was emailed."
+  },
+  "home": {
+    "greeting": {
+      "morning": "Good morning, {{name}}",
+      "afternoon": "Good afternoon, {{name}}",
+      "evening": "Good evening, {{name}}"
+    },
+    "tipUndo": "Every sale and receipt can be undone for 10 seconds from the bar at the bottom.",
+    "cards": {
+      "lowStock": "Low stock",
+      "outOfStock": "Out of stock",
+      "peopleWaiting": "People waiting for products",
+      "newFollowers": "New followers this week",
+      "stockValue": "Stock value at cost",
+      "salesToday": "Sales today"
+    },
+    "needsYou": "Needs you",
+    "needsYouFooter": "Things that wait for someone with your role.",
+    "needs": {
+      "approvals_one": "{{count}} post waiting for approval",
+      "approvals_other": "{{count}} posts waiting for approval",
+      "negative_one": "{{count}} product with negative stock",
+      "negative_other": "{{count}} products with negative stock",
+      "unknownCodes_one": "{{count}} unknown code scanned",
+      "unknownCodes_other": "{{count}} unknown codes scanned",
+      "unknownCodesSub": "Add them to a product so the next scan finds it",
+      "transfers_one": "{{count}} transfer on the way",
+      "transfers_other": "{{count}} transfers on the way",
+      "scheduled_one": "{{count}} post scheduled",
+      "scheduled_other": "{{count}} posts scheduled",
+      "nothing": "All clear"
+    }
+  },
+  "stock": {
+    "searchPlaceholder": "Name, barcode, greeklish works too",
+    "filter": {
+      "all": "All",
+      "low": "Low",
+      "out": "Out",
+      "negative": "Needs fixing",
+      "waiting": "People waiting"
+    },
+    "count_one": "{{count}} product",
+    "count_other": "{{count}} products",
+    "empty": {
+      "title": "No products here",
+      "body": "Scan your first barcode. It takes ten seconds.",
+      "searchTitle": "Nothing found",
+      "searchBody": "No product matches \"{{q}}\". Try fewer letters or the barcode."
+    }
+  },
+  "product": {
+    "stockPerShop": "Stock per shop",
+    "adjust": "Adjust",
+    "prices": "Prices",
+    "basePrice": "Price",
+    "cost": "Cost",
+    "margin": "Margin {{pct}}%",
+    "vat": "VAT",
+    "costHidden": "Costs are hidden for your role.",
+    "variants": "Variants",
+    "barcodes": "Barcodes",
+    "packOf": "Box of {{count}}",
+    "history": "History"
+  },
+  "history": {
+    "footer": "Nothing is ever deleted. Mistakes are fixed with a new line.",
+    "emptyTitle": "No history yet",
+    "emptyBody": "Every receipt, sale and correction shows up here."
+  },
+  "adjust": {
+    "title": "Adjust stock",
+    "remove": "Take out",
+    "add": "Add",
+    "less": "One less",
+    "more": "One more",
+    "reasonRequired": "Pick a reason. It shows in reports, so missing stock has an explanation.",
+    "saveMinus": "Take out {{count}}",
+    "savePlus": "Add {{count}}",
+    "saved": "Stock adjusted"
+  },
+  "shopPicker": {
+    "title": "Shop",
+    "footer": "Lists and numbers follow the shop you pick.",
+    "allSub_one": "{{count}} shop together",
+    "allSub_other": "{{count}} shops together",
+    "business": "Business"
+  },
+  "scan": {
+    "mode": {
+      "lookup": "Look up",
+      "receive": "Receive",
+      "sell": "Sell",
+      "count": "Count"
+    },
+    "hint": {
+      "lookup": "Point at a barcode to open the product.",
+      "receive": "Scan everything that arrived, then confirm once.",
+      "sell": "Each scan takes one off, with undo.",
+      "count": "Scan each item. Differences show against the expected stock."
+    },
+    "listHead": {
+      "receive_one": "{{count}} item",
+      "receive_other": "{{count}} items",
+      "sell_one": "Sold now · {{count}} item",
+      "sell_other": "Sold now · {{count}} items",
+      "count_one": "{{count}} counted",
+      "count_other": "{{count}} counted"
+    },
+    "receiveCta_one": "Receive {{count}} item",
+    "receiveCta_other": "Receive {{count}} items",
+    "received_one": "Received {{count}} item",
+    "received_other": "Received {{count}} items",
+    "sold": "Sold {{count}} × {{name}}",
+    "applyCount": "Apply differences",
+    "countApplied_one": "{{count}} difference applied",
+    "countApplied_other": "{{count}} differences applied",
+    "countNoDifferences": "Everything matches. Nothing to change.",
+    "countNeedsApproval": "Counts are applied by a manager. Show them this list.",
+    "expected": "Expected {{qty}}",
+    "clear": "Clear",
+    "torch": "Torch",
+    "typeCode": "Type a code",
+    "typeCodePlaceholder": "Barcode digits",
+    "samples": "Try a sample code",
+    "unknownTitle": "Unknown code",
+    "damaged": "This code looks damaged. Check the digits.",
+    "createWithCode": "New product with this code",
+    "unknownSaved": "Saved for your manager, who can add it to a product.",
+    "allowCamera": "Allow camera",
+    "cameraWhy": "The camera reads barcodes. Nothing is recorded or saved.",
+    "webNoCamera": "Scanning uses the phone camera. Here you can type a code or try a sample.",
+    "noModesTitle": "Nothing to scan for your role",
+    "noModesBody": "Your role can look at stock but not change it.",
+    "lowStockNote_one": "{{count}} product just dropped to its reorder point",
+    "lowStockNote_other": "{{count}} products just dropped to their reorder point",
+    "backInStockBody": "They asked to hear when it is back. Each gets one message, in their language.",
+    "toldSnack_one": "{{count}} customer told it is back",
+    "toldSnack_other": "{{count}} customers told it is back",
+    "countSubmitted": "Count sent to your manager for review",
+    "submitCount": "Send count for review",
+    "lines_one": "{{count}} line",
+    "lines_other": "{{count}} lines"
+  },
+  "newProduct": {
+    "title": "New product",
+    "footer": "Photos, category and variants can be added later.",
+    "name": "Name",
+    "namePlaceholder": "What is on the label",
+    "price": "Price",
+    "saved": "Product added"
+  },
+  "customers": {
+    "search": "Name or email",
+    "all": "All",
+    "pending": "Not confirmed",
+    "count_one": "{{count}} customer",
+    "count_other": "{{count}} customers",
+    "maskedNote": "contacts are partly hidden for your role",
+    "emptyTitle": "No customers yet",
+    "emptyBody": "Print your window QR. People join in 30 seconds."
+  },
+  "customer": {
+    "contact": "Contact",
+    "contactFooter": "Use it only for what they agreed to.",
+    "none": "No email",
+    "maskedWhy": "Full email and phone are hidden for your role.",
+    "follows": "Follows",
+    "sub": {
+      "pending": "Not confirmed",
+      "subscribed": "Following",
+      "unsubscribed": "Stopped"
+    },
+    "consents": "Consent",
+    "consentsFooter": "Proof of what they agreed to, when, and to which wording.",
+    "granted": "yes",
+    "withdrawn": "no",
+    "consentLine": "{{when}} · {{source}} · {{version}}",
+    "source": {
+      "join_page": "join page",
+      "staff": "at the counter",
+      "app": "in the app",
+      "import": "import",
+      "unsubscribe_link": "unsubscribe link",
+      "double_opt_in": "email confirmation"
+    },
+    "waitingFor": "Waiting for",
+    "saved": "Saved",
+    "notes": "Notes",
+    "addNote": "Add a note",
+    "saveNote": "Save note",
+    "sent": "What we sent",
+    "delivery": {
+      "sent": "Delivered",
+      "skipped": "Not sent",
+      "failed": "Failed",
+      "queued": "Waiting",
+      "opened": "Opened",
+      "bounced": "Bounced",
+      "clicked": "Clicked",
+      "held": "Held until morning"
+    }
+  },
+  "posts": {
+    "new": "New",
+    "emptyTitle": "No posts yet",
+    "emptyBody": "Tell your followers about new stock or an offer.",
+    "reached_one": "reached {{count}}",
+    "reached_other": "reached {{count}}",
+    "products": "Products",
+    "was": "Was {{price}}",
+    "wasFooter": "The \"was\" price is the lowest of the last 30 days.",
+    "delivery": "Delivery",
+    "channels": "Channels",
+    "sentAt": "Sent",
+    "scheduledFor": "Scheduled for",
+    "validUntil": "Offer ends",
+    "stats": {
+      "sent": "Delivered",
+      "opened": "Opened",
+      "skipped": "Not sent",
+      "skippedWhy": "No consent, push off or the daily limit"
+    },
+    "author": "Written by",
+    "approve": "Approve and publish",
+    "approved": "Published",
+    "waitingApproval": "Waiting for someone who can publish.",
+    "cannotRecall": "Sent push and email cannot be taken back. Edits update the feed only."
+  },
+  "compose": {
+    "title": "New post",
+    "kind": "Kind",
+    "titlePlaceholder": "Title",
+    "bodyPlaceholder": "What do you want to tell them?",
+    "defaultLangFooter": "Required. Followers who read another language get this one if there is no translation.",
+    "otherLangFooter_one": "Optional. {{count}} follower reads this language.",
+    "otherLangFooter_other": "Optional. {{count}} followers read this language.",
+    "products": "Products",
+    "addProducts_one": "Add products ({{count}} picked)",
+    "addProducts_other": "Add products ({{count}} picked)",
+    "hideProducts": "Done picking",
+    "offerPrice": "Offer price",
+    "offerFooter": "Offer prices apply in the post's shops for 7 days, also at the counter.",
+    "offerPriceLocked": "Offer prices need a role with offer pricing.",
+    "audience": "Who",
+    "allOf": "All of {{org}}",
+    "channels": "Channels",
+    "always": "Always",
+    "emailLocked": "Email is not in your role. Ask an admin.",
+    "whoGetsIt": "Who gets it",
+    "preview": {
+      "total_one": "{{count}} person will see this",
+      "total_other": "{{count}} people will see this",
+      "scope_one": "{{count}} follows {{name}}",
+      "scope_other": "{{count}} follow {{name}}",
+      "push_one": "Push to {{count}}.",
+      "push_other": "Push to {{count}}.",
+      "pushWhy": "{{off}} turned push off, {{noApp}} do not have the app.",
+      "quiet": "Pushes between 22:00 and 09:00 wait until morning.",
+      "quietNow": "It is quiet hours now. Pushes go out at 09:00.",
+      "email_one": "Email to {{count}}.",
+      "email_other": "Email to {{count}}.",
+      "emailWhy_one": "{{count}} has not confirmed their email yet.",
+      "emailWhy_other": "{{count}} have not confirmed their email yet."
+    },
+    "publish": "Publish",
+    "submit": "Submit for approval",
+    "approvalWhy": "Someone who can publish will check it first.",
+    "published_one": "Published to {{count}} person",
+    "published_other": "Published to {{count}} people",
+    "submitted": "Sent for approval"
+  },
+  "more": {
+    "business": "Business",
+    "reports": "Reports",
+    "team": "Team",
+    "joinLinks": "QR codes and join links",
+    "customerPage": "What customers see",
+    "customerPageSub": "Catalog, prices, stock",
+    "nothingForRole": "Nothing more for your role",
+    "you": "You",
+    "language": "Language",
+    "switchToShopper": "Switch to my shops",
+    "demoData": "Running on demo data"
+  },
+  "reports": {
+    "sales14": "Sales, last 14 days",
+    "bestDay": "Best day: {{day}}, {{value}}",
+    "moneyHidden": "Money is hidden for your role.",
+    "mostWanted": "Most wanted",
+    "mostWantedFooter": "People asked to hear when these are back. A good reason to order.",
+    "topSellers": "Top sellers, 30 days",
+    "joinLinks": "Which QR brings people in",
+    "joinLinksFooter": "Percent of people who opened a link and joined.",
+    "linkLine": "{{opens}} opened, {{signups}} joined",
+    "shrinkage": "Shrinkage, 30 days"
+  },
+  "team": {
+    "invite": "Invite",
+    "members": "People",
+    "footer": "You can manage people ranked below you, in your shops.",
+    "roles": "Roles",
+    "roleLine": "{{count}} permissions · rank {{rank}}",
+    "blocked": {
+      "self": "You",
+      "rank": "Above you",
+      "scope": "Other shop",
+      "forbidden": "View only"
+    }
+  },
+  "invite": {
+    "title": "Invite someone",
+    "emailFooter": "They get a link in their language. It works once, for 7 days.",
+    "where": "Where",
+    "role": "Role",
+    "roleFooter": "You can give roles below yours, with permissions you have.",
+    "blocked": {
+      "rank": "Same rank as yours or above",
+      "ceiling": "Has permissions you do not have",
+      "scope": "Outside your shops",
+      "forbidden": "Your role cannot invite",
+      "self": "Not for yourself"
+    },
+    "send": "Send invite",
+    "sent": "Invite ready for {{email}}",
+    "noEmailInDev": "In development no email is sent."
+  },
+  "customerPage": {
+    "catalog": "Catalog",
+    "catalogMode": {
+      "off": "Off",
+      "subscribers": "Followers",
+      "public": "Public"
+    },
+    "catalogFooter": {
+      "off": "Customers only see posts and offers.",
+      "subscribers": "People who follow you see the catalog in the app.",
+      "public": "Anyone with the link sees it, search engines too."
+    },
+    "prices": "Show prices",
+    "pricesFooter": "Turn off for made to order or \"ask in the shop\" items.",
+    "stock": "Stock",
+    "stockMode": {
+      "off": "Off",
+      "availability": "In stock or not",
+      "exact": "Exact"
+    },
+    "stockFooter": {
+      "off": "Nothing about quantities.",
+      "availability": "In stock, only a few left, or out. Per shop.",
+      "exact": "The exact number per shop. Competitors can see this too."
+    },
+    "preview": "How a customer sees it",
+    "previewProduct": "Thyme honey 450g",
+    "priceHidden": "Price hidden",
+    "noStockShown": "No stock shown"
+  },
+  "joinLinks": {
+    "footer": "Tap to share a link. Each one counts its own visitors."
+  },
+  "language": {
+    "footer": "Changes the app right away. Messages from shops follow it too."
+  },
+  "feed": {
+    "title": "For you",
+    "hello": "Hi {{name}}, here is what is new.",
+    "endsOn": "Ends {{date}}",
+    "wasNote": "Was: lowest price of the last 30 days.",
+    "emptyTitle": "Follow a shop",
+    "emptyBody": "Scan the QR at a shop you like. Their news and offers land here.",
+    "goneTitle": "This post is gone",
+    "goneBody": "The offer may have ended."
+  },
+  "offers": {
+    "emptyTitle": "No offers right now",
+    "emptyBody": "When a shop you follow runs an offer, it shows here with the end date."
+  },
+  "catalog": {
+    "search": "Search products",
+    "offTitle": "No catalog here",
+    "offBody": "{{org}} does not share its catalog in the app. You still get their offers.",
+    "save": "Save",
+    "unsave": "Remove from saved",
+    "askInShop": "Ask in the shop",
+    "offerUntil": "until {{date}}",
+    "availability": "Where to find it",
+    "notifyMe": "Tell me when it is back",
+    "notifySet": "We will tell you once, when it is back",
+    "waiting": "You will hear from us when it is back."
+  },
+  "shops": {
+    "join": "Join a shop",
+    "call": "Call",
+    "directions": "Directions",
+    "unfollow": "Unfollow",
+    "unfollowTitle": "Unfollow {{name}}?",
+    "unfollowBody": "You will stop getting their news and offers."
+  },
+  "join": {
+    "webNoCamera": "Scan with your phone camera, or type the code printed under the QR.",
+    "cameraWhy": "The camera reads the shop's QR code. Nothing is recorded.",
+    "code": "Code",
+    "codeFooter": "The code is printed under the QR.",
+    "notFoundTitle": "Code not found",
+    "heading": "Join {{name}}",
+    "what": "News, offers and back in stock alerts from this shop. Only what you choose below.",
+    "name": "Name",
+    "namePlaceholder": "Your name",
+    "channels": "How to reach you",
+    "channelsFooter": "Both are off until you turn them on. You can stop anytime.",
+    "emailNews": "Email news",
+    "push": "Notifications",
+    "pushSub": "Max 2 a day, never at night",
+    "over15": "I am 15 or older",
+    "privacy": "{{org}} keeps your details to send what you chose. You can see or delete them from your profile.",
+    "cta": "Join {{name}}",
+    "done": "You follow {{name}}",
+    "you": "You"
+  },
+  "pushExplain": {
+    "title": "Hear about offers first",
+    "offers": "New offers and arrivals from shops you follow.",
+    "backInStock": "A note when something you asked for is back.",
+    "limit": "At most 2 a day per shop, and never between 22:00 and 09:00.",
+    "allow": "Turn on notifications",
+    "notNow": "Not now",
+    "footer": "You can change this anytime in your profile."
+  },
+  "me": {
+    "channelsFooter": "Turn email or notifications off for this business.",
+    "waiting": "Waiting for",
+    "waitingEmpty": "Nothing yet",
+    "saved": "Saved",
+    "savedEmpty": "Nothing saved yet",
+    "switchToWork": "Switch to work",
+    "privacy": "Your data",
+    "privacyFooter": "Each business only sees what you shared with it.",
+    "export": "Download my data",
+    "exported": "Your data is ready to share",
+    "delete": "Delete my account",
+    "deleteTitle": "Delete your account?",
+    "deleteBody": "Your details are erased from every shop you follow. This cannot be undone.",
+    "cancelAlert": "Stop waiting"
+  }
+}
