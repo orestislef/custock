@@ -170,5 +170,55 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     join: (code, input) => post(`/v1/public/join/${enc(code)}`, input),
     confirmJoin: (token) => post('/v1/public/confirm', { token }),
     shelfProduct: (code) => get(`/v1/public/p/${enc(code)}`),
+
+    // stage 2 additions
+    updateMe: (p) => patch('/v1/me', p),
+
+    archiveProduct: (orgId, productId) => post(`${org(orgId)}/products/${enc(productId)}/archive`),
+    setBasePrice: (orgId, variantId, priceMinor) => patch(`${org(orgId)}/variants/${enc(variantId)}/price`, { priceMinor }),
+    setShopVariantSettings: (orgId, shopId, variantId, input) => put(`${org(orgId)}/shops/${enc(shopId)}/variants/${enc(variantId)}/settings`, input),
+    nextInternalBarcode: (orgId) => post(`${org(orgId)}/barcodes/internal`),
+    resolveUnknownScan: (orgId, id, variantId) => post(`${org(orgId)}/unknown-scans/${enc(id)}/resolve`, { variantId }),
+    sync: (orgId, shopId, cursor) => get(`${org(orgId)}/shops/${enc(shopId)}/sync`, { since: cursor ?? undefined }),
+
+    counts: (orgId, q) => get(`${org(orgId)}/counts`, q as Query),
+    stockCount: (orgId, id) => get(`${org(orgId)}/counts/${enc(id)}`),
+    startCount: (orgId, shopId, input) => post(`${org(orgId)}/shops/${enc(shopId)}/counts`, input),
+    setCountLine: (orgId, id, variantId, countedQty, mode) => put(`${org(orgId)}/counts/${enc(id)}/lines/${enc(variantId)}`, { countedQty, mode: mode ?? 'set' }),
+    submitCount: (orgId, id) => post(`${org(orgId)}/counts/${enc(id)}/submit`),
+    applyCount: (orgId, id, uncountedPolicy) => post(`${org(orgId)}/counts/${enc(id)}/apply`, { uncountedPolicy }),
+    cancelCount: (orgId, id) => post(`${org(orgId)}/counts/${enc(id)}/cancel`),
+
+    transfers: (orgId, q) => get(`${org(orgId)}/transfers`, q as Query),
+    transfer: (orgId, id) => get(`${org(orgId)}/transfers/${enc(id)}`),
+    createTransfer: (orgId, input) => post(`${org(orgId)}/transfers`, input),
+    sendTransfer: (orgId, id) => post(`${org(orgId)}/transfers/${enc(id)}/send`),
+    receiveTransfer: (orgId, id, lines) => post(`${org(orgId)}/transfers/${enc(id)}/receive`, { lines }),
+    cancelTransfer: (orgId, id) => post(`${org(orgId)}/transfers/${enc(id)}/cancel`),
+
+    addCustomer: (orgId, input) => post(`${org(orgId)}/customers`, input),
+    eraseCustomer: (orgId, id) => post(`${org(orgId)}/customers/${enc(id)}/erase`),
+    updateJoinLink: (orgId, id, p) => patch(`${org(orgId)}/join-links/${enc(id)}`, p),
+
+    deletePost: (orgId, id) => del(`${org(orgId)}/posts/${enc(id)}`),
+
+    invites: (orgId) => get(`${org(orgId)}/invites`),
+    revokeInvite: (orgId, id) => post(`${org(orgId)}/invites/${enc(id)}/revoke`),
+    acceptInvite: (token) => post('/v1/invites/accept', { token }),
+    updateMember: (orgId, membershipId, p) => patch(`${org(orgId)}/members/${enc(membershipId)}`, p),
+    roleImpact: (orgId, roleId) => get(`${org(orgId)}/roles/${enc(roleId)}/impact`),
+
+    audit: (orgId, cursor) => get(`${org(orgId)}/audit`, { cursor }),
+    devOutbox: (limit) => get('/v1/dev/outbox', { limit }),
+    devRunJobs: () => post('/v1/dev/run-jobs'),
+
+    joinAsCustomer: (code, input) => post(`/v1/c/join/${enc(code)}`, input ?? {}),
+    follow: (scopeType, scopeId) => post('/v1/c/follow', { scopeType, scopeId }),
+    alerts: () => get('/v1/c/alerts'),
+    cancelAlert: (id) => del(`/v1/c/alerts/${enc(id)}`),
+    favorites: () => get('/v1/c/favorites'),
+
+    unsubscribePage: (token) => get(`/v1/public/subscription/${enc(token)}`),
+    unsubscribe: (token, everything) => post(`/v1/public/subscription/${enc(token)}`, { everything: !!everything }),
   };
 }

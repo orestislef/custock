@@ -346,7 +346,7 @@ export type Audience = z.infer<typeof Audience>;
 export const PostInput = z.object({
   kind: PostKind,
   defaultLocale: Locale,
-  translations: z.record(Locale, PostText),
+  translations: z.partialRecord(Locale, PostText), // only the default language is required
   channels: z.array(Channel).min(1),
   audience: Audience,
   products: z.array(z.object({ variantId: z.string(), offerPriceMinor: z.number().int().nullable().default(null) })).default([]),
@@ -520,3 +520,165 @@ export type SeriesPoint = z.infer<typeof SeriesPoint>;
 
 export const Paged = <T extends z.ZodTypeAny>(item: T) =>
   z.object({ items: z.array(item), nextCursor: z.string().nullable() });
+
+// ---------------------------------------------------------------- stage 2 additions
+
+export const ShopVariantSettingsInput = z.object({
+  priceOverrideMinor: z.number().int().nullable().optional(),
+  isListed: z.boolean().optional(),
+  reorderPoint: z.number().int().nullable().optional(),
+  reorderQty: z.number().int().nullable().optional(),
+});
+export type ShopVariantSettingsInput = z.infer<typeof ShopVariantSettingsInput>;
+
+export const UncountedPolicy = z.enum(['ignore', 'set_zero']);
+export type UncountedPolicy = z.infer<typeof UncountedPolicy>;
+
+export const StockCountLine = z.object({
+  variantId: z.string(),
+  productId: z.string(),
+  name: z.string(),
+  countedQty: z.number(),
+  expectedQty: z.number(),
+  difference: z.number(),
+  differenceCostMinor: z.number().nullable(), // only with products.cost.view
+  countedBy: z.string(),
+  countedByName: z.string().nullable(),
+  countedAt: z.number(),
+});
+export type StockCountLine = z.infer<typeof StockCountLine>;
+
+export const StockCount = z.object({
+  id: z.string(),
+  shopId: z.string(),
+  kind: z.enum(['full', 'partial']),
+  filter: z.record(z.string(), z.string()).nullable(),
+  status: z.enum(['open', 'review', 'applied', 'cancelled']),
+  startedBy: z.string(),
+  startedAt: z.number(),
+  submittedAt: z.number().nullable(),
+  appliedBy: z.string().nullable(),
+  appliedAt: z.number().nullable(),
+  uncountedPolicy: UncountedPolicy.nullable(),
+  lines: z.array(StockCountLine),
+});
+export type StockCount = z.infer<typeof StockCount>;
+
+export const TransferLine = z.object({
+  variantId: z.string(),
+  name: z.string(),
+  qtySent: z.number(),
+  qtyReceived: z.number().nullable(),
+  lost: z.number(), // sent minus received once received
+});
+export type TransferLine = z.infer<typeof TransferLine>;
+
+export const Transfer = z.object({
+  id: z.string(),
+  fromShopId: z.string(),
+  toShopId: z.string(),
+  status: z.enum(['draft', 'sent', 'received', 'cancelled']),
+  note: z.string().nullable(),
+  createdBy: z.string(),
+  createdAt: z.number(),
+  sentAt: z.number().nullable(),
+  receivedAt: z.number().nullable(),
+  lines: z.array(TransferLine),
+});
+export type Transfer = z.infer<typeof Transfer>;
+
+export const TransferInput = z.object({
+  fromShopId: z.string(),
+  toShopId: z.string(),
+  note: z.string().max(500).optional(),
+  lines: z.array(z.object({ variantId: z.string(), qty: z.number().int().positive() })).min(1),
+});
+export type TransferInput = z.infer<typeof TransferInput>;
+
+export const AddCustomerInput = z.object({
+  name: z.string().min(1).max(120),
+  email: z.string().email().optional(),
+  phone: z.string().max(30).optional(),
+  locale: Locale.default('el'),
+  shopId: z.string(),
+  emailNews: z.boolean().default(false),
+  push: z.boolean().default(false),
+  tags: z.array(z.string()).default([]),
+});
+export type AddCustomerInput = z.infer<typeof AddCustomerInput>;
+
+export const Invite = z.object({
+  id: z.string(),
+  email: z.string(),
+  roleId: z.string(),
+  roleName: z.string(),
+  scopeType: ScopeType,
+  scopeId: z.string(),
+  invitedBy: z.string(),
+  createdAt: z.number(),
+  expiresAt: z.number(),
+});
+export type Invite = z.infer<typeof Invite>;
+
+export const AuditEntry = z.object({
+  id: z.string(),
+  actorId: z.string().nullable(),
+  actorName: z.string().nullable(),
+  actorKind: z.string(),
+  action: z.string(),
+  entityType: z.string().nullable(),
+  entityId: z.string().nullable(),
+  before: z.unknown().nullable(),
+  after: z.unknown().nullable(),
+  createdAt: z.number(),
+});
+export type AuditEntry = z.infer<typeof AuditEntry>;
+
+export const DevOutboxItem = z.object({
+  id: z.string(),
+  channel: z.enum(['email', 'push', 'sms']),
+  orgId: z.string().nullable(),
+  userId: z.string().nullable(),
+  customerId: z.string().nullable(),
+  to: z.string().nullable(),
+  locale: z.string().nullable(),
+  title: z.string().nullable(),
+  body: z.string().nullable(),
+  payload: z.unknown().nullable(),
+  createdAt: z.number(),
+});
+export type DevOutboxItem = z.infer<typeof DevOutboxItem>;
+
+export const SyncResult = z.object({
+  cursor: z.string(),
+  full: z.boolean(),
+  products: z.array(Product),
+  levels: z.array(StockLevel),
+  categories: z.array(Category),
+  tombstones: z.object({ products: z.array(z.string()), variants: z.array(z.string()), barcodes: z.array(z.string()) }),
+});
+export type SyncResult = z.infer<typeof SyncResult>;
+
+export const StockAlertItem = z.object({
+  id: z.string(),
+  orgId: z.string(),
+  orgName: z.string(),
+  variantId: z.string(),
+  productId: z.string(),
+  productName: z.string(),
+  imageUrl: z.string().nullable(),
+  shopId: z.string().nullable(),
+  shopName: z.string().nullable(),
+  status: z.enum(['waiting', 'notified', 'cancelled']),
+  createdAt: z.number(),
+  notifiedAt: z.number().nullable(),
+});
+export type StockAlertItem = z.infer<typeof StockAlertItem>;
+
+export const UnsubscribePage = z.object({
+  orgName: z.string(),
+  scopeName: z.string(),
+  email: z.string().nullable(), // masked
+  locale: Locale,
+});
+export type UnsubscribePage = z.infer<typeof UnsubscribePage>;

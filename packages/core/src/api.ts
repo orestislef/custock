@@ -8,6 +8,8 @@ import type {
   Movement, MovementBatchResult, MovementInput, OrgSettings, Post, PostInput, Product,
   ProductInput, PublicProduct, Role, ScanResult, SeriesPoint, Shop, ShopGroup, StockLevel,
   Tokens, ScopeType,
+  AddCustomerInput, AuditEntry, DevOutboxItem, Invite, ShopVariantSettingsInput, StockAlertItem, StockCount,
+  StockCountLine, SyncResult, Transfer, TransferInput, UncountedPolicy, UnsubscribePage,
 } from './contract';
 
 export interface Page<T> { items: T[]; nextCursor: string | null }
@@ -113,4 +115,64 @@ export interface CustockApi {
   join(code: string, input: JoinInput): Promise<{ pending: true; devConfirmLink?: string }>;
   confirmJoin(token: string): Promise<{ orgName: string; scopeName: string }>;
   shelfProduct(code: string): Promise<PublicProduct>;
+
+  // ---------------------------------------------------------------- stage 2 additions
+
+  updateMe(patch: { displayName?: string; locale?: Locale }): Promise<void>;
+
+  // catalog writes
+  archiveProduct(orgId: string, productId: string): Promise<void>;
+  setBasePrice(orgId: string, variantId: string, priceMinor: number): Promise<void>;
+  setShopVariantSettings(orgId: string, shopId: string, variantId: string, input: ShopVariantSettingsInput): Promise<void>;
+  nextInternalBarcode(orgId: string): Promise<{ code: string }>;
+  resolveUnknownScan(orgId: string, unknownScanId: string, variantId: string | null): Promise<void>;
+  sync(orgId: string, shopId: string, cursor?: string | null): Promise<SyncResult>;
+
+  // counts
+  counts(orgId: string, query?: { shopId?: string; status?: string }): Promise<StockCount[]>;
+  stockCount(orgId: string, countId: string): Promise<StockCount>;
+  startCount(orgId: string, shopId: string, input: { kind: 'full' | 'partial'; filter?: Record<string, string> | null }): Promise<StockCount>;
+  setCountLine(orgId: string, countId: string, variantId: string, countedQty: number, mode?: 'set' | 'add'): Promise<StockCountLine>;
+  submitCount(orgId: string, countId: string): Promise<StockCount>;
+  applyCount(orgId: string, countId: string, uncountedPolicy?: UncountedPolicy): Promise<StockCount>;
+  cancelCount(orgId: string, countId: string): Promise<StockCount>;
+
+  // transfers
+  transfers(orgId: string, query?: { shopId?: string; status?: string }): Promise<Transfer[]>;
+  transfer(orgId: string, transferId: string): Promise<Transfer>;
+  createTransfer(orgId: string, input: TransferInput): Promise<Transfer>;
+  sendTransfer(orgId: string, transferId: string): Promise<Transfer>;
+  receiveTransfer(orgId: string, transferId: string, lines: { variantId: string; qtyReceived: number }[]): Promise<Transfer>;
+  cancelTransfer(orgId: string, transferId: string): Promise<Transfer>;
+
+  // customers and join links
+  addCustomer(orgId: string, input: AddCustomerInput): Promise<Customer>;
+  eraseCustomer(orgId: string, customerId: string): Promise<void>;
+  updateJoinLink(orgId: string, joinLinkId: string, patch: { label?: string | null; disabled?: boolean }): Promise<JoinLink>;
+
+  // posts
+  deletePost(orgId: string, postId: string): Promise<void>;
+
+  // team
+  invites(orgId: string): Promise<Invite[]>;
+  revokeInvite(orgId: string, inviteId: string): Promise<void>;
+  acceptInvite(token: string): Promise<{ orgId: string }>;
+  updateMember(orgId: string, membershipId: string, patch: { status: 'active' | 'suspended' | 'removed' }): Promise<void>;
+  roleImpact(orgId: string, roleId: string): Promise<{ members: number; names: string[] }>;
+
+  // audit and dev tools
+  audit(orgId: string, cursor?: string): Promise<Page<AuditEntry>>;
+  devOutbox(limit?: number): Promise<DevOutboxItem[]>;
+  devRunJobs(): Promise<{ ran: number }>;
+
+  // customer side
+  joinAsCustomer(code: string, input?: { emailNews?: boolean; push?: boolean }): Promise<{ orgName: string; scopeName: string }>;
+  follow(scopeType: ScopeType, scopeId: string): Promise<void>;
+  alerts(): Promise<StockAlertItem[]>;
+  cancelAlert(alertId: string): Promise<void>;
+  favorites(): Promise<PublicProduct[]>;
+
+  // public, from the email link
+  unsubscribePage(token: string): Promise<UnsubscribePage>;
+  unsubscribe(token: string, everything?: boolean): Promise<void>;
 }
