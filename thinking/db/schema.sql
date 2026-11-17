@@ -66,6 +66,11 @@ CREATE TABLE organizations (
   posts_need_approval   INTEGER NOT NULL DEFAULT 0,
   push_daily_cap        INTEGER NOT NULL DEFAULT 2,       -- max pushes per customer per day from this org
   quiet_hours           TEXT NOT NULL DEFAULT '22:00-09:00',
+  -- what customers can see, see 06-customers-and-comms
+  customer_catalog      TEXT NOT NULL DEFAULT 'subscribers' CHECK (customer_catalog IN ('off','subscribers','public')),
+  customer_prices       INTEGER NOT NULL DEFAULT 1,
+  customer_stock        TEXT NOT NULL DEFAULT 'off' CHECK (customer_stock IN ('off','availability','exact')),
+  few_left_threshold    INTEGER NOT NULL DEFAULT 3,       -- "only a few left" at or below this
   support_access_until  INTEGER,
   created_at            INTEGER NOT NULL,
   archived_at           INTEGER
@@ -84,6 +89,8 @@ CREATE TABLE shops (
   lat          REAL,
   lng          REAL,
   opening_hours TEXT,                   -- json
+  customer_visible INTEGER NOT NULL DEFAULT 1,   -- 0 hides the shop from customers (a warehouse)
+  customer_stock   TEXT CHECK (customer_stock IN ('off','availability','exact')),  -- null = org setting
   created_at   INTEGER NOT NULL,
   archived_at  INTEGER,
   UNIQUE (org_id, slug)
@@ -221,7 +228,9 @@ CREATE TABLE products (
   uom          TEXT NOT NULL DEFAULT 'piece' CHECK (uom IN ('piece','kg','l','m')),
   tax_rate_bp  INTEGER NOT NULL DEFAULT 2400,          -- basis points. 2400 = 24%, 1300 = 13%, 600 = 6%
   track_stock  INTEGER NOT NULL DEFAULT 1,             -- 0 for services or things we do not count
-  search_key   TEXT NOT NULL,                          -- normalised + transliterated name, see 09-languages
+  customer_visible      INTEGER NOT NULL DEFAULT 1,    -- 0 = internal only (packaging, supplies)
+  customer_stock_hidden INTEGER NOT NULL DEFAULT 0,    -- 1 = never show stock of this one to customers
+  search_key   TEXT NOT NULL,                         -- normalised + transliterated name, see 09-languages
   created_by   TEXT REFERENCES users(id),
   created_at   INTEGER NOT NULL,
   updated_at   INTEGER NOT NULL,
@@ -294,6 +303,22 @@ CREATE TABLE shop_variant_settings (
   updated_at           INTEGER NOT NULL,
   PRIMARY KEY (shop_id, variant_id)
 );
+
+-- every price a variant had, per shop or for all shops. needed to show "was" prices legally
+-- (EU omnibus rule: the "was" price is the lowest price of the last 30 days) and for reports.
+CREATE TABLE price_history (
+  id           TEXT PRIMARY KEY,
+  org_id       TEXT NOT NULL,
+  variant_id   TEXT NOT NULL REFERENCES product_variants(id),
+  shop_id      TEXT REFERENCES shops(id),              -- null = base price
+  price_minor  INTEGER NOT NULL,
+  source       TEXT NOT NULL CHECK (source IN ('base','shop_override','offer')),
+  post_id      TEXT,                                   -- when source = offer
+  valid_from   INTEGER NOT NULL,
+  valid_to     INTEGER,                                -- null = still current
+  changed_by   TEXT REFERENCES users(id)
+);
+CREATE INDEX price_history_variant ON price_history(variant_id, shop_id, valid_from);
 
 -- scans that matched nothing, so a manager can fix them
 CREATE TABLE unknown_scans (
@@ -534,6 +559,16 @@ CREATE TABLE stock_alerts (
 CREATE UNIQUE INDEX stock_alerts_waiting_uq ON stock_alerts(customer_id, variant_id, COALESCE(shop_id, '')) WHERE status = 'waiting';
 CREATE INDEX stock_alerts_variant ON stock_alerts(variant_id, status);
 
+-- hearts on products. explicit, so fine to use for targeting ("people who saved this")
+CREATE TABLE customer_favorites (
+  org_id       TEXT NOT NULL,
+  customer_id  TEXT NOT NULL REFERENCES customers(id),
+  product_id   TEXT NOT NULL REFERENCES products(id),
+  created_at   INTEGER NOT NULL,
+  PRIMARY KEY (customer_id, product_id)
+);
+CREATE INDEX customer_favorites_product ON customer_favorites(product_id);
+
 -- =====================================================================
 -- comms
 -- =====================================================================
@@ -547,8 +582,9 @@ CREATE TABLE posts (
   channels          TEXT NOT NULL,                     -- json array of feed, push, email
   audience          TEXT NOT NULL,                     -- json: scopes, tags, interests, locales, filters
   cover_file_id     TEXT REFERENCES files(id),
-  scheduled_at      INTEGER,
-  valid_until       INTEGER,                           -- offer end, drops off the feed after
+  scheduled_at      INTEGER,                           -- when it goes out
+  valid_from        INTEGER,                           -- offers: when prices start (can be after it goes out)
+  valid_until       INTEGER,                           -- offers: when prices end, drops off the feed after
   author_id         TEXT NOT NULL REFERENCES users(id),
   approved_by       TEXT REFERENCES users(id),
   sent_at           INTEGER,
@@ -578,9 +614,10 @@ CREATE TABLE post_scopes (
 CREATE INDEX post_scopes_scope ON post_scopes(org_id, scope_type, scope_id);
 
 CREATE TABLE post_products (
-  post_id     TEXT NOT NULL REFERENCES posts(id),
-  variant_id  TEXT NOT NULL REFERENCES product_variants(id),
-  sort        INTEGER NOT NULL DEFAULT 0,
+  post_id            TEXT NOT NULL REFERENCES posts(id),
+  variant_id         TEXT NOT NULL REFERENCES product_variants(id),
+  offer_price_minor  INTEGER,                          -- offers only. used by quick sale in the post's shops while valid
+  sort               INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (post_id, variant_id)
 );
 
@@ -648,6 +685,17 @@ CREATE TABLE daily_variant_stats (
   received_qty  INTEGER NOT NULL DEFAULT 0,
   closing_qty   INTEGER NOT NULL,                      -- on hand at end of day
   PRIMARY KEY (shop_id, variant_id, day)
+);
+
+-- what customers look at, counted only, never per person
+CREATE TABLE product_view_stats_daily (
+  org_id          TEXT NOT NULL,
+  product_id      TEXT NOT NULL REFERENCES products(id),
+  day             TEXT NOT NULL,
+  views           INTEGER NOT NULL DEFAULT 0,
+  notify_me_taps  INTEGER NOT NULL DEFAULT 0,
+  favorites_added INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (product_id, day)
 );
 
 CREATE TABLE join_link_stats_daily (
