@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-17T23:30:00+02:00",
-  "overall": 80,
+  "updated": "2026-11-18T00:30:00+02:00",
+  "overall": 84,
   "areas": [
     {
       "key": "thinking",
@@ -26,16 +26,16 @@
     {
       "key": "shared",
       "name": "Shared packages (contract, tokens, translations)",
-      "percent": 95,
-      "state": "building",
+      "percent": 100,
+      "state": "done",
       "note": "API contract and client interface, design tokens, en/el/ru common translations with tested plurals."
     },
     {
       "key": "backend",
       "name": "Backend (permissions engine, database, API)",
-      "percent": 92,
+      "percent": 97,
       "state": "building",
-      "note": "All endpoints, ledger, counts, transfers, posts sending, invites, audit log, job worker. Independent security review: all 31 findings fixed with regression tests (dev features behind a flag, per email login limits, consent only on the customer click, team rules at every scope, status changes run once). 186 tests passing. Now: deploy setup, external login adapter, search speed on a big data set."
+      "note": "All endpoints, ledger, counts, transfers, posts sending, invites, audit log, job worker, security review fixed. New: accepts tokens from an external login server (JWKS), FCM and SMTP transports that stay off unless sending is explicitly allowed, full text search fast on 2,000 products, 200,000 movements and 20,000 customers (every list and report under 150 ms), OpenAPI document, product variants and photos, names in the reader's language, Docker and litestream deploy files, backup scripts. 206 tests passing."
     },
     {
       "key": "web",
@@ -108,6 +108,10 @@
     {
       "at": "2026-11-17T23:30:00+02:00",
       "text": "Web app second round done: counts, transfers, product form, audit log, dev outbox, every action on the real API, end to end flow passing."
+    },
+    {
+      "at": "2026-11-18T00:30:00+02:00",
+      "text": "Backend ready for a server: external login adapter, live transports kept off, fast search, OpenAPI, deploy files and backups. Web design review fixes in progress."
     }
   ],
   "screens": [
