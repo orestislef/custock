@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-17T20:30:00+02:00",
-  "overall": 55,
+  "updated": "2026-11-17T21:00:00+02:00",
+  "overall": 62,
   "areas": [
     {
       "key": "thinking",
@@ -26,16 +26,16 @@
     {
       "key": "shared",
       "name": "Shared packages (contract, tokens, translations)",
-      "percent": 90,
+      "percent": 95,
       "state": "building",
       "note": "API contract and client interface, design tokens, en/el/ru common translations with tested plurals."
     },
     {
       "key": "backend",
       "name": "Backend (permissions engine, database, API)",
-      "percent": 50,
+      "percent": 85,
       "state": "building",
-      "note": "Permissions and delegation rules, search for greek, greeklish and russian, barcode normalisation, SQLite schema (54 tables) with Lemoni seed data, Hono API with dev logins and every read endpoint. 103 tests passing, including cross business isolation. Next: write endpoints, job worker, posts sending, counts and transfers."
+      "note": "Done: permissions and delegation, search for greek, greeklish and russian, barcodes, SQLite with Lemoni seed data, every read and write endpoint, stock ledger with idempotency, back in stock and low stock rules, counts, transfers, posts with audience preview, approval, quiet hours and caps, double opt in, invites, audit log, job worker, dev outbox instead of real sending. 142 tests passing. Now: independent security review."
     },
     {
       "key": "web",
@@ -84,6 +84,10 @@
     {
       "at": "2026-11-17T20:30:00+02:00",
       "text": "Web app first version done and wired to the real API. Apple design review of the demo done, 45 fixes being applied."
+    },
+    {
+      "at": "2026-11-17T21:00:00+02:00",
+      "text": "Backend write side done: ledger, counts, transfers, posts sending, invites, audit log. 142 tests passing. Security review started."
     }
   ]
 }
