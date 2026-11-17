@@ -1,10 +1,11 @@
 // dashboard and reports. money only with reports.financial.view, days in the org timezone.
 
 import type { Context, Hono } from 'hono';
-import type { DashboardCards, SeriesPoint } from '@custock/core';
+import { shopsInScope, type DashboardCards, type SeriesPoint } from '@custock/core';
 import type { AppEnv } from '../types';
 import { has, need, nowOf, orgOf, shopsFor } from '../lib/context';
 import { variantLabel } from '../services/catalog';
+import { loadPosts, postShops } from '../services/posts';
 import { canSee, customerVisibility, loadSubscriptions, reachedShops } from '../services/customers';
 
 const DAY = 86_400_000;
@@ -26,6 +27,15 @@ function reportShops(c: Context<AppEnv>, perm = 'reports.view'): string[] {
 }
 
 const units = (qty: number, uom: string) => (uom === 'piece' ? qty : qty / 1000);
+
+// posts in a status that reach at least one of the given shops
+function postsReaching(c: Context<AppEnv>, status: string, shops: string[]): number {
+  const { t, topology } = orgOf(c);
+  if (!shops.length) return 0;
+  const ids = t.all<{ id: string }>('SELECT id FROM posts WHERE org_id = @org AND status = @s AND deleted_at IS NULL', { s: status }).map((r) => r.id);
+  const wanted = new Set(shops);
+  return loadPosts(t, ids, { withStats: false, showPrices: false }).filter((p) => postShops(t, p, topology).some((s) => wanted.has(s))).length;
+}
 
 export function reportRoutes(app: Hono<AppEnv>) {
   // the home screen of every work role. each number needs its own permission.
@@ -84,8 +94,8 @@ export function reportRoutes(app: Hono<AppEnv>) {
             )
           : 0,
       newFollowersWeek: newFollowers,
-      scheduledPosts: has(c, 'posts.view') ? count("SELECT count(*) AS n FROM posts WHERE org_id = @org AND status = 'scheduled' AND deleted_at IS NULL", {}) : 0,
-      pendingApprovals: has(c, 'posts.publish') ? count("SELECT count(*) AS n FROM posts WHERE org_id = @org AND status = 'pending_approval' AND deleted_at IS NULL", {}) : 0,
+      scheduledPosts: has(c, 'posts.view') ? postsReaching(c, 'scheduled', shops) : 0,
+      pendingApprovals: has(c, 'posts.publish') ? postsReaching(c, 'pending_approval', shops.filter((s) => has(c, 'posts.publish', s))) : 0,
       countsInReview: with_('stock.count.approve').length
         ? count("SELECT count(*) AS n FROM stock_counts WHERE org_id = @org AND status = 'review' AND shop_id IN (SELECT value FROM json_each(@shops))", { shops: with_('stock.count.approve') })
         : 0,
@@ -150,15 +160,15 @@ export function reportRoutes(app: Hono<AppEnv>) {
     const shops = reportShops(c);
     const { t } = orgOf(c);
     const money = shops.every((s) => has(c, 'reports.financial.view', s));
-    const rows = t.all<{ variant_id: string; name: string; options: string | null; qty: number; value: number }>(
-      `SELECT m.variant_id, p.name, v.options, -sum(m.qty_delta) AS qty,
+    const rows = t.all<{ variant_id: string; name: string; options: string | null; uom: 'piece' | 'kg' | 'l' | 'm'; qty: number; value: number }>(
+      `SELECT m.variant_id, p.name, v.options, p.uom, -sum(m.qty_delta) AS qty,
               sum(-(CASE WHEN p.uom = 'piece' THEN m.qty_delta ELSE m.qty_delta / 1000.0 END) * coalesce(m.unit_price_minor, v.price_minor, 0)) AS value
          FROM stock_movements m JOIN product_variants v ON v.id = m.variant_id JOIN products p ON p.id = v.product_id
         WHERE m.org_id = @org AND m.kind = 'sale' AND m.recorded_at >= @from AND m.shop_id IN (SELECT value FROM json_each(@shops))
         GROUP BY m.variant_id ORDER BY value DESC LIMIT 10`,
       { shops, from: nowOf(c) - days(c, 30) * DAY },
     );
-    return c.json(rows.map((r) => ({ variantId: r.variant_id, name: variantLabel(r.name, r.options, c.get('locale')), qty: r.qty, valueMinor: money ? Math.round(r.value) : null })));
+    return c.json(rows.map((r) => ({ variantId: r.variant_id, name: variantLabel(r.name, r.options, c.get('locale')), qty: r.qty, uom: r.uom, valueMinor: money ? Math.round(r.value) : null })));
   });
 
   // what customers ask for while it is out: the best hint for the next order
@@ -177,15 +187,23 @@ export function reportRoutes(app: Hono<AppEnv>) {
   });
 
   app.get('/v1/orgs/:org/reports/join-links', (c) => {
-    reportShops(c);
-    const { t } = orgOf(c);
+    const shops = new Set(reportShops(c));
+    const { t, topology } = orgOf(c);
     const rows = t.all<{ id: string; label: string | null; opens: number | null; signups: number | null; confirmed: number | null }>(
       `SELECT j.id, j.label, sum(s.opens) AS opens, sum(s.signups) AS signups, sum(s.confirmed) AS confirmed
          FROM join_links j LEFT JOIN join_link_stats_daily s ON s.join_link_id = j.id AND s.day >= @since
         WHERE j.org_id = @org GROUP BY j.id ORDER BY opens DESC`,
       { since: dayKey(nowOf(c) - days(c, 30) * DAY, orgOf(c).org.timezone) },
     );
-    return c.json(rows.map((r) => ({ joinLinkId: r.id, label: r.label, opens: r.opens ?? 0, signups: r.signups ?? 0, confirmed: r.confirmed ?? 0 })));
+    const scopes = new Map(t.all<{ id: string; scope_type: 'org' | 'group' | 'shop'; scope_id: string }>('SELECT id, scope_type, scope_id FROM join_links WHERE org_id = @org').map((x) => [x.id, x]));
+    return c.json(
+      rows
+        .filter((r) => {
+          const l = scopes.get(r.id);
+          return !!l && shopsInScope(topology, { scopeType: l.scope_type, scopeId: l.scope_id }).some((s) => shops.has(s));
+        })
+        .map((r) => ({ joinLinkId: r.id, label: r.label, opens: r.opens ?? 0, signups: r.signups ?? 0, confirmed: r.confirmed ?? 0 })),
+    );
   });
 
   app.get('/v1/orgs/:org/reports/shrinkage', (c) => {

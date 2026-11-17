@@ -80,15 +80,15 @@ export function orgRoutes(app: Hono<AppEnv>) {
       { u: user.id },
     );
     const orgs = memberships.map((m) => buildContextFor(db, m.org_id, user.id)).filter((x) => x !== null).map((x) => x.access);
-    const following = p.all<{ org_id: string; org_name: string; customer_id: string }>(
-      `SELECT c.org_id, o.name AS org_name, c.id AS customer_id FROM customers c JOIN organizations o ON o.id = c.org_id
+    const following = p.all<{ org_id: string; org_name: string; org_slug: string; customer_id: string }>(
+      `SELECT c.org_id, o.name AS org_name, o.slug AS org_slug, c.id AS customer_id FROM customers c JOIN organizations o ON o.id = c.org_id
         WHERE c.user_id = @u AND c.erased_at IS NULL AND o.archived_at IS NULL`,
       { u: user.id },
     );
     const body: MeContext = {
       user: { id: user.id, email: user.email, displayName: user.displayName, locale: user.locale },
       orgs,
-      following: following.map((f) => ({ orgId: f.org_id, orgName: f.org_name, customerId: f.customer_id })),
+      following: following.map((f) => ({ orgId: f.org_id, orgName: f.org_name, orgSlug: f.org_slug, customerId: f.customer_id })),
     };
     return c.json(body);
   });

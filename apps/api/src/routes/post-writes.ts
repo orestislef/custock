@@ -24,12 +24,17 @@ function allowedAt(c: Context<AppEnv>, scopes: Scope[], perm: string): boolean {
   return scopes.length > 0 && scopes.every((s) => effectiveAtScope(assignments, topology, s).perms.has(perm));
 }
 
-function checkInput(c: Context<AppEnv>, input: PostInput) {
-  const { topology, org, t } = orgOf(c);
-  for (const s of input.audience.scopes) {
-    const known = s.scopeType === 'org' ? s.scopeId === org.id : s.scopeType === 'group' ? s.scopeId in topology.groups : topology.shops.includes(s.scopeId);
+function checkScopes(c: Context<AppEnv>, scopes: Scope[]) {
+  const { topology, org } = orgOf(c);
+  for (const s of scopes) {
+    const known = s.scopeType === 'org' ? s.scopeId === org.id : s.scopeType === 'group' ? Object.hasOwn(topology.groups, s.scopeId) : topology.shops.includes(s.scopeId);
     if (!known) throw notFound('scope');
   }
+}
+
+function checkInput(c: Context<AppEnv>, input: PostInput) {
+  const { t } = orgOf(c);
+  checkScopes(c, input.audience.scopes);
   if (!allowedAt(c, input.audience.scopes, 'posts.create')) throw forbidden('posts.create at every scope', 'scope');
   if (input.channels.includes('push') && !allowedAt(c, input.audience.scopes, 'posts.channel.push')) throw forbidden('posts.channel.push');
   if (input.channels.includes('email') && !allowedAt(c, input.audience.scopes, 'posts.channel.email')) throw forbidden('posts.channel.email');
@@ -71,16 +76,18 @@ function postRow(c: Context<AppEnv>, id: string) {
 const one = (c: Context<AppEnv>, id: string) => loadPosts(orgOf(c).t, [id], { withStats: true, showPrices: true })[0]!;
 
 // goes out now or at its time. offers get their price history rows here.
-function release(c: Context<AppEnv>, id: string, approvedBy: string | null) {
+function release(c: Context<AppEnv>, id: string, approvedBy: string | null, from: Post['status'][]) {
   const { t } = orgOf(c);
   const now = nowOf(c);
   const row = postRow(c, id);
   const scheduled = row.scheduled_at != null && row.scheduled_at > now;
   cfgOf(c).db.transaction(() => {
-    t.run(
-      `UPDATE posts SET status = @status, approved_by = coalesce(@approver, approved_by, @me), updated_at = @stamp WHERE org_id = @org AND id = @id`,
-      { status: scheduled ? 'scheduled' : 'sending', approver: approvedBy, me: c.get('user').id, stamp: nextStamp(row.updated_at, now), id },
+    const moved = t.run(
+      `UPDATE posts SET status = @status, approved_by = coalesce(@approver, approved_by, @me), updated_at = @stamp
+        WHERE org_id = @org AND id = @id AND status IN (SELECT value FROM json_each(@from))`,
+      { status: scheduled ? 'scheduled' : 'sending', approver: approvedBy, me: c.get('user').id, stamp: nextStamp(row.updated_at, now), id, from },
     );
+    if (!moved.changes) throw new ApiProblem(409, 'conflict', 'post changed status');
     if (row.kind === 'offer') {
       const from = row.valid_from ?? row.scheduled_at ?? now;
       const offers = t.all<{ variant_id: string; offer_price_minor: number }>('SELECT pp.variant_id, pp.offer_price_minor FROM post_products pp JOIN posts p ON p.id = pp.post_id WHERE p.org_id = @org AND pp.post_id = @id AND pp.offer_price_minor IS NOT NULL', { id });
@@ -149,6 +156,7 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
       })();
     } else {
       checkInput(c, input);
+      const publisherNew = allowedAt(c, input.audience.scopes, 'posts.publish');
       cfgOf(c).db.transaction(() => {
         const cover = writeChildren(c, id, input, now);
         t.run(
@@ -158,10 +166,13 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
            WHERE org_id = @org AND id = @id`,
           {
             kind: input.kind, locale: input.defaultLocale, channels: JSON.stringify(input.channels), audience: JSON.stringify(input.audience),
-            sched: input.scheduledAt, from: input.validFrom, until: input.validUntil, cover, now, publisher, id,
+            sched: input.scheduledAt, from: input.validFrom, until: input.validUntil, cover, now, publisher: publisherNew, id,
           },
         );
-        if (row.status === 'scheduled' && input.scheduledAt) {
+        if (row.status === 'scheduled' && !publisherNew) {
+          // dropped back to a draft: the scheduled send goes away
+          platform(cfgOf(c).db).run("UPDATE jobs SET done_at = @now, last_error = 'back to draft' WHERE dedupe_key = @k AND done_at IS NULL", { now, k: `send_post:${id}` });
+        } else if (row.status === 'scheduled' && input.scheduledAt) {
           platform(cfgOf(c).db).run("UPDATE jobs SET run_at = @at WHERE dedupe_key = @k AND done_at IS NULL AND kind = 'send_post'", { at: input.scheduledAt, k: `send_post:${id}` });
         }
       })();
@@ -173,7 +184,9 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
   app.delete('/v1/orgs/:org/posts/:id', (c) => {
     need(c, 'posts.delete');
     const id = c.req.param('id');
-    postRow(c, id);
+    const doomed = postRow(c, id);
+    const deleteScopes = parseJson<Audience>(doomed.audience, { scopes: [] } as unknown as Audience).scopes;
+    if (!allowedAt(c, deleteScopes, 'posts.delete')) throw forbidden('posts.delete at every scope', 'scope');
     const { t } = orgOf(c);
     const now = nowOf(c);
     cfgOf(c).db.transaction(() => {
@@ -189,6 +202,7 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
     need(c, 'posts.create');
     const body = z.object({ audience: Audience, channels: z.array(z.string()).default(['feed']), productIds: z.array(z.string()).optional() }).parse(await c.req.json());
     const { org, topology, shopNames, groupNames } = orgOf(c);
+    checkScopes(c, body.audience.scopes);
     if (!allowedAt(c, body.audience.scopes, 'posts.create')) throw forbidden('posts.create at every scope', 'scope');
     return c.json(
       previewAudience(cfgOf(c).db, org, topology, body.audience, body.channels, {
@@ -207,12 +221,13 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
     if (!['draft', 'pending_approval'].includes(row.status)) throw new ApiProblem(409, 'conflict', `post is ${row.status}`);
     const scopes = parseJson<Audience>(row.audience, { scopes: [] } as unknown as Audience).scopes;
     if (allowedAt(c, scopes, 'posts.publish')) {
-      release(c, id, row.status === 'pending_approval' ? c.get('user').id : null);
+      release(c, id, row.status === 'pending_approval' ? c.get('user').id : null, ['draft', 'pending_approval']);
     } else {
       if (row.author_id !== c.get('user').id) throw forbidden('not your post');
       const { t, org } = orgOf(c);
       const now = nowOf(c);
-      t.run("UPDATE posts SET status = 'pending_approval', updated_at = @now WHERE org_id = @org AND id = @id", { now: nextStamp(row.updated_at, now), id });
+      const moved = t.run("UPDATE posts SET status = 'pending_approval', updated_at = @now WHERE org_id = @org AND id = @id AND status IN ('draft', 'pending_approval')", { now: nextStamp(row.updated_at, now), id });
+      if (!moved.changes) throw new ApiProblem(409, 'conflict', 'post changed status');
       const post = one(c, id);
       const title = post.translations[post.defaultLocale]?.title ?? '';
       notifyMembers(cfgOf(c).db, org.id, {
@@ -231,7 +246,7 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
     if (row.status !== 'pending_approval') throw new ApiProblem(409, 'conflict', `post is ${row.status}`);
     const scopes = parseJson<Audience>(row.audience, { scopes: [] } as unknown as Audience).scopes;
     if (!allowedAt(c, scopes, 'posts.publish')) throw forbidden('posts.publish at every scope', 'scope');
-    release(c, id, c.get('user').id);
+    release(c, id, c.get('user').id, ['pending_approval']);
     return c.json(one(c, id));
   });
 
@@ -241,10 +256,16 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
     const id = c.req.param('id');
     const row = postRow(c, id);
     if (!['scheduled', 'sending', 'pending_approval', 'draft'].includes(row.status)) throw new ApiProblem(409, 'conflict', `post is ${row.status}`);
+    const cancelScopes = parseJson<Audience>(row.audience, { scopes: [] } as unknown as Audience).scopes;
+    if (!allowedAt(c, cancelScopes, 'posts.publish')) throw forbidden('posts.publish at every scope', 'scope');
     const { t } = orgOf(c);
     const now = nowOf(c);
     cfgOf(c).db.transaction(() => {
-      t.run("UPDATE posts SET status = 'cancelled', updated_at = @stamp WHERE org_id = @org AND id = @id", { stamp: nextStamp(row.updated_at, now), id });
+      const moved = t.run(
+        "UPDATE posts SET status = 'cancelled', updated_at = @stamp WHERE org_id = @org AND id = @id AND status IN ('scheduled', 'sending', 'pending_approval', 'draft')",
+        { stamp: nextStamp(row.updated_at, now), id },
+      );
+      if (!moved.changes) throw new ApiProblem(409, 'conflict', 'post changed status');
       t.run("UPDATE deliveries SET status = 'skipped', skip_reason = 'cancelled', updated_at = @now WHERE org_id = @org AND post_id = @id AND status IN ('queued', 'held')", { now, id });
       platform(cfgOf(c).db).run("UPDATE jobs SET done_at = @now, last_error = 'cancelled' WHERE dedupe_key = @k AND done_at IS NULL", { now, k: `send_post:${id}` });
       t.run("UPDATE price_history SET valid_to = @now WHERE org_id = @org AND post_id = @id AND source = 'offer' AND (valid_to IS NULL OR valid_to > @now)", { now, id });
