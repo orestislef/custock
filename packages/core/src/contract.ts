@@ -45,6 +45,10 @@ export const ErrorCode = z.enum([
   'perms_stale', 'scope', 'ceiling', 'rank', 'self', 'last_owner',
   'barcode_taken', 'negative_stock_blocked', 'invite_expired', 'invite_email_mismatch',
   'join_link_disabled', 'already_subscribed', 'account_exists', 'internal',
+  // platform: a feature the super admin switched off, a paused business, a limit, an emergency pause
+  'feature_off', 'org_suspended', 'limit_reached', 'platform_paused', 'last_superadmin', 'storage_full',
+  // a forgot password link that was used, expired or never existed
+  'reset_expired',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 
@@ -61,6 +65,11 @@ export type Problem = z.infer<typeof Problem>;
 // ---------------------------------------------------------------- auth and context
 
 export const LoginInput = z.object({ email: z.string().email().max(254), password: z.string().min(1).max(200) });
+// forgot password. the answer is the same whether or not the email has an account
+export const PasswordForgotInput = z.object({ email: z.string().email().max(254), locale: Locale.optional() });
+export type PasswordForgotInput = z.infer<typeof PasswordForgotInput>;
+export const PasswordResetInput = z.object({ token: z.string().min(10).max(200), password: z.string().min(10).max(200) });
+export type PasswordResetInput = z.infer<typeof PasswordResetInput>;
 export const OtpRequestInput = z.object({ email: z.string().email().max(254), locale: Locale.optional() });
 export const OtpVerifyInput = z.object({ email: z.string().email().max(254), code: z.string().length(6) });
 
@@ -91,6 +100,15 @@ export const OrgAccess = z.object({
   anyPerms: z.array(z.string()),
   shops: z.array(ShopAccess),
   permsVersion: z.number(),
+  // set for a super admin who is not a member: access comes from the platform role
+  platformAccess: z.boolean().optional(),
+  // the business is paused by a super admin, its staff see a paused screen
+  suspended: z.boolean().optional(),
+  // features a super admin switched off for this business (see platform.ts FEATURES)
+  disabledFeatures: z.array(z.string()).optional(),
+  // a limit is reached (or new staff invites are paused): the apps leave out the add button
+  shopsFull: z.boolean().optional(),
+  staffFull: z.boolean().optional(),
 });
 export type OrgAccess = z.infer<typeof OrgAccess>;
 
@@ -100,9 +118,17 @@ export const MeContext = z.object({
     email: z.string().nullable(),
     displayName: z.string().nullable(),
     locale: Locale,
+    // the profile photo, null shows the initials
+    avatarUrl: z.string().nullable().optional(),
   }),
   orgs: z.array(OrgAccess),
   following: z.array(z.object({ orgId: z.string(), orgName: z.string(), orgSlug: z.string(), customerId: z.string() })),
+  // 'superadmin' sits above every business owner. null or missing for everyone else
+  platformRole: z.enum(['superadmin']).nullable().optional(),
+  // platform wide pauses that are on right now, only sent to a super admin (for the banner)
+  platformPaused: z.array(z.string()).optional(),
+  // how full the photo storage free tier is, 0 to 100, only sent to a super admin (70 and 90 warn)
+  storagePercent: z.number().optional(),
 });
 export type MeContext = z.infer<typeof MeContext>;
 
@@ -315,6 +341,8 @@ export const Customer = z.object({
   tags: z.array(z.string()),
   subscriptions: z.array(Subscription),
   createdAt: z.number(),
+  // the photo the person chose for their account, if they have one
+  avatarUrl: z.string().nullable().optional(),
 });
 export type Customer = z.infer<typeof Customer>;
 
@@ -437,6 +465,7 @@ export const Member = z.object({
   userId: z.string(),
   name: z.string().nullable(),
   email: z.string().nullable(),
+  avatarUrl: z.string().nullable().optional(),
   status: z.enum(['active', 'suspended', 'removed']),
   assignments: z.array(z.object({ id: z.string(), roleId: z.string(), roleName: z.string(), scopeType: ScopeType, scopeId: z.string(), scopeName: z.string() })),
   // what the caller may do with this member, with reason codes when not
@@ -648,6 +677,7 @@ export const AuditEntry = z.object({
   id: z.string(),
   actorId: z.string().nullable(),
   actorName: z.string().nullable(),
+  actorAvatarUrl: z.string().nullable().optional(),
   actorKind: z.string(),
   action: z.string(),
   entityType: z.string().nullable(),
@@ -711,7 +741,8 @@ export type UnsubscribePage = z.infer<typeof UnsubscribePage>;
 
 // ---------------------------------------------------------------- uploads
 
-export const UploadPurpose = z.enum(['product', 'post', 'logo', 'shop']);
+// avatar is the person's own photo (POST /v1/me/uploads/presign), the rest belong to a business
+export const UploadPurpose = z.enum(['product', 'post', 'logo', 'shop', 'avatar']);
 export type UploadPurpose = z.infer<typeof UploadPurpose>;
 
 export const PresignInput = z.object({

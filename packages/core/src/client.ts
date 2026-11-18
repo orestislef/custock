@@ -25,6 +25,8 @@ export interface ApiClientOptions {
   onUnauthorized?: () => void | Promise<void>;
   // called when the server says the caller's permissions changed
   onPermsStale?: (orgId: string) => void;
+  // called after a request that failed with 5xx (not for the error report itself)
+  onServerError?: (info: { method: string; path: string; status: number; code: string }) => void;
   // extra headers on every request, for example the forwarded client address from a server
   headers?: Record<string, string> | (() => Record<string, string> | undefined | Promise<Record<string, string> | undefined>);
   fetch?: typeof fetch;
@@ -75,6 +77,13 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
       const problem = (data && typeof data === 'object' && 'code' in data ? data : null) as Problem | null;
       const code = (problem?.code ?? (res.status === 401 ? 'unauthorized' : res.status === 403 ? 'forbidden' : res.status === 404 ? 'not_found' : 'internal')) as ErrorCode;
       if (res.status === 401) await opts.onUnauthorized?.();
+      if (res.status >= 500 && path !== '/v1/client-errors') {
+        try {
+          opts.onServerError?.({ method, path, status: res.status, code });
+        } catch {
+          // reporting must never break the call
+        }
+      }
       throw new ApiError(res.status, code, problem);
     }
     return data as T;
@@ -97,6 +106,9 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     refresh: (refreshToken) => post('/v1/auth/refresh', { refreshToken }),
     logout: () => post('/v1/auth/logout'),
     me: () => get('/v1/me/context'),
+    requestPasswordReset: (email, locale) => post('/v1/auth/password/forgot', { email, locale }),
+    passwordResetPreview: (token) => get(`/v1/auth/password/reset/${enc(token)}`),
+    resetPassword: (token, password) => post('/v1/auth/password/reset', { token, password }),
 
     // org
     orgSettings: (orgId) => get(org(orgId)),
@@ -228,6 +240,7 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     confirmEmailChange: (newEmail, code) => post('/v1/me/email/verify', { email: newEmail, code }),
     detachBarcode: (orgId, variantId, barcodeId) => del(`${org(orgId)}/variants/${enc(variantId)}/barcodes/${enc(barcodeId)}`),
     presignUpload: (orgId, input) => post(`${org(orgId)}/uploads/presign`, input),
+    presignAvatar: (input) => post('/v1/me/uploads/presign', { ...input, purpose: 'avatar' }),
     negativeReview: (orgId, shopId) => get(`${org(orgId)}/review/negative`, { shopId }),
 
     pushKey: async () => {
@@ -240,9 +253,40 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     },
     savePushSubscription: (input) => request('POST', '/v1/me/push-subscriptions', input),
     deletePushSubscription: (endpoint) => request('DELETE', '/v1/me/push-subscriptions', { endpoint }),
+    testPush: (orgId) => post('/v1/me/push/test', { orgId: orgId ?? null }),
 
     invitePreview: (token) => get(`/v1/invites/${enc(token)}`),
     registerWithInvite: (input) => post('/v1/invites/register', input),
     createShop: (orgId, input) => post(`${org(orgId)}/shops`, input),
+  
+
+    platformOverview: () => get('/v1/platform/overview'),
+    platformBusinesses: () => get('/v1/platform/businesses'),
+    platformBusiness: (orgId) => get(`/v1/platform/businesses/${enc(orgId)}`),
+    suggestSlug: (name) => get('/v1/platform/slug', { name }),
+    createBusiness: (input) => post('/v1/platform/businesses', input),
+    inviteOwner: (orgId, input) => post(`/v1/platform/businesses/${enc(orgId)}/owner-invites`, input),
+    resendOwnerInvite: (orgId, inviteId) => post(`/v1/platform/businesses/${enc(orgId)}/owner-invites/${enc(inviteId)}/resend`),
+    revokeOwnerInvite: (orgId, inviteId) => del(`/v1/platform/businesses/${enc(orgId)}/owner-invites/${enc(inviteId)}`),
+    setOrgControls: (orgId, patchBody) => patch(`/v1/platform/businesses/${enc(orgId)}/controls`, patchBody),
+    deleteBusiness: (orgId, confirm) => request('DELETE', `/v1/platform/businesses/${enc(orgId)}`, { confirm }),
+    platformSettings: () => get('/v1/platform/settings'),
+    setPlatformSettings: (patchBody) => patch('/v1/platform/settings', patchBody),
+    platformAudit: (cursor) => get('/v1/platform/audit', { cursor }),
+    superAdmins: () => get('/v1/platform/superadmins'),
+    inviteSuperAdmin: (input) => post('/v1/platform/superadmin-invites', input),
+    resendSuperAdminInvite: (inviteId) => post(`/v1/platform/superadmin-invites/${enc(inviteId)}/resend`),
+    revokeSuperAdminInvite: (inviteId) => del(`/v1/platform/superadmin-invites/${enc(inviteId)}`),
+    removeSuperAdmin: (userId) => del(`/v1/platform/superadmins/${enc(userId)}`),
+    orgControls: (orgId) => get(`${org(orgId)}/controls`),
+    platformInvitePreview: (token) => get(`/v1/platform-invites/${enc(token)}`),
+    registerPlatformInvite: (input) => post('/v1/platform-invites/register', input),
+    acceptPlatformInvite: (token) => post('/v1/platform-invites/accept', { token }),
+    platformErrors: (q) => get('/v1/platform/errors', q as Query | undefined),
+    platformError: (id) => get(`/v1/platform/errors/${enc(id)}`),
+    setPlatformErrorStatus: (id, status) => patch(`/v1/platform/errors/${enc(id)}`, { status }),
+    reportClientError: (input) => post('/v1/client-errors', input),
+    openApi: () => get('/v1/openapi.json'),
+    platformServer: () => get('/v1/platform/server'),
   };
 }

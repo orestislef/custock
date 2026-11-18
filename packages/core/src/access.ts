@@ -142,6 +142,11 @@ export interface RoleLike {
   locked?: boolean;
 }
 
+// a super admin acting through the platform role (apps/api/src/lib/platform-access.ts)
+export function isPlatformActor(actor: Actor): boolean {
+  return actor.assignments.some((a) => a.roleId === 'platform');
+}
+
 function holdsAnywhere(assignments: readonly AccessAssignment[], perm: string): boolean {
   return assignments.some((a) => permsFrom(a).includes(perm));
 }
@@ -159,7 +164,8 @@ export function canGrantRole(args: {
   const { actor, topology, role, scope } = args;
   const via = args.via ?? 'members.invite';
   if (args.targetUserId && args.targetUserId === actor.userId) return no('self');
-  if (role.locked) return no('rank');
+  // locked roles (owner) are only handed out by the platform: setup, owner invites, a super admin
+  if (role.locked && !isPlatformActor(actor)) return no('rank');
   const eff = effectiveAtScope(actor.assignments, topology, scope);
   if (!eff.perms.has(via)) return holdsAnywhere(actor.assignments, via) ? no('scope') : no('forbidden');
   // rank first: "you can give roles below manager" says more than a missing permission

@@ -2,6 +2,8 @@
 // web and mobile code against this interface, so a fixture implementation can stand in during
 // development and tests.
 
+import type { OpenApiDoc, ServerInfo } from './server-info';
+import type { ClientErrorInput, Issue, IssueDetail, IssuePage, IssueQuery, IssueStatus } from './errors';
 import type {
   AudiencePreview, Audience, Category, Customer, CustomerDetail, DashboardCards, FeedItem,
   GrantableRole, InviteInput, JoinInput, JoinLink, JoinPage, Locale, MeContext, Member,
@@ -12,6 +14,11 @@ import type {
   StockCountLine, SyncResult, Transfer, TransferInput, UncountedPolicy, UnsubscribePage, PresignInput, PresignResult,
   PushSubscriptionInput, InviteCreated, InvitePreview, InviteRegisterInput, ShopInput,
 } from './contract';
+
+import type {
+  BusinessCreated, NewBusinessInput, OrgControls, OrgControlsPatch, PlatformAuditEntry, PlatformBusiness, PlatformBusinessDetail,
+  PlatformInviteInput, PlatformInvitePreview, PlatformOverview, PlatformSettings, PlatformSettingsPatch, SuperAdmins,
+} from './platform';
 
 export interface Page<T> { items: T[]; nextCursor: string | null }
 
@@ -42,10 +49,17 @@ export interface CustockApi {
   refresh(refreshToken: string): Promise<Tokens>;
   logout(): Promise<void>;
   me(): Promise<MeContext>;
+  // forgot password: always { sent: true }, whether or not the email has an account
+  requestPasswordReset(email: string, locale?: Locale): Promise<{ sent: true }>;
+  // the reset link page. 410 reset_expired when the link was used, expired or never existed
+  passwordResetPreview(token: string): Promise<{ valid: true; expiresAt: number }>;
+  // sets the new password, signs out every session of that person and signs this one in
+  resetPassword(token: string, password: string): Promise<Tokens>;
 
   // org
   orgSettings(orgId: string): Promise<OrgSettings>;
-  updateOrgSettings(orgId: string, patch: Partial<OrgSettings>): Promise<OrgSettings>;
+  // logoFileId: a 'logo' upload of this business, or null to take the logo off
+  updateOrgSettings(orgId: string, patch: Partial<OrgSettings> & { logoFileId?: string | null }): Promise<OrgSettings>;
   // the caller's own shops. all: every shop of the org, for picking a transfer destination
   // (needs stock.transfer.send at some shop)
   shops(orgId: string, opts?: { all?: boolean }): Promise<Shop[]>;
@@ -123,7 +137,8 @@ export interface CustockApi {
 
   // ---------------------------------------------------------------- stage 2 additions
 
-  updateMe(patch: { displayName?: string; locale?: Locale }): Promise<void>;
+  // avatarFileId: an 'avatar' upload of this person, or null to remove the photo
+  updateMe(patch: { displayName?: string; locale?: Locale; avatarFileId?: string | null }): Promise<void>;
 
   // catalog writes
   archiveProduct(orgId: string, productId: string): Promise<void>;
@@ -190,6 +205,8 @@ export interface CustockApi {
   // movements accepted offline that pushed stock below zero in strict mode
   // a signed upload slot for a photo. in dev the api stores the file itself and serves it under /files.
   presignUpload(orgId: string, input: PresignInput): Promise<PresignResult>;
+  // an upload slot for the person's own profile photo, not tied to a business
+  presignAvatar(input: { mime: PresignInput['mime']; bytes: number }): Promise<PresignResult>;
   negativeReview(orgId: string, shopId?: string): Promise<{ movementId: string; shopId: string; variantId: string; name: string; qtyDelta: number; onHandAfter: number; createdByName: string | null; recordedAt: number }[]>;
 
   // ---------------------------------------------------------------- web push
@@ -200,6 +217,9 @@ export interface CustockApi {
   // so a shop's home screen app only gets that shop's pushes. saving the same endpoint again updates it.
   savePushSubscription(input: PushSubscriptionInput): Promise<void>;
   deletePushSubscription(endpoint: string): Promise<void>;
+  // one test notification to the caller's own devices: the staff app (orgId null) or one business's app.
+  // devices is how many subscriptions or phones it went to, 0 when none has alerts on
+  testPush(orgId?: string | null): Promise<{ devices: number }>;
 
   // ---------------------------------------------------------------- production onboarding
 
@@ -210,4 +230,54 @@ export interface CustockApi {
   registerWithInvite(input: InviteRegisterInput): Promise<Tokens & { orgId: string }>;
   // needs shops.create
   createShop(orgId: string, input: ShopInput): Promise<Shop>;
+
+  // ---------------------------------------------------------------- platform (super admin)
+  // every /v1/platform call answers 403 for anyone who is not a super admin
+
+  platformOverview(): Promise<PlatformOverview>;
+  platformBusinesses(): Promise<PlatformBusiness[]>;
+  platformBusiness(orgId: string): Promise<PlatformBusinessDetail>;
+  // a free slug for a business name, greek and cyrillic transliterated
+  suggestSlug(name: string): Promise<{ slug: string }>;
+  // the business, its roles, first shop and an owner invite (emailed when mail is live)
+  createBusiness(input: NewBusinessInput): Promise<BusinessCreated>;
+  inviteOwner(orgId: string, input: PlatformInviteInput): Promise<{ id: string; link: string; emailed: boolean }>;
+  resendOwnerInvite(orgId: string, inviteId: string): Promise<{ id: string; link: string; emailed: boolean }>;
+  revokeOwnerInvite(orgId: string, inviteId: string): Promise<void>;
+  setOrgControls(orgId: string, patch: OrgControlsPatch): Promise<OrgControls>;
+  // the whole business with everything in it, its photos and the accounts of people only there.
+  // confirm is the business web address (slug) typed again
+  deleteBusiness(orgId: string, confirm: string): Promise<{ accountsClosed: number; objects: number; rows: number }>;
+  platformSettings(): Promise<PlatformSettings>;
+  setPlatformSettings(patch: PlatformSettingsPatch): Promise<PlatformSettings>;
+  platformAudit(cursor?: string): Promise<Page<PlatformAuditEntry>>;
+  superAdmins(): Promise<SuperAdmins>;
+  inviteSuperAdmin(input: PlatformInviteInput): Promise<{ id: string; link: string; emailed: boolean }>;
+  resendSuperAdminInvite(inviteId: string): Promise<{ id: string; link: string; emailed: boolean }>;
+  revokeSuperAdminInvite(inviteId: string): Promise<void>;
+  // never the caller, never the last one: 409 last_superadmin / 403 self
+  removeSuperAdmin(userId: string): Promise<void>;
+
+  // any member of the business can read what the super admin decided for it
+  orgControls(orgId: string): Promise<OrgControls>;
+
+  // public: the super admin invite page. 410 invite_expired when used, revoked or old
+  platformInvitePreview(token: string): Promise<PlatformInvitePreview>;
+  // public: a brand new person makes their account from the invite. 409 account_exists: sign in, then accept
+  registerPlatformInvite(input: { token: string; displayName: string; password: string; locale?: Locale }): Promise<Tokens>;
+  // signed in with the invited email
+  acceptPlatformInvite(token: string): Promise<void>;
+
+  // errors seen in production (super admins only). open issues first, newest first
+  platformErrors(query?: IssueQuery): Promise<IssuePage>;
+  platformError(id: string): Promise<IssueDetail>;
+  setPlatformErrorStatus(id: string, status: IssueStatus): Promise<Issue>;
+  // public: a browser reports its own error. fire and forget, rate limited, no personal data
+  reportClientError(input: ClientErrorInput): Promise<void>;
+
+  // ---------------------------------------------------------------- developer (super admin)
+  // the api description. public in dev, super admins only in production
+  openApi(): Promise<OpenApiDoc>;
+  // build, uptime, database, sending, storage and worker state. no secrets, super admins only
+  platformServer(): Promise<ServerInfo>;
 }

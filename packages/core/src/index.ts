@@ -9,3 +9,6 @@ export * from './qty';
 export * from './ids';
 export * from './mask';
 export * from './client';
+export * from './platform';
+export * from './errors';
+export * from './server-info';
