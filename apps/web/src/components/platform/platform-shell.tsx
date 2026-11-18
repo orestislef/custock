@@ -37,7 +37,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
       <header className="bar" data-toolbar>
         <div className="flex items-center gap-2 h-[52px] px-safe-4 md:px-safe-8 max-w-[1100px] w-full mx-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
           {/* all businesses is the root of a super admin: the name, never a back arrow */}
-          <Link href="/admin/platform" className="t-headline t-display hover:no-underline" style={{ color: 'var(--c-ink)' }}>Custock</Link>
+          <Link href="/admin/platform" className="t-headline t-display hover:no-underline inline-flex items-center min-h-[44px]" style={{ color: 'var(--c-ink)' }}>Custock</Link>
           <span id="bar-title" className="t-headline flex-1 text-center truncate opacity-0 transition-opacity" aria-hidden="true" />
           <SuperAdminPill label={t('platform.superadmin')} />
           <button type="button" className="icon-btn" aria-label={t('admin.account')} onClick={() => setUserOpen(true)}>

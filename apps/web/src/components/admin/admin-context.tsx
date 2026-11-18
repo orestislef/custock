@@ -270,7 +270,10 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   // /admin alone, and the old short addresses (/admin/stock/1): on to the business in the address
   if (!onPlatform && !loc.slug) {
     const search = typeof window === 'undefined' ? '' : window.location.search;
-    return <Redirect to={loc.legacy ? orgPath(`${loc.section}${search}`, org.slug) : `/admin/${org.slug}`} />;
+    // a link naming a business this person is not in goes to their own home, not to that section
+    const wanted = linkTarget().org;
+    const strange = !!wanted && !state.me.orgs.some((o) => o.orgId === wanted);
+    return <Redirect to={loc.legacy && !strange ? orgPath(`${loc.section}${search}`, org.slug) : `/admin/${org.slug}`} />;
   }
   // a business this person cannot open: their own home, quietly
   // another of this person's businesses in the address: it loads (see the effect above)
