@@ -609,3 +609,8 @@
   .schema-nest { margin: 4px 0 2px 14px; padding-left: 10px; border-left: 1.5px solid var(--c-line); }
   .code-path { font: 13px/18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
 }
+
+/* sheet buttons: side by side with room between them, equal width, a single one fills the row */
+.sheet-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.sheet-actions > .btn { flex: 1 1 0; min-width: 0; min-height: 50px; justify-content: center; }
+.sheet-actions > :not(.btn) { flex-basis: 100%; }

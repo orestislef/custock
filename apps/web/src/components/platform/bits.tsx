@@ -49,7 +49,7 @@ export function Meter({ percent, label }: { percent: number; label: string }) {
 export function LinkActions({ link, t, title }: { link: string; t: TFunction; title: string }) {
   const toast = useToast();
   return (
-    <div className="flex gap-2 flex-wrap">
+    <div className="flex gap-3 flex-wrap">
       <button type="button" className="btn btn-tinted" onClick={() => void navigator.clipboard.writeText(link).then(() => toast(t('links.copied')))}>
         <IconCopy size={18} />{t('team.copyLink')}
       </button>

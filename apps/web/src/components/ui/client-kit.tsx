@@ -89,7 +89,7 @@ export function Sheet({ open, onClose, title, children, footer, error }: { open:
           <div className="px-4 pt-3" data-sheet-footer>
             {/* errors sit right above the button they belong to, and stay until the next try */}
             {error ? <p className="sheet-error" role="alert">{error}</p> : null}
-            {footer}
+            {footer ? <div className="sheet-actions">{footer}</div> : null}
           </div>
         ) : null}
       </div>
