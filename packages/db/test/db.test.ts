@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { migrate, openDb, seed, hashPassword, verifyPassword, MIGRATIONS_DIR, type Db, type SeedResult } from '../src/index';
 
@@ -18,7 +18,8 @@ describe('migrations', () => {
   it('apply once and record themselves', () => {
     expect(migrate(db)).toEqual([]);
     const row = one<{ n: number }>('SELECT count(*) n FROM schema_migrations');
-    expect(row.n).toBe(8);
+    // every file in the folder, once
+    expect(row.n).toBe(readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).length);
   });
   it('turn on foreign keys', () => {
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
