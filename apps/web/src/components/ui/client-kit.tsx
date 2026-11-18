@@ -16,6 +16,135 @@ import { IconChevronDown, IconClose, IconEye, IconEyeOff, IconGlobe, IconInfo } 
 // ctrl or cmd + enter as its primary button.
 const sheetStack: object[] = [];
 
+// the page behind a sheet never scrolls. with the keyboard down overflow: hidden on the body is
+// enough (as it always was). with the keyboard up ios scrolls the layout viewport to the focused
+// field and lets touch scrolls through, so for that time the body is pinned at its saved offset,
+// any scroll safari still makes is put straight back, and the offset is restored afterwards.
+// nested sheets and popovers share the lock, released when the last one closes.
+let lockCount = 0;
+let lockedOverflow = '';
+export function lockPage() {
+  if (lockCount++ > 0) return;
+  lockedOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+}
+export function unlockPage() {
+  if (lockCount === 0 || --lockCount > 0) return;
+  unpinPage(true);
+  document.body.style.overflow = lockedOverflow;
+}
+
+const pinOwners = new Set<object>();
+let pinnedScroll = 0;
+const keepPinned = () => { if (pinOwners.size > 0 && window.scrollY !== 0) window.scrollTo({ top: 0, behavior: 'instant' }); };
+function pinPage(owner: object) {
+  if (pinOwners.has(owner)) return;
+  pinOwners.add(owner);
+  if (pinOwners.size > 1) return;
+  pinnedScroll = window.scrollY;
+  const b = document.body.style;
+  b.position = 'fixed'; b.top = `-${pinnedScroll}px`; b.left = '0'; b.right = '0'; b.width = '100%';
+  window.addEventListener('scroll', keepPinned, { passive: true });
+  window.visualViewport?.addEventListener('scroll', keepPinned);
+}
+function unpinPage(all = false, owner?: object) {
+  if (all) pinOwners.clear(); else if (owner) pinOwners.delete(owner);
+  if (pinOwners.size > 0 || document.body.style.position !== 'fixed') return;
+  window.removeEventListener('scroll', keepPinned);
+  window.visualViewport?.removeEventListener('scroll', keepPinned);
+  const b = document.body.style;
+  b.position = ''; b.top = ''; b.left = ''; b.right = ''; b.width = '';
+  window.scrollTo({ top: pinnedScroll, behavior: 'instant' });
+}
+
+// a precise pointer (mouse, trackpad): the first field gets the focus as the sheet opens. on touch
+// the person taps the field, so the keyboard never slides up while the sheet is still moving.
+const finePointer = () => typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches;
+const phoneWidth = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+
+// keeps a bottom sheet above the on screen keyboard. ios keeps the layout viewport when the
+// keyboard opens and only the visual viewport shrinks (and may scroll), so a fixed sheet would sit
+// behind the keyboard. the gap goes into a css variable that moves the sheet with a transform and
+// caps its height, nothing changes layout, so the viewport events cannot feed back into a loop.
+function useKeyboardInset(ref: { current: HTMLDivElement | null }, open: boolean) {
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    const el = ref.current;
+    if (!open || !vv || !el) return;
+    let frame = 0;
+    let last = '';
+    const owner = {};
+    // a field that brings up the keyboard (not a switch, a checkbox or a picker wheel)
+    const typing = (n: EventTarget | null) => n instanceof HTMLElement && n.matches('input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="button"]):not([type="submit"]), textarea, [contenteditable="true"]');
+    let wasUp = false;
+    const clear = () => {
+      el.style.removeProperty('--kb'); el.style.removeProperty('--vvh'); el.removeAttribute('data-kb');
+      // right after a tap the keyboard is still on its way (field focused, keyboard not up yet):
+      // the page stays pinned meanwhile. once the keyboard was up and went down, typing is over
+      const waiting = !wasUp && typing(document.activeElement) && el.contains(document.activeElement);
+      wasUp = false;
+      if (!waiting) unpinPage(false, owner);
+    };
+    // safari scrolls the page to a field the moment it is tapped, before the keyboard has moved
+    // the visual viewport. so the page is pinned at the touch already, and let go again on blur
+    // when no keyboard came up (a hardware keyboard, or the tap went elsewhere)
+    const onTouch = (e: Event) => { if (phoneWidth() && typing(e.target)) pinPage(owner); };
+    const onBlur = () => { window.setTimeout(() => { if (last === 'down' || last === '') clear(); }, 400); };
+    const apply = () => {
+      frame = 0;
+      if (!phoneWidth()) { clear(); last = ''; return; }
+      const layout = document.documentElement.clientHeight;
+      const inset = Math.max(0, Math.round(layout - (vv.height + vv.offsetTop)));
+      // a gap this tall is the keyboard, not the browser's own bars. with the keyboard down
+      // nothing is touched, the sheet behaves as it always did
+      const keyboard = inset > 80;
+      const key = keyboard ? `${inset}:${Math.round(vv.height)}` : 'down';
+      if (key === last) return;
+      last = key;
+      if (!keyboard) { clear(); return; }
+      wasUp = true;
+      pinPage(owner);
+      el.style.setProperty('--kb', `${inset}px`);
+      el.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+      el.setAttribute('data-kb', '');
+      revealFocused(el);
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(apply); };
+    // the focused field, kept in view inside the sheet once the keyboard has settled
+    const onFocus = () => { schedule(); window.setTimeout(() => revealFocused(el), 350); };
+    vv.addEventListener('resize', schedule);
+    vv.addEventListener('scroll', schedule);
+    el.addEventListener('focusin', onFocus);
+    el.addEventListener('focusout', onBlur);
+    el.addEventListener('touchstart', onTouch, { capture: true, passive: true });
+    el.addEventListener('pointerdown', onTouch, { capture: true, passive: true });
+    apply();
+    return () => {
+      cancelAnimationFrame(frame);
+      vv.removeEventListener('resize', schedule);
+      vv.removeEventListener('scroll', schedule);
+      el.removeEventListener('focusin', onFocus);
+      el.removeEventListener('focusout', onBlur);
+      el.removeEventListener('touchstart', onTouch, { capture: true });
+      el.removeEventListener('pointerdown', onTouch, { capture: true });
+      unpinPage(false, owner);
+    };
+  }, [ref, open]);
+}
+
+// scrolls the sheet itself (never the page) so the focused field sits above the sticky buttons
+function revealFocused(sheet: HTMLElement) {
+  const f = document.activeElement as HTMLElement | null;
+  if (!f || !sheet.contains(f) || !f.matches('input, textarea, select, [contenteditable="true"]')) return;
+  const box = sheet.getBoundingClientRect();
+  const footer = sheet.querySelector<HTMLElement>('[data-sheet-footer]');
+  const bottom = footer ? footer.getBoundingClientRect().top : box.bottom;
+  const r = f.getBoundingClientRect();
+  const margin = 12;
+  if (r.bottom > bottom - margin) sheet.scrollTop += r.bottom - (bottom - margin);
+  else if (r.top < box.top + margin) sheet.scrollTop -= box.top + margin - r.top;
+}
+
 export function Sheet({ open, onClose, title, children, footer, error }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode; error?: ReactNode }) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
@@ -44,16 +173,25 @@ export function Sheet({ open, onClose, title, children, footer, error }: { open:
     };
     document.addEventListener('keydown', onKey);
     const prev = document.activeElement as HTMLElement | null;
-    ref.current?.querySelector<HTMLElement>('input, textarea, select, button:not([data-close])')?.focus();
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const sheet = ref.current;
+    if (sheet) {
+      if (finePointer()) {
+        // a field marked data-autofocus first, else the first control
+        (sheet.querySelector<HTMLElement>('[data-autofocus]') ?? sheet.querySelector<HTMLElement>('input, textarea, select, button:not([data-close])'))?.focus({ preventScroll: true });
+      } else {
+        // touch: the dialog itself takes the focus, so screen readers land in it and no keyboard opens
+        sheet.focus({ preventScroll: true });
+      }
+    }
+    lockPage();
     return () => {
       sheetStack.splice(sheetStack.indexOf(me), 1);
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = overflow;
-      prev?.focus?.();
+      unlockPage();
+      prev?.focus?.({ preventScroll: true });
     };
   }, [open, onClose]);
+  useKeyboardInset(ref, open);
 
   if (!open || typeof document === 'undefined') return null;
   // rendered at the end of the body, so a sheet opened from inside another sheet stacks on top
@@ -65,8 +203,9 @@ export function Sheet({ open, onClose, title, children, footer, error }: { open:
         className="sheet"
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         aria-label={typeof title === 'string' ? title : undefined}
-        style={drag ? { transform: `translateY(${drag}px)`, transition: 'none' } : undefined}
+        style={drag ? { transform: `translate3d(0, calc(${drag}px - var(--kb, 0px)), 0)`, transition: 'none' } : undefined}
       >
         <div
           className="pt-1 pb-1 touch-none"
