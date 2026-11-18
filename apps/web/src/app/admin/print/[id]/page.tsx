@@ -7,6 +7,7 @@ import { useAdmin } from '@/components/admin/admin-context';
 import { Qr } from '@/components/ui/qr';
 import { IconChevronLeft, IconPrint } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
+import { basePath } from '@/lib/api-client';
 
 // an A4 poster for the shop window: the qr, the shop name and one line in each language,
 // so greek, english and russian speaking customers all know what it is
@@ -17,7 +18,7 @@ export default function PosterPage({ params }: { params: Promise<{ id: string }>
   const l = links.data?.find((x) => x.id === id);
   if (!l) return <div className="p-10"><div className="h-[400px] skel" /></div>;
   const shop = l.scopeType === 'shop' ? shops.find((s) => s.id === l.scopeId)?.name : null;
-  const url = `${window.location.origin}${l.url}`;
+  const url = `${window.location.origin}${basePath}${l.url}`;
   const lines = (['el', 'en', 'ru'] as const).map((lc) => translator(lc, 'web')('poster.line', { org: org.name }));
 
   return (

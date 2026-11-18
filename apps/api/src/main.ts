@@ -7,7 +7,7 @@ import { serve } from '@hono/node-server';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createRemoteJWKSet } from 'jose';
-import { DEFAULT_DB_PATH, migrate, openDb, rebuildSearch, seed } from '@custock/db';
+import { DEFAULT_DB_PATH, hashPassword, migrate, openDb, rebuildSearch, seed } from '@custock/db';
 import { createApp } from './app';
 import { createLiveSender, liveProblems, type LiveSender } from './lib/live';
 import type { Config } from './types';
@@ -56,8 +56,12 @@ const fresh = !existsSync(dbPath);
 const db = openDb(dbPath);
 migrate(db);
 // the made up Lemoni business only lands in a new database when asked, or in dev
+// on a shared server CUSTOCK_SEED_PASSWORD replaces the public dev password of the demo accounts
 if (fresh && (env.CUSTOCK_SEED === '1' || dev)) {
-  const r = seed(db);
+  if (!dev && env.CUSTOCK_SEED === '1' && (env.CUSTOCK_SEED_PASSWORD ?? '').length < 12) {
+    fail('CUSTOCK_SEED outside dev needs CUSTOCK_SEED_PASSWORD (12+ characters)');
+  }
+  const r = seed(db, env.CUSTOCK_SEED_PASSWORD ? { passwordHash: hashPassword(env.CUSTOCK_SEED_PASSWORD) } : {});
   console.log(`new database, seeded Lemoni (${r.customers} customers, ${r.movements} movements)`);
 }
 // rowids can move after a restore or VACUUM INTO, the search index follows them again

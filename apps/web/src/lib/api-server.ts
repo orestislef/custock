@@ -19,7 +19,8 @@ async function reachable(url: string): Promise<boolean> {
 
 export async function serverApi(locale?: string): Promise<{ api: CustockApi; mode: 'real' | 'fixtures' }> {
   const url = process.env.CUSTOCK_API_URL?.replace(/\/$/, '');
-  if (url && (await reachable(url))) {
+  // in production the api is always real. sample data is only a fallback while developing
+  if (url && (process.env.NODE_ENV === 'production' || (await reachable(url)))) {
     return { api: createApiClient({ baseUrl: url, getLocale: () => locale ?? null }), mode: 'real' };
   }
   fixture ??= createFixtureApi();

@@ -4,7 +4,7 @@
 // storage with a presigned url, see thinking/13-stack.md. in sample data mode they stay local.
 
 import type { CustockApi, UploadPurpose } from '@custock/core';
-import { apiMode } from './api-client';
+import { apiMode, basePath } from './api-client';
 
 const MAX = 1600;
 
@@ -22,7 +22,7 @@ async function shrink(file: File): Promise<Blob> {
 
 // the api hands out its own absolute url. the browser goes through this origin (see next.config)
 function sameOrigin(url: string): string {
-  return url.replace(/^https?:\/\/[^/]+\/v1\//, '/api/v1/').replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/files\//, '/files/');
+  return url.replace(/^https?:\/\/[^/]+\/v1\//, `${basePath}/api/v1/`).replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/files\//, `${basePath}/files/`);
 }
 
 export async function uploadPhoto(api: CustockApi, orgId: string, file: File, purpose: UploadPurpose = 'product'): Promise<string> {

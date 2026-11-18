@@ -7,6 +7,8 @@ import { createApiClient, type CustockApi } from '@custock/core';
 import { createFixtureApi } from './fixtures';
 
 export const apiMode: 'real' | 'fixtures' = process.env.NEXT_PUBLIC_API_MODE === 'real' ? 'real' : 'fixtures';
+// the path the app is served under ('' or for example '/custock'), fixed at build time
+export const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
 const TOKENS_KEY = 'custock.tokens';
 
@@ -36,7 +38,7 @@ export function createBrowserApi(opts: {
 }): CustockApi {
   if (apiMode === 'real') {
     return createApiClient({
-      baseUrl: '/api',
+      baseUrl: `${basePath}/api`,
       getAccessToken: () => loadTokens()?.accessToken,
       getLocale: opts.getLocale,
       getPermsVersion: opts.getPermsVersion,

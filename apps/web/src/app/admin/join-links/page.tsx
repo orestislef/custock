@@ -10,6 +10,7 @@ import { Picker, Sheet, Tip, useToast } from '@/components/ui/client-kit';
 import { Qr } from '@/components/ui/qr';
 import { IconCopy, IconLink, IconPlus, IconPrint } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
+import { basePath } from '@/lib/api-client';
 import { number, percent } from '@/lib/format';
 
 export default function JoinLinksPage() {
@@ -18,7 +19,7 @@ export default function JoinLinksPage() {
   const groups = useAsync(() => api.groups(org.orgId), []);
   const [creating, setCreating] = useState(false);
   const toast = useToast();
-  const origin = typeof window === 'undefined' ? '' : window.location.origin;
+  const origin = typeof window === 'undefined' ? '' : window.location.origin + basePath;
   const scopeName = (l: JoinLink) => l.scopeType === 'org' ? org.name : l.scopeType === 'group' ? groups.data?.find((g) => g.id === l.scopeId)?.name ?? '' : shops.find((s) => s.id === l.scopeId)?.name ?? '';
 
   if (!can('joinlinks.manage', null)) return <Page title={t('links.title')}><Why>{t('common:error.forbidden')}</Why></Page>;
