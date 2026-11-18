@@ -10,21 +10,20 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@10.34.9 --activate
 
-# the api's production dependencies only. the workspace is cut down to the api and the shared
-# packages first, otherwise the hoisted install brings the whole web and phone toolchains along
+# the api's production dependencies only, exactly as locked in pnpm-lock.yaml. the isolated
+# linker installs just the api's dependency graph (the hoisted one in .npmrc would bring the web
+# toolchain along), and --frozen-lockfile fails the build instead of resolving anything new.
+# public-hoist-pattern puts that graph at /app/node_modules too, so `node --import tsx` and the
+# command line work from /app.
 FROM base AS deps
-COPY package.json pnpm-lock.yaml .npmrc tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
 COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
 COPY packages/core/package.json packages/core/
 COPY packages/db/package.json packages/db/
 COPY packages/i18n/package.json packages/i18n/
 COPY packages/tokens/package.json packages/tokens/
-# the lockfile is left out on purpose: in the full workspace drizzle-orm is resolved with the
-# phone's expo-sqlite as a peer, which would drag react native into the server image
-RUN echo "packages: [apps/api, 'packages/*']" > pnpm-workspace.yaml \
- && echo "onlyBuiltDependencies: [better-sqlite3, esbuild]" >> pnpm-workspace.yaml \
- && rm pnpm-lock.yaml \
- && pnpm install --prod
+RUN pnpm install --frozen-lockfile --prod --filter "@custock/api..." --config.node-linker=isolated --config.public-hoist-pattern='*'
 
 # the web as a next.js standalone server
 FROM base AS web

@@ -66,6 +66,22 @@ ProxyPass /custock http://127.0.0.1:3090/custock
 ProxyPassReverse /custock http://127.0.0.1:3090/custock
 ```
 
+HSTS, so browsers only ever use https for the host. It needs `mod_headers` and holds for the whole
+host, not only the path, so add it once in the `:443` virtual host (on its own subdomain,
+custock.example.com, in that host):
+
+```
+Header always set Strict-Transport-Security "max-age=31536000"
+```
+
+The app sends its own Content-Security-Policy (with a nonce per page, see `apps/web/src/proxy.ts`),
+X-Frame-Options, nosniff, Referrer-Policy and Permissions-Policy, so the proxy adds nothing else.
+
+Its own subdomain is the safer home: the sign in tokens live in the browser's storage for the
+origin, which every app on the same host shares. Moving from a path to a subdomain: a DNS record,
+a virtual host with the two ProxyPass lines without the path, `CUSTOCK_BASE_PATH=` (empty) when
+building, and `CUSTOCK_PUBLIC_WEB_URL`, `CUSTOCK_API_URL` and `CUSTOCK_CORS` on the new address.
+
 Then every update, from the repo on your machine:
 
 ```
