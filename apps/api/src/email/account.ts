@@ -30,3 +30,21 @@ export function passwordChangedEmail(locale: Locale, p: { email: string; url: st
     footer: footer(t),
   }, opts);
 }
+
+// the code that confirms deleting an account without a password
+export function deleteCodeEmail(locale: Locale, p: { code: string }, opts?: { forceDark?: boolean }): RenderedEmail {
+  const { l, t } = tr(locale);
+  return renderEmail({
+    locale: l, subject: t('email.deleteCode.subject', p), preheader: t('email.deleteCode.preheader'), heading: t('email.deleteCode.heading'),
+    paragraphs: [t('email.deleteCode.lead')], code: p.code, note: t('email.deleteCode.note'), footer: footer(t),
+  }, opts);
+}
+
+// after the old address used the way back: the email is the old one again, everyone signed out
+export function emailRevertedEmail(locale: Locale, p: { email: string }, opts?: { forceDark?: boolean }): RenderedEmail {
+  const { l, t } = tr(locale);
+  return renderEmail({
+    locale: l, subject: t('email.emailReverted.subject'), preheader: t('email.emailReverted.preheader', p), heading: t('email.emailReverted.heading'),
+    paragraphs: [t('email.emailReverted.lead', p)], note: t('email.emailReverted.note'), footer: footer(t),
+  }, opts);
+}

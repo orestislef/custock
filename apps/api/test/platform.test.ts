@@ -275,8 +275,8 @@ describe('platform', () => {
     const before = process.env.CUSTOCK_STORAGE_FREE_BYTES;
     process.env.CUSTOCK_STORAGE_FREE_BYTES = '10000';
     try {
-      db.prepare(`INSERT INTO files (id, org_id, storage_key, purpose, is_public, mime, bytes, created_at) VALUES (?, ?, ?, 'product', 1, 'image/webp', 9000, ?)`)
-        .run(uuidv7(clock), s.orgId, `orgs/${s.orgId}/products/meter.webp`, clock);
+      db.prepare(`INSERT INTO files (id, org_id, storage_key, purpose, is_public, mime, bytes, created_at, confirmed_at) VALUES (?, ?, ?, 'product', 1, 'image/webp', 9000, ?, ?)`)
+        .run(uuidv7(clock), s.orgId, `orgs/${s.orgId}/products/meter.webp`, clock, clock);
       const o = (await call('GET', '/v1/platform/overview', tokens.root)).body;
       expect(o.storage.bytesUsed).toBe(9000);
       expect(o.storage.percent).toBe(90);

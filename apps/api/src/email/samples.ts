@@ -56,7 +56,7 @@ export function sampleEmail(kind: EmailKind, locale: AppLocale, web: string, opt
     case 'emailChanged':
       return emailChangedEmail(locale, { email: 'a***@example.com' }, opts);
     case 'joinConfirm':
-      return joinConfirmEmail(locale, { name: x.name, scope: x.shop, url: `${web}/confirm/sample-token` }, opts);
+      return joinConfirmEmail(locale, { name: x.name, scope: x.shop, org: 'Lemoni', url: `${web}/confirm/sample-token` }, opts);
     case 'invite':
       return inviteEmail(locale, { inviter: x.inviter, org: 'Lemoni', role, scope: x.shop, url: `${web}/invite/sample-token` }, opts);
     case 'passwordReset':
@@ -66,10 +66,10 @@ export function sampleEmail(kind: EmailKind, locale: AppLocale, web: string, opt
     case 'ownerInvite':
       return ownerInviteEmail(locale, { org: 'Lemoni', url: `${web}/invite/sample-owner-token` }, opts);
     case 'backInStock':
-      return backInStockEmail(locale, { shop: x.shop, product: x.product, url: `${web}/s/lemoni/p/sample`, imageUrl: image('p-thyme-honey'), price: formatMoney(1290, 'EUR', locale) }, opts);
+      return backInStockEmail(locale, { shop: x.shop, org: 'Lemoni', product: x.product, url: `${web}/s/lemoni/p/sample`, imageUrl: image('p-thyme-honey'), price: formatMoney(1290, 'EUR', locale) }, opts);
     case 'post':
       return postEmail(locale, {
-        sender: x.shop, kind: 'offer', title: x.postTitle, body: x.postBody, coverUrl: image('post-offer'), url: `${web}/s/lemoni?post=sample`,
+        sender: x.shop, org: 'Lemoni', senderLogo: image('s-kifisia'), kind: 'offer', title: x.postTitle, body: x.postBody, coverUrl: image('post-offer'), url: `${web}/s/lemoni?post=sample`,
         products: [
           { name: x.oil, url: `${web}/s/lemoni/p/oil`, imageUrl: image('p-olive-oil'), priceMinor: 1290, offerPriceMinor: 1030, wasMinor: 1190 },
           { name: x.honey, url: `${web}/s/lemoni/p/honey`, imageUrl: image('p-thyme-honey'), priceMinor: 1290, offerPriceMinor: null, wasMinor: null },

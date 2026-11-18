@@ -279,13 +279,13 @@ describe('M4 M5 posts', () => {
     expect((await call(own, 'POST', `/v1/orgs/${own.s.orgId}/posts/${own.s.posts.event}/cancel`, 'giorgos')).status).toBe(403);
     expect(q(own, 'SELECT status FROM posts WHERE id = ?', own.s.posts.event).status).toBe('scheduled');
   });
-  it('editing a scheduled post without publishing rights drops it back to a draft', async () => {
+  it('editing a scheduled post without publishing rights sends it back for approval', async () => {
     const own = world();
     await login(own, 'maria');
     const got = await call(own, 'GET', `/v1/orgs/${own.s.orgId}/posts/${own.s.posts.event}`, 'maria');
     const body = { kind: got.body.kind, defaultLocale: 'el', translations: got.body.translations, channels: got.body.channels, audience: got.body.audience, scheduledAt: got.body.scheduledAt };
     const r = await call(own, 'PATCH', `/v1/orgs/${own.s.orgId}/posts/${own.s.posts.event}`, 'maria', body);
-    expect(r.body.status).toBe('draft');
+    expect(r.body.status).toBe('pending_approval');
     expect(q(own, "SELECT count(*) n FROM jobs WHERE dedupe_key = ? AND done_at IS NULL", `send_post:${own.s.posts.event}`).n).toBe(0);
   });
 });
@@ -396,7 +396,7 @@ describe('contract additions', () => {
   it('an account email change needs a code to the new address and tells the old one', async () => {
     const own = world();
     await login(own, 'anna');
-    const req = await call(own, 'POST', '/v1/me/email', 'anna', { email: 'anna.new@example.com' });
+    const req = await call(own, 'POST', '/v1/me/email', 'anna', { email: 'anna.new@example.com', password: 'custock' });
     expect(req.body.devCode).toMatch(/^\d{6}$/);
     expect((await call(own, 'POST', '/v1/me/email/verify', 'anna', { email: 'anna.new@example.com', code: '000000' === req.body.devCode ? '111111' : '000000' })).status).toBe(400);
     expect((await call(own, 'POST', '/v1/me/email/verify', 'anna', { email: 'anna.new@example.com', code: req.body.devCode })).status).toBe(204);

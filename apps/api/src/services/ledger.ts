@@ -11,6 +11,7 @@ import { platform, Tenant } from '../lib/tenant';
 import { pushReachableSql } from '../lib/webpush';
 import { enqueue } from '../worker';
 import { variantLabel } from './catalog';
+import { policyIn } from '../lib/policy';
 
 export const KIND_PERM: Record<string, string> = {
   initial: 'stock.adjust',
@@ -136,6 +137,12 @@ export function recordMovement(ctx: LedgerCtx, input: MovementInput, opts: { int
     if (POSITIVE.has(m.kind) && m.qtyDelta <= 0) return { status: 'rejected', id: m.id, code: 'validation' };
     if (NEGATIVE.has(m.kind) && m.qtyDelta >= 0) return { status: 'rejected', id: m.id, code: 'validation' };
     if ((m.kind === 'adjust' || m.kind === 'damage') && !m.reason && !opts.internal) return { status: 'rejected', id: m.id, code: 'validation' };
+    // the largest single correction for this person at this shop (policy stock.adjustLimit, set for
+    // the business, a shop, a role or a person; 0 means none). bigger differences go through a count
+    if ((m.kind === 'adjust' || m.kind === 'damage') && !opts.internal) {
+      const most = Number(policyIn(ctx.db, ctx.org.id, 'stock.adjustLimit', { userId: ctx.userId, shopId: m.shopId }));
+      if (most > 0 && Math.abs(m.qtyDelta) > most) return { status: 'rejected', id: m.id, code: 'limit_reached' };
+    }
     // references are set by the server (counts, transfers, reversals), never by the client
     if (!opts.internal) m = { ...m, refType: undefined, refId: undefined };
   }

@@ -7,12 +7,15 @@ import type { AppEnv } from '../types';
 import { audit, nextStamp } from '../lib/audit';
 import { cfgOf, need, nowOf, orgOf } from '../lib/context';
 import { idempotent } from '../lib/idempotency';
-import { notifyMembers } from '../lib/notify';
+import { notifyMembers, notifyUser } from '../lib/notify';
 import { ApiProblem, forbidden, notFound } from '../lib/problem';
 import { parseJson, platform } from '../lib/tenant';
 import { previewAudience } from '../services/audience';
 import { loadPosts } from '../services/posts';
+import { setFileBase, uploadKeyFromUrl } from '../services/catalog';
+import { confirmFiles } from '../lib/files';
 import { enqueue } from '../worker';
+import { policyIn } from '../lib/policy';
 
 export const postEtag = (updatedAt: number) => `W/"post-${updatedAt}"`;
 
@@ -55,10 +58,24 @@ function writeChildren(c: Context<AppEnv>, postId: string, input: PostInput, now
   );
   let coverId: string | null = null;
   if (input.coverUrl) {
-    coverId = t.get<{ id: string }>('SELECT id FROM files WHERE org_id = @org AND storage_key = @k', { k: input.coverUrl })?.id ?? null;
-    if (!coverId) {
-      coverId = uuidv7(now);
-      t.run("INSERT INTO files (id, org_id, storage_key, purpose, is_public, mime, bytes, created_by, created_at) VALUES (@id, @org, @k, 'post', 1, 'image/jpeg', 0, @u, @now)", { id: coverId, k: input.coverUrl, u: c.get('user').id, now });
+    // like product photos: one of this business's own uploads, or an https picture somewhere else.
+    // a bare storage key or another business's upload is refused, so deleting a business can never
+    // take a photo that belongs to someone else
+    const { org } = orgOf(c);
+    setFileBase(cfgOf(c).apiPublicUrl);
+    const key = uploadKeyFromUrl(input.coverUrl);
+    if (key) {
+      const own = key.startsWith(`uploads/${org.id}/`) || key.startsWith(`orgs/${org.id}/`);
+      coverId = own ? t.get<{ id: string }>('SELECT id FROM files WHERE org_id = @org AND storage_key = @k AND deleted_at IS NULL', { k: key })?.id ?? null : null;
+      if (!coverId) throw new ApiProblem(400, 'validation', 'unknown upload', { coverUrl: 'not_found' });
+      confirmFiles(cfgOf(c).db, [coverId], now);
+    } else {
+      if (!/^https:\/\/[^\s]+$/.test(input.coverUrl)) throw new ApiProblem(400, 'validation', 'the cover must be https', { coverUrl: 'https' });
+      coverId = t.get<{ id: string }>('SELECT id FROM files WHERE org_id = @org AND storage_key = @k', { k: input.coverUrl })?.id ?? null;
+      if (!coverId) {
+        coverId = uuidv7(now);
+        t.run("INSERT INTO files (id, org_id, storage_key, purpose, is_public, mime, bytes, created_by, created_at, confirmed_at) VALUES (@id, @org, @k, 'post', 1, 'image/jpeg', 0, @u, @now, @now)", { id: coverId, k: input.coverUrl, u: c.get('user').id, now });
+      }
     }
   }
   return coverId;
@@ -81,6 +98,15 @@ function release(c: Context<AppEnv>, id: string, approvedBy: string | null, from
   const now = nowOf(c);
   const row = postRow(c, id);
   const scheduled = row.scheduled_at != null && row.scheduled_at > now;
+  // how many posts a person sends in a day (policy posts.dailyLimit, 0 means no limit)
+  const most = Number(policyIn(cfgOf(c).db, orgOf(c).org.id, 'posts.dailyLimit', { userId: c.get('user').id }));
+  if (most > 0) {
+    const sent = t.get<{ n: number }>(
+      "SELECT count(*) AS n FROM audit_log WHERE org_id = @org AND actor_id = @me AND action IN ('post.published', 'post.scheduled') AND created_at > @since",
+      { me: c.get('user').id, since: now - 86_400_000 },
+    )!.n;
+    if (sent >= most) throw new ApiProblem(403, 'limit_reached', 'posts for today');
+  }
   cfgOf(c).db.transaction(() => {
     const moved = t.run(
       `UPDATE posts SET status = @status, approved_by = coalesce(@approver, approved_by, @me), updated_at = @stamp
@@ -145,7 +171,8 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
     const { t } = orgOf(c);
     const now = nextStamp(row.updated_at, nowOf(c));
     if (row.status === 'sent' || row.status === 'sending') {
-      if (!publisher && row.author_id !== c.get('user').id) throw forbidden('posts.publish');
+      // what went out was approved as it was: changing it afterwards needs the right to publish
+      if (!publisher) throw forbidden('posts.publish');
       cfgOf(c).db.transaction(() => {
         t.run('DELETE FROM post_translations WHERE post_id = @p AND post_id IN (SELECT id FROM posts WHERE org_id = @org)', { p: id });
         for (const [locale, text] of Object.entries(input.translations)) {
@@ -162,7 +189,8 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
         t.run(
           `UPDATE posts SET kind = @kind, default_locale = @locale, channels = @channels, audience = @audience, scheduled_at = @sched,
              valid_from = @from, valid_until = @until, cover_file_id = @cover, updated_at = @now,
-             status = CASE WHEN status = 'scheduled' AND NOT @publisher THEN 'draft' ELSE status END
+             status = CASE WHEN status = 'scheduled' AND NOT @publisher THEN 'pending_approval' ELSE status END,
+             approved_by = CASE WHEN status = 'scheduled' AND NOT @publisher THEN NULL ELSE approved_by END
            WHERE org_id = @org AND id = @id`,
           {
             kind: input.kind, locale: input.defaultLocale, channels: JSON.stringify(input.channels), audience: JSON.stringify(input.audience),
@@ -170,12 +198,22 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
           },
         );
         if (row.status === 'scheduled' && !publisherNew) {
-          // dropped back to a draft: the scheduled send goes away
-          platform(cfgOf(c).db).run("UPDATE jobs SET done_at = @now, last_error = 'back to draft' WHERE dedupe_key = @k AND done_at IS NULL", { now, k: `send_post:${id}` });
+          // approved, not sent yet, and changed by someone who cannot publish: it waits for approval
+          // again and the scheduled send goes away until someone approves the new text
+          platform(cfgOf(c).db).run("UPDATE jobs SET done_at = @now, last_error = 'waiting for approval again' WHERE dedupe_key = @k AND done_at IS NULL", { now, k: `send_post:${id}` });
         } else if (row.status === 'scheduled' && input.scheduledAt) {
           platform(cfgOf(c).db).run("UPDATE jobs SET run_at = @at WHERE dedupe_key = @k AND done_at IS NULL AND kind = 'send_post'", { at: input.scheduledAt, k: `send_post:${id}` });
         }
       })();
+    }
+    if (row.status === 'scheduled' && !allowedAt(c, input.audience.scopes, 'posts.publish')) {
+      const post = one(c, id);
+      notifyMembers(cfgOf(c).db, orgOf(c).org.id, {
+        // whoever can approve it: publish rights at every place the post reaches, shop managers included
+        perm: 'posts.publish', scopes: input.audience.scopes, key: 'approvalNeeded', exceptUserId: c.get('user').id,
+        params: () => ({ author: c.get('user').displayName ?? '', title: post.translations[post.defaultLocale]?.title ?? '' }), payload: { postId: id },
+      });
+      audit(orgOf(c).t, { id: c.get('user').id }, 'post.submitted', { type: 'post', id }, null, null, now);
     }
     c.header('ETag', postEtag(now));
     return c.json(one(c, id));
@@ -231,7 +269,7 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
       const post = one(c, id);
       const title = post.translations[post.defaultLocale]?.title ?? '';
       notifyMembers(cfgOf(c).db, org.id, {
-        perm: 'posts.publish', shopId: null, key: 'approvalNeeded', exceptUserId: c.get('user').id,
+        perm: 'posts.publish', scopes, key: 'approvalNeeded', exceptUserId: c.get('user').id,
         params: () => ({ author: c.get('user').displayName ?? '', title }), payload: { postId: id },
       });
       audit(t, { id: c.get('user').id }, 'post.submitted', { type: 'post', id }, null, null, now);
@@ -247,7 +285,15 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
     const scopes = parseJson<Audience>(row.audience, { scopes: [] } as unknown as Audience).scopes;
     if (!allowedAt(c, scopes, 'posts.publish')) throw forbidden('posts.publish at every scope', 'scope');
     release(c, id, c.get('user').id, ['pending_approval']);
-    return c.json(one(c, id));
+    const done = one(c, id);
+    // the author hears it went out (or is set for its time), unless they approved it themselves
+    if (row.author_id !== c.get('user').id) {
+      notifyUser(cfgOf(c).db, orgOf(c).org.id, row.author_id, {
+        key: done.status === 'scheduled' ? 'postScheduled' : 'postPublished',
+        params: () => ({ title: done.translations[done.defaultLocale]?.title ?? '' }), payload: { postId: id },
+      });
+    }
+    return c.json(done);
   });
 
   // stops what has not gone out yet. sent pushes and emails cannot be pulled back.
@@ -271,6 +317,13 @@ export function postWriteRoutes(app: Hono<AppEnv>) {
       t.run("UPDATE price_history SET valid_to = @now WHERE org_id = @org AND post_id = @id AND source = 'offer' AND (valid_to IS NULL OR valid_to > @now)", { now, id });
       audit(t, { id: c.get('user').id }, 'post.cancelled', { type: 'post', id }, null, null, now);
     })();
-    return c.json(one(c, id));
+    const stopped = one(c, id);
+    // a post waiting for approval that someone else stopped: its author hears it will not go out
+    if (row.status === 'pending_approval' && row.author_id !== c.get('user').id) {
+      notifyUser(cfgOf(c).db, orgOf(c).org.id, row.author_id, {
+        key: 'postReturned', params: () => ({ title: stopped.translations[stopped.defaultLocale]?.title ?? '' }), payload: { postId: id },
+      });
+    }
+    return c.json(stopped);
   });
 }

@@ -4,9 +4,14 @@
 
 import { createECDH, createHash } from 'node:crypto';
 import type { Db } from '@custock/db';
+import { iconVersion } from '@custock/core';
+import { pickLocale, translator } from '@custock/i18n';
 import { parseJson, platform } from './tenant';
+import { orgLogoUrl } from '../services/catalog';
 
 let webBase = 'http://localhost:3000';
+
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 3)}...` : s);
 
 // CUSTOCK_PUBLIC_WEB_URL, including a base path like /custock
 export function setWebBase(url: string | undefined) {
@@ -21,40 +26,82 @@ interface LinkPayload {
   countId?: string;
   transferId?: string;
   shopId?: string;
+  membershipId?: string;
   [k: string]: unknown;
 }
 
-// the page a tap opens, relative to the web base. customers land on the business's pages, staff in /admin.
+// a page in the staff app. the business (org) and, when it matters, the shop travel along, so a tap
+// opens the right business and shop even when another one was open on that device.
+export function staffPath(path: string, orgId: string | null, shopId?: string | null, extra: Record<string, string | undefined> = {}): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(extra)) if (v) q.set(k, v);
+  if (orgId) q.set('org', orgId);
+  if (shopId) q.set('shop', shopId);
+  const qs = q.toString();
+  return qs ? `${path}?${qs}` : path;
+}
+
+// the page a tap opens, relative to the web base. customers land on the business's pages, staff in
+// /admin on the exact item: the post to approve, the count to review, the transfer, the product.
 export function pushPath(db: Db, orgId: string | null, customer: boolean, p: LinkPayload): string {
   const slug = orgId ? platform(db).get<{ slug: string }>('SELECT slug FROM organizations WHERE id = @o', { o: orgId })?.slug : undefined;
   const enc = encodeURIComponent;
+  const shop = typeof p.shopId === 'string' ? p.shopId : null;
   switch (p.type) {
     case 'post':
-      if (customer && slug && p.postId) return `/s/${enc(slug)}?post=${enc(p.postId)}`;
-      if (!customer && p.postId) return `/admin/posts/${enc(p.postId)}`;
+      if (customer && slug && p.postId) return `/s/${enc(slug)}/news?post=${enc(p.postId)}`;
+      if (!customer && p.postId) return staffPath(`/admin/posts/${enc(p.postId)}`, orgId);
       break;
     case 'back_in_stock':
       if (slug && p.productId) return `/s/${enc(slug)}/p/${enc(p.productId)}`;
       break;
     case 'approvalNeeded':
-      if (p.postId) return `/admin/posts/${enc(p.postId)}`;
-      break;
+    case 'postPublished':
+    case 'postScheduled':
+    case 'postReturned':
+      if (p.postId) return staffPath(`/admin/posts/${enc(p.postId)}`, orgId);
+      return staffPath('/admin/posts', orgId);
     case 'countReady':
-      if (p.countId) return `/admin/stock/counts/${enc(p.countId)}`;
-      break;
+      if (p.countId) return staffPath(`/admin/stock/counts/${enc(p.countId)}`, orgId, shop);
+      return staffPath('/admin/stock/counts', orgId, shop);
     case 'transferSent':
-      if (p.transferId) return `/admin/stock/transfers/${enc(p.transferId)}`;
-      break;
+    case 'transferReceived':
+      if (p.transferId) return staffPath(`/admin/stock/transfers/${enc(p.transferId)}`, orgId, shop);
+      return staffPath('/admin/stock/transfers', orgId, shop);
     case 'lowStock': {
       const product = p.variantId && orgId
         ? platform(db).get<{ product_id: string }>('SELECT product_id FROM product_variants WHERE org_id = @o AND id = @v', { o: orgId, v: p.variantId })?.product_id
         : undefined;
-      return product ? `/admin/stock/${enc(product)}` : '/admin/stock?filter=low';
+      return product ? staffPath(`/admin/stock/${enc(product)}`, orgId, shop) : staffPath('/admin/stock', orgId, shop, { filter: 'low' });
     }
     case 'inviteAccepted':
-      return '/admin/team';
+      return staffPath('/admin/team', orgId, null, { member: typeof p.membershipId === 'string' ? p.membershipId : undefined });
   }
-  return customer && slug ? `/s/${enc(slug)}` : '/admin';
+  if (customer && slug) return `/s/${enc(slug)}`;
+  return staffPath('/admin', orgId);
+}
+
+export interface PushAction { action: string; title: string; url: string }
+
+// what makes a push recognisable: the business's own icon for everything that belongs to one (its
+// logo, or its monogram, with the version in the url so a new logo shows), custock's icon for the
+// super admin and the staff app's test push. buttons where the browser shows them: customers get
+// View, and Offers on a post; staff get Open.
+export function pushDecorations(db: Db, orgId: string | null, customer: boolean, locale: string | null | undefined, p: LinkPayload & { url?: string }): { icon: string; actions: PushAction[] } {
+  const org = orgId ? platform(db).get<{ slug: string; name: string }>('SELECT slug, name FROM organizations WHERE id = @o', { o: orgId }) : undefined;
+  const enc = encodeURIComponent;
+  const icon = org
+    ? `${webBase}/s/${enc(org.slug)}/icon/192?v=${iconVersion(org.name, orgLogoUrl(db, orgId!))}`
+    : `${webBase}/icons/icon-192.png`;
+  const tr = translator(pickLocale(locale), 'server');
+  const url = typeof p.url === 'string' ? p.url : pushUrl(db, orgId, customer, p);
+  const actions: PushAction[] = customer
+    ? [
+        { action: 'view', title: tr('push.action.view'), url },
+        ...(p.type === 'post' && org ? [{ action: 'offers', title: tr('push.action.offers'), url: `${webBase}/s/${enc(org.slug)}/offers` }] : []),
+      ]
+    : [{ action: 'open', title: tr('push.action.open'), url }];
+  return { icon, actions };
 }
 
 export function pushUrl(db: Db, orgId: string | null, customer: boolean, p: LinkPayload): string {
@@ -75,10 +122,20 @@ export interface WebPushMessage {
   options: { TTL: number; urgency: 'very-low' | 'low' | 'normal' | 'high'; topic: string };
 }
 
-const STAFF_TYPES = new Set(['approvalNeeded', 'countReady', 'transferSent', 'lowStock', 'inviteAccepted']);
+const STAFF_TYPES = new Set(['approvalNeeded', 'postPublished', 'postScheduled', 'postReturned', 'countReady', 'transferSent', 'transferReceived', 'lowStock', 'inviteAccepted', 'platform_alert']);
 
 function idOf(p: LinkPayload): string {
-  return String(p.postId ?? p.productId ?? p.variantId ?? p.countId ?? p.transferId ?? '');
+  return String(p.postId ?? p.productId ?? p.variantId ?? p.countId ?? p.transferId ?? p.membershipId ?? p.tag ?? '');
+}
+
+const absUrl = (v: unknown, max = 500): string | null => (typeof v === 'string' && /^https?:\/\//.test(v) && v.length <= max ? v : null);
+
+function cleanActions(v: unknown): PushAction[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((a): a is PushAction => !!a && typeof a.action === 'string' && typeof a.title === 'string' && !!absUrl(a.url))
+    .slice(0, 2)
+    .map((a) => ({ action: a.action.slice(0, 20), title: clip(a.title, 30), url: a.url }));
 }
 
 // the push service keeps only the newest message per topic while the phone is offline
@@ -86,12 +143,11 @@ export function topicOf(p: LinkPayload, orgId: string | null): string {
   return createHash('sha256').update(`${p.type ?? 'push'}|${orgId ?? ''}|${idOf(p)}|${String(p.shopId ?? '')}`).digest('base64url').slice(0, 32);
 }
 
-const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 3)}...` : s);
 
 // one web push for one outbox row. null for silent pushes: browsers must show every push, a
 // silent one would turn into a generic notice (or cost the subscription on iOS).
 export function buildWebPush(row: WebPushRow): WebPushMessage | null {
-  const p = parseJson<LinkPayload & { silent?: boolean; url?: string; image?: string | null }>(row.payload, {});
+  const p = parseJson<LinkPayload & { silent?: boolean; url?: string; image?: string | null; icon?: string; actions?: unknown; tag?: string }>(row.payload, {});
   if (p.silent || !(row.title || row.body)) return null;
   const staff = STAFF_TYPES.has(p.type ?? '');
   const message: Record<string, unknown> = {
@@ -101,13 +157,15 @@ export function buildWebPush(row: WebPushRow): WebPushMessage | null {
     tag: `${p.type ?? 'push'}:${idOf(p)}`,
     type: p.type ?? null,
     orgId: row.org_id,
-    image: typeof p.image === 'string' && p.image.length <= 500 ? p.image : null,
+    icon: absUrl(p.icon),
+    image: absUrl(p.image),
+    actions: cleanActions(p.actions),
   };
   let payload = JSON.stringify(message);
-  // the encrypted record must stay under 4 kB
-  if (Buffer.byteLength(payload) > 3000) {
-    message.image = null;
-    message.body = clip(String(message.body), 200);
+  // the encrypted record must stay under 4 kB: the picture goes first, then the buttons, then body
+  for (const trim of [() => { message.image = null; }, () => { message.actions = []; }, () => { message.body = clip(String(message.body), 200); }, () => { message.body = clip(String(message.body), 80); }]) {
+    if (Buffer.byteLength(payload) <= 3000) break;
+    trim();
     payload = JSON.stringify(message);
   }
   const TTL = staff ? 12 * 3600 : p.type === 'back_in_stock' ? 3 * 86400 : 2 * 86400;

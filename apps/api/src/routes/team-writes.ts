@@ -4,10 +4,10 @@
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import {
-  canEditRole, canGrantRole, canManageMember, checkOwnersAfter, effectiveAtScope, InviteInput, InviteRegisterInput, isPermission, ShopInput, uuidv7,
+  canEditRole, canGrantRole, canManageMember, checkOwnersAfter, effectiveAtScope, InviteInput, InviteRegisterInput, isPermission, LIMITS, passwordProblem, ShopInput, uuidv7, zLine, zPhone,
   type AccessAssignment, type AuditEntry, type Invite, type InviteCreated, type InvitePreview, type OrgSettings,
 } from '@custock/core';
-import { hashPassword, randomToken, sha256, type Db } from '@custock/db';
+import { hashPasswordAsync, randomToken, sha256, type Db } from '@custock/db';
 import { pickLocale, translator } from '@custock/i18n';
 import type { AppEnv } from '../types';
 import { audit, bumpPerms } from '../lib/audit';
@@ -19,6 +19,7 @@ import { permsChanged } from '../lib/notify';
 import { ApiProblem, badRequest, forbidden, notFound } from '../lib/problem';
 import { clampLimit, decodeCursor, page, parseJson, platform, Tenant } from '../lib/tenant';
 import { devOutboxTransport } from '../lib/transport';
+import { pushSuperadmins } from '../lib/platform-notify';
 import { emailMessage } from '../lib/transport';
 import { inviteEmail } from '../email/messages';
 import { loadRoles } from './team';
@@ -26,8 +27,17 @@ import { loadShops, orgSettings } from './org';
 import { addShop, BootstrapError, ensureDefaultJoinLink } from '../services/bootstrap';
 import { avatarKeySql, fileUrl } from '../services/catalog';
 import { retireFile } from './uploads';
+import { policyNumber, setPolicies } from '../lib/policy';
+import { isSuperadmin } from '../lib/platform-access';
+import type { PolicyPatch } from '@custock/core';
+import { confirmFiles } from '../lib/files';
 
-const INVITE_TTL = 7 * 86_400_000;
+// org settings fields that are policies (packages/core/src/policies.ts)
+const SETTING_POLICIES: Record<string, string> = {
+  pushDailyCap: 'push.dailyCap', quietHours: 'push.quietHours', postsNeedApproval: 'posts.needApproval', allowNegativeStock: 'stock.allowNegative',
+  fewLeftThreshold: 'stock.fewLeft', customerCatalog: 'catalog.mode', customerPrices: 'catalog.prices', customerStock: 'catalog.stock',
+};
+
 
 // asks the runtime, so aliases like Europe/Nicosia pass and made up names do not
 export function isTimezone(tz: string): boolean {
@@ -129,15 +139,21 @@ function claimInvite(db: Db, inv: OpenInvite, user: { id: string; name: string }
     // the first owner from the server setup: the business gets its default join link now
     if (!inv.invited_by) ensureDefaultJoinLink(db, inv.org_id, user.id, now);
   })();
-  // the first owner was invited by the server setup, there is nobody to tell
-  if (!inv.invited_by) return;
   const orgName = t.get<{ name: string }>('SELECT name FROM organizations WHERE id = @org')!.name;
+  // the first owner was invited by the server setup or a super admin's new business: the super
+  // admins hear that the business now has its owner
+  if (!inv.invited_by) {
+    pushSuperadmins(db, 'owner', { name: user.name ?? '', org: orgName }, { path: `/admin/platform/${inv.org_id}`, tag: `owner-${inv.org_id}` });
+    return;
+  }
   const inviter = platform(db).get<{ locale: string }>('SELECT locale FROM users WHERE id = @id', { id: inv.invited_by });
   const tr = translator(pickLocale(inviter?.locale), 'server');
+  // the tap opens the new person on the team page
+  const joined = t.get<{ id: string }>('SELECT id FROM memberships WHERE org_id = @org AND user_id = @u', { u: user.id });
   const params = { name: user.name, org: orgName };
   devOutboxTransport(db, () => {}).send({
     channel: 'push', orgId: inv.org_id, userId: inv.invited_by, locale: inviter?.locale ?? 'el',
-    title: tr('push.inviteAccepted.title', params), body: tr('push.inviteAccepted.body', params), payload: { type: 'inviteAccepted' },
+    title: tr('push.inviteAccepted.title', params), body: tr('push.inviteAccepted.body', params), payload: { type: 'inviteAccepted', membershipId: joined?.id },
   });
 }
 
@@ -179,7 +195,7 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
       t.run(
         `INSERT INTO invites (id, org_id, email, role_id, scope_type, scope_id, token_hash, locale, invited_by, created_at, expires_at)
          VALUES (@id, @org, @email, @role, @st, @sid, @hash, @locale, @u, @now, @exp)`,
-        { id, email, role: role.id, st: input.scopeType, sid: input.scopeId, hash: sha256(token), locale: input.locale, u: c.get('user').id, now, exp: now + INVITE_TTL },
+        { id, email, role: role.id, st: input.scopeType, sid: input.scopeId, hash: sha256(token), locale: input.locale, u: c.get('user').id, now, exp: now + policyNumber(cfgOf(c).db, 'invites.staffDays') * 86_400_000 },
       );
       const url = `${cfgOf(c).publicWebUrl.replace(/\/$/, '')}/invite/${token}`;
       const commonRole = translator(pickLocale(input.locale), 'common');
@@ -251,10 +267,11 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
     const inv = openInvite(db, input.token, now);
     const p = platform(db);
     if (p.get('SELECT 1 FROM users WHERE email = @e', { e: inv.email })) throw new ApiProblem(409, 'account_exists', 'sign in with that account, then accept');
+    if (passwordProblem(input.password, inv.email) === 'sameAsEmail') throw new ApiProblem(400, 'validation', 'the password is the email', { password: 'sameAsEmail' });
     // the email counts as verified only when the invite really went out by email
     const emailed = !!p.get("SELECT 1 FROM dev_outbox WHERE channel = 'email' AND sent_at IS NOT NULL AND json_extract(payload, '$.inviteId') = @id", { id: inv.id });
     const userId = uuidv7(now);
-    const hash = hashPassword(input.password);
+    const hash = await hashPasswordAsync(input.password);
     db.transaction(() => {
       p.run(
         `INSERT INTO users (id, email, display_name, password_hash, email_verified_at, locale, created_at, updated_at)
@@ -337,7 +354,7 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
   // ------------------------------------------------------------ roles
 
   app.post('/v1/orgs/:org/roles', async (c) => {
-    const input = z.object({ id: z.string().optional(), name: z.string().min(1).max(60), rank: z.number().int().min(1).max(99), permissions: z.array(z.string()) }).parse(await c.req.json());
+    const input = z.object({ id: z.string().optional(), name: zLine(LIMITS.roleName), rank: z.number().int().min(1).max(99), permissions: z.array(z.string()) }).parse(await c.req.json());
     const unknown = input.permissions.filter((p) => !isPermission(p));
     if (unknown.length) throw badRequest('unknown permissions', Object.fromEntries(unknown.map((p) => [p, 'unknown'])));
     const { t, topology } = orgOf(c);
@@ -375,10 +392,9 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
   // ------------------------------------------------------------ org and shop settings
 
   app.patch('/v1/orgs/:org', async (c) => {
-    need(c, 'org.settings.manage');
     const patch = z
       .object({
-        name: z.string().min(1).max(120),
+        name: zLine(LIMITS.businessName),
         brandColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable(),
         defaultLocale: z.enum(['en', 'el', 'ru']),
         timezone: z.string().refine(isTimezone, 'unknown timezone'),
@@ -397,6 +413,20 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
       .parse(await c.req.json());
     const { t, org } = orgOf(c);
     const before = orgSettings(cfgOf(c).db, org);
+    // limits and options go through the policy engine: their own permission, the super admin's
+    // ceilings and whether the business may change them at all (lib/policy.ts)
+    const engine: PolicyPatch = {};
+    for (const [field, key] of Object.entries(SETTING_POLICIES)) {
+      const v = patch[field as keyof typeof patch];
+      if (v === undefined) continue;
+      engine[key] = v as boolean | number | string;
+      delete patch[field as keyof typeof patch];
+    }
+    if (Object.values(patch).some((v) => v !== undefined) || !Object.keys(engine).length) need(c, 'org.settings.manage');
+    if (Object.keys(engine).length) {
+      const o = orgOf(c);
+      setPolicies(cfgOf(c).db, org.id, { userId: c.get('user').id, assignments: o.assignments, topology: o.topology, superadmin: isSuperadmin(cfgOf(c).db, c.get('user').id) }, { level: 'business' }, engine, nowOf(c));
+    }
     if (patch.logoFileId && !t.get("SELECT 1 FROM files WHERE org_id = @org AND id = @f AND purpose = 'logo' AND deleted_at IS NULL", { f: patch.logoFileId })) {
       throw notFound('file');
     }
@@ -415,7 +445,8 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
       if (patch.postsNeedApproval !== undefined && patch.postsNeedApproval !== before.postsNeedApproval) bumpPerms(t, 'all');
       audit(t, { id: c.get('user').id }, 'org.settings_changed', { type: 'organization', id: org.id }, before, patch, now);
     })();
-    // a replaced or removed logo leaves the bucket
+    // the new logo is in use now, a replaced or removed one leaves the bucket
+    if (patch.logoFileId) confirmFiles(cfgOf(c).db, [patch.logoFileId], now);
     if (oldLogo) retireFile(cfgOf(c), oldLogo, now);
     const fresh = platform(cfgOf(c).db).get<typeof org>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE id = @id`, { id: org.id })!;
     return c.json(orgSettings(cfgOf(c).db, fresh) satisfies OrgSettings);
@@ -439,7 +470,7 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
     need(c, 'shop.settings.manage', shopId);
     const patch = z
       .object({
-        name: z.string().min(1).max(80), city: z.string().nullable(), address: z.string().nullable(), phone: z.string().nullable(),
+        name: zLine(LIMITS.shopName), city: zLine(LIMITS.city, 0).nullable(), address: zLine(LIMITS.address, 0).nullable(), phone: zPhone.or(z.literal('')).nullable(),
         timezone: z.string().refine(isTimezone, 'unknown timezone').nullable(), customerVisible: z.boolean(), customerStock: z.enum(['off', 'availability', 'exact']).nullable(),
       })
       .partial()

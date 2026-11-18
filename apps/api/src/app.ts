@@ -12,6 +12,7 @@ import { catalogRoutes } from './routes/catalog';
 import { customerRoutes as customerAppRoutes } from './routes/customer';
 import { customerRoutes } from './routes/customers';
 import { orgRoutes } from './routes/org';
+import { categoryRoutes } from './routes/categories';
 import { postRoutes } from './routes/posts';
 import { publicRoutes } from './routes/public';
 import { reportRoutes } from './routes/reports';
@@ -26,12 +27,14 @@ import { MAX_UPLOAD_BYTES, uploadRoutes } from './routes/uploads';
 import { platformDevRoutes } from './routes/platform-dev';
 import { setBucketBase, setFileBase } from './services/catalog';
 import { setWebBase } from './lib/webpush';
+import { setPlatformNotifyBase } from './lib/platform-notify';
 import { pushRoutes } from './routes/push';
 import { platformGuards, platformRoutes } from './routes/platform';
 import { emailRoutes } from './routes/email';
 import { setEmailAssetBase } from './email/layout';
 import { captureServerErrors, setErrorWebBase } from './lib/errors';
 import { errorRoutes } from './routes/errors';
+import { policyRoutes } from './routes/policies';
 
 export function createApp(cfg: Config) {
   const app = new Hono<AppEnv>();
@@ -63,6 +66,7 @@ export function createApp(cfg: Config) {
   setEmailAssetBase(cfg.apiPublicUrl);
   setBucketBase(cfg.storage?.kind === 's3' ? cfg.storage.s3.publicUrl : null);
   setWebBase(cfg.publicWebUrl);
+  setPlatformNotifyBase(cfg.publicWebUrl);
   setErrorWebBase(cfg.publicWebUrl);
   // shelf qr codes printed with our own web address scan as the product inside them
   setOwnDomains(ownDomainsFor(cfg.publicWebUrl, ...(cfg.ownDomains ?? [])));
@@ -79,6 +83,7 @@ export function createApp(cfg: Config) {
   authRoutes(app);
   passwordResetRoutes(app);
   orgRoutes(app);
+  categoryRoutes(app);
   catalogRoutes(app);
   customerRoutes(app);
   postRoutes(app);
@@ -96,6 +101,7 @@ export function createApp(cfg: Config) {
   uploadRoutes(app);
   pushRoutes(app);
   platformRoutes(app);
+  policyRoutes(app);
   errorRoutes(app);
 
   // the api description (super admins only in production) and the state of this server. last, so
@@ -107,7 +113,9 @@ export function createApp(cfg: Config) {
   app.onError((err, c) => {
     if (err instanceof ApiProblem) return c.json(err.toJSON(), err.status as 400);
     if (err instanceof ZodError) {
-      const fields = Object.fromEntries(err.issues.map((i) => [i.path.join('.') || '_', i.code]));
+      // a rule from validate.ts carries its field error code (common.json field.*) as the message
+      const code = (i: (typeof err.issues)[number]) => (i.code === 'custom' || /^[a-zA-Z]+$/.test(i.message ?? '') && i.message.length < 24 && i.code !== 'invalid_type' ? i.message : i.code);
+      const fields = Object.fromEntries(err.issues.map((i) => [i.path.join('.') || '_', code(i)]));
       return c.json(new ApiProblem(400, 'validation', 'invalid input', fields).toJSON(), 400);
     }
     if (err instanceof SyntaxError) return c.json(new ApiProblem(400, 'validation', 'invalid json').toJSON(), 400);

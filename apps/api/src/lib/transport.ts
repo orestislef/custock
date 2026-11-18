@@ -1,10 +1,10 @@
 // outgoing messages. everything is written to the outbox table first. in live mode the worker
 // sends unsent rows (lib/live.ts), otherwise nothing ever leaves the machine.
 
-import { uuidv7 } from '@custock/core';
+import { maskEmail, uuidv7 } from '@custock/core';
 import type { Db } from '@custock/db';
 import { platform } from './tenant';
-import { pushUrl } from './webpush';
+import { pushDecorations, pushUrl } from './webpush';
 import type { RenderedEmail } from '../email/layout';
 
 export interface OutgoingMessage {
@@ -33,6 +33,11 @@ export function devOutboxTransport(db: Db, log: (line: string) => void = (l) => 
       if (msg.channel === 'push' && !msg.payload?.silent && !msg.payload?.url) {
         msg = { ...msg, payload: { ...(msg.payload ?? {}), url: pushUrl(db, msg.orgId ?? null, !!msg.customerId, msg.payload ?? {}) } };
       }
+      // the business's icon and the buttons, unless the sender chose its own
+      if (msg.channel === 'push' && !msg.payload?.silent) {
+        const deco = pushDecorations(db, msg.orgId ?? null, !!msg.customerId, msg.locale ?? null, msg.payload ?? {});
+        msg = { ...msg, payload: { icon: deco.icon, actions: deco.actions, ...(msg.payload ?? {}) } };
+      }
       platform(db).run(
         `INSERT INTO dev_outbox (id, channel, org_id, user_id, customer_id, to_address, locale, title, body, html, payload, created_at)
          VALUES (@id, @channel, @org, @user, @customer, @to, @locale, @title, @body, @html, @payload, @now)`,
@@ -42,7 +47,10 @@ export function devOutboxTransport(db: Db, log: (line: string) => void = (l) => 
           payload: msg.payload ? JSON.stringify(msg.payload) : null, now: Date.now(),
         },
       );
-      log(`[dev outbox] ${msg.channel} to ${msg.to ?? msg.customerId ?? msg.userId ?? '?'}: ${msg.title}`);
+      // logs never carry an address or a subject (subjects can hold sign in codes): a masked
+      // address and the kind of message are enough to follow what happens
+      const kind = typeof msg.payload?.type === 'string' ? msg.payload.type : 'message';
+      log(`[outbox] ${msg.channel} to ${maskEmail(msg.to) ?? (msg.customerId ? 'customer' : msg.userId ? 'user' : '?')}: ${kind}`);
       return { id };
     },
   };

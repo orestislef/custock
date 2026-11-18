@@ -153,7 +153,7 @@ describe('web push', () => {
     const tr = devOutboxTransport(db, () => {});
     const { id } = tr.send({ channel: 'push', orgId: s.orgId, userId: s.users.eleni, title: 'Count', body: 'ready', payload: { type: 'countReady', countId: 'c1' } });
     const row = db.prepare('SELECT payload FROM dev_outbox WHERE id = ?').get(id) as Json;
-    expect(JSON.parse(row.payload).url).toBe('http://localhost:3000/custock/admin/stock/counts/c1');
+    expect(JSON.parse(row.payload).url).toBe(`http://localhost:3000/custock/admin/stock/counts/c1?org=${s.orgId}`);
     const silent = tr.send({ channel: 'push', orgId: s.orgId, userId: s.users.eleni, title: '', body: '', payload: { type: 'perms_changed', silent: true } });
     expect(JSON.parse((db.prepare('SELECT payload FROM dev_outbox WHERE id = ?').get(silent.id) as Json).payload).url).toBeUndefined();
     const silentRow = db.prepare('SELECT * FROM dev_outbox WHERE id = ?').get(silent.id) as OutboxRow;
@@ -175,7 +175,7 @@ describe('web push', () => {
     expect(row).toBeTruthy();
     const msg = buildWebPush(row)!;
     const body = JSON.parse(msg.payload);
-    expect(body).toMatchObject({ title: 'Lemoni Kifisia', body: 'Νέα', url: `http://localhost:3000/custock/s/lemoni?post=${post.body.id}`, type: 'post', orgId: s.orgId });
+    expect(body).toMatchObject({ title: 'Lemoni Kifisia', body: 'Νέα', url: `http://localhost:3000/custock/s/lemoni/news?post=${post.body.id}`, type: 'post', orgId: s.orgId });
     expect(msg.options).toMatchObject({ TTL: 172800, urgency: 'normal' });
     expect(msg.options.topic).toMatch(/^[A-Za-z0-9_-]{32}$/);
 
@@ -223,7 +223,8 @@ describe('web push', () => {
     expect((await call('DELETE', '/v1/me/push-subscriptions', tokens.web, { endpoint: sub.endpoint })).status).toBe(204);
     expect(pushOk()).toBe(0);
     expect((await call('POST', '/v1/me/push-subscriptions', tokens.web, { ...sub, orgId: s.orgId })).status).toBe(204);
-    await call('DELETE', '/v1/me', tokens.web);
+    const start = await call('POST', '/v1/me/delete/start', tokens.web);
+    expect((await call('DELETE', '/v1/me', tokens.web, { code: start.body.devCode })).status).toBe(204);
     expect((db.prepare('SELECT count(*) n FROM push_subscriptions WHERE endpoint = ?').get(sub.endpoint) as Json).n).toBe(0);
   });
 
@@ -365,7 +366,7 @@ describe('production from nothing', () => {
     const preview = await call('GET', `/v1/invites/${token}`, undefined, undefined, { 'Accept-Language': 'en' });
     expect(preview.body).toMatchObject({ orgName: 'Kafeneio', scopeName: 'Center', roleName: 'Staff', email: 'nina@example.com', accountExists: false });
     expect((await call('POST', '/v1/invites/register', undefined, { token, displayName: 'Nina', password: 'short' })).status).toBe(400);
-    const reg = await call('POST', '/v1/invites/register', undefined, { token, displayName: 'Nina', password: 'nina staff password', locale: 'en' });
+    const reg = await call('POST', '/v1/invites/register', undefined, { token, displayName: 'Nina', password: 'nina.staff.password', locale: 'en' });
     expect(reg.status).toBe(201);
     expect(reg.body.orgId).toBe(orgId);
     const me = await call('GET', '/v1/me/context', reg.body.accessToken);
@@ -375,8 +376,8 @@ describe('production from nothing', () => {
     // not emailed, so the address is not marked verified
     expect((db.prepare('SELECT email_verified_at FROM users WHERE email = ?').get('nina@example.com') as Json).email_verified_at).toBeNull();
     // the password works on the normal sign in, the link is used up
-    expect((await call('POST', '/v1/auth/login', undefined, { email: 'nina@example.com', password: 'nina staff password' })).status).toBe(200);
-    expect((await call('POST', '/v1/invites/register', undefined, { token, displayName: 'Nina', password: 'nina staff password' })).status).toBe(410);
+    expect((await call('POST', '/v1/auth/login', undefined, { email: 'nina@example.com', password: 'nina.staff.password' })).status).toBe(200);
+    expect((await call('POST', '/v1/invites/register', undefined, { token, displayName: 'Nina', password: 'nina.staff.password' })).status).toBe(410);
     expect((await call('GET', `/v1/invites/${token}`)).status).toBe(410);
     // the inviter hears about it
     expect(db.prepare("SELECT 1 FROM dev_outbox WHERE channel = 'push' AND json_extract(payload, '$.type') = 'inviteAccepted'").get()).toBeTruthy();
@@ -386,10 +387,10 @@ describe('production from nothing', () => {
     const r = await call('POST', `/v1/orgs/${orgId}/invites`, owner, { email: 'nina@example.com', roleId: staffRoleId, scopeType: 'shop', scopeId: centerId, locale: 'en' });
     const token = r.body.link.split('/').pop();
     expect((await call('GET', `/v1/invites/${token}`)).body.accountExists).toBe(true);
-    const reg = await call('POST', '/v1/invites/register', undefined, { token, displayName: 'Mallory', password: 'mallory password' });
+    const reg = await call('POST', '/v1/invites/register', undefined, { token, displayName: 'Mallory', password: 'mallory.password' });
     expect(reg.status).toBe(409);
     expect(reg.body.code).toBe('account_exists');
-    const nina = (await call('POST', '/v1/auth/login', undefined, { email: 'nina@example.com', password: 'nina staff password' })).body.accessToken;
+    const nina = (await call('POST', '/v1/auth/login', undefined, { email: 'nina@example.com', password: 'nina.staff.password' })).body.accessToken;
     expect((await call('POST', '/v1/invites/accept', nina, { token })).status).toBe(200);
   });
 

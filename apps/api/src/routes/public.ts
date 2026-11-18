@@ -1,19 +1,25 @@
 // public endpoints, no login, rate limited: join page, shelf product page, public catalog
 
 import type { Hono } from 'hono';
-import { normalizeBarcode, type JoinPage } from '@custock/core';
+import { normalizeBarcode, type JoinPage, type PublicProduct } from '@custock/core';
 import type { AppEnv, OrgRow } from '../types';
 import { categoryNameSql, cfgOf, nowOf, optionalAuth, ORG_COLUMNS, readerLocale } from '../lib/context';
 import { forbidden, notFound } from '../lib/problem';
 import { rateLimit } from '../lib/ratelimit';
+import { policyNumber } from '../lib/policy';
 import { platform, Tenant } from '../lib/tenant';
 import { fileUrl } from '../services/catalog';
 import { storefrontProducts } from '../services/storefront';
 import { catalogIds, followingOf } from './customer';
 import { dayKey } from './reports';
 
+// a product as a visitor who does not follow a followers only business sees it on the shelf page
+export function shelfTeaser(p: PublicProduct): PublicProduct {
+  return { ...p, priceMinor: null, offer: null, availability: [], waitingForIt: false, saved: false };
+}
+
 export function publicRoutes(app: Hono<AppEnv>) {
-  app.use('/v1/public/*', rateLimit({ windowMs: 60_000, max: 120, prefix: 'public' }), optionalAuth);
+  app.use('/v1/public/*', rateLimit({ windowMs: 60_000, max: (c) => policyNumber(cfgOf(c).db, 'rate.publicPerMinute'), prefix: 'public' }), optionalAuth);
 
   app.get('/v1/public/join/:code', (c) => {
     const db = cfgOf(c).db;
@@ -90,10 +96,15 @@ export function publicRoutes(app: Hono<AppEnv>) {
     );
     if (!hit) throw notFound('product');
     const org = platform(db).get<OrgRow>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE id = @id`, { id: hit.org_id })!;
+    // the shelf page follows what the business shows customers: nothing when the catalog is off,
+    // and for followers only, a visitor who does not follow sees the name and photos without
+    // price or stock
+    if (org.customer_catalog === 'off') throw notFound('product');
     const user = c.get('user');
     const viewer = user ? followingOf(db, user.id).find((f) => f.org.id === org.id)?.customerIds ?? [] : [];
     const [p] = storefrontProducts(db, org, [hit.product_id], { locale: readerLocale(c, org.default_locale), viewerCustomerIds: viewer, now: nowOf(c) });
     if (!p) throw notFound('product');
+    if (org.customer_catalog !== 'public' && !viewer.length) return c.json(shelfTeaser(p));
     return c.json(p);
   });
 
@@ -118,6 +129,6 @@ export function publicRoutes(app: Hono<AppEnv>) {
       { now: nowOf(c) },
     );
     const logo = org.logo_file_id ? platform(db).get<{ storage_key: string }>('SELECT storage_key FROM files WHERE id = @id AND deleted_at IS NULL', { id: org.logo_file_id }) : undefined;
-    return c.json({ slug: org.slug, name: org.name, catalog: org.customer_catalog, joinCode: link?.code ?? null, logoUrl: fileUrl(logo?.storage_key) });
+    return c.json({ slug: org.slug, name: org.name, catalog: org.customer_catalog, joinCode: link?.code ?? null, logoUrl: fileUrl(logo?.storage_key), timezone: org.timezone });
   });
 }

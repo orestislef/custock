@@ -94,9 +94,9 @@ export function storageFreeTier(env: Record<string, string | undefined> = proces
   return { bytes: num(env.CUSTOCK_STORAGE_FREE_BYTES, 10_000_000_000), writes: num(env.CUSTOCK_STORAGE_FREE_WRITES, 1_000_000) };
 }
 
-// photos the platform keeps: every file row not deleted. links to outside pictures (made up data)
-// are not ours and not counted
-const OWN_FILE = "deleted_at IS NULL AND storage_key NOT LIKE 'http%'";
+// photos the platform keeps: every confirmed file row not deleted (an upload slot nobody used is
+// not a photo, see lib/files.ts). links to outside pictures (made up data) are not ours and not counted
+const OWN_FILE = "deleted_at IS NULL AND confirmed_at IS NOT NULL AND storage_key NOT LIKE 'http%'";
 
 export function storageBytes(db: Db, orgId?: string): number {
   return platform(db).get<{ n: number | null }>(
@@ -112,7 +112,7 @@ function monthStart(now: number): number {
 
 // every upload slot is a write to the bucket, even when the photo is deleted later
 export function storageWritesThisMonth(db: Db, now = Date.now()): number {
-  return platform(db).get<{ n: number }>("SELECT count(*) AS n FROM files WHERE created_at >= @from AND storage_key NOT LIKE 'http%'", { from: monthStart(now) })!.n;
+  return platform(db).get<{ n: number }>("SELECT count(*) AS n FROM files WHERE created_at >= @from AND confirmed_at IS NOT NULL AND storage_key NOT LIKE 'http%'", { from: monthStart(now) })!.n;
 }
 
 export function storageUse(db: Db, now = Date.now()) {

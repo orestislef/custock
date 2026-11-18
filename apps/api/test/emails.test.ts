@@ -48,6 +48,9 @@ async function rawMail(row: OutboxRow): Promise<string> {
   return info.message.toString();
 }
 
+// mail a business sends its customers
+const BUSINESS_KINDS = new Set<string>(['joinConfirm', 'backInStock', 'post']);
+
 describe('templates', () => {
   it('every kind in every language: html and text, nothing left untranslated, no tracking', () => {
     for (const kind of EMAIL_KINDS) {
@@ -57,8 +60,15 @@ describe('templates', () => {
         expect(m.subject, where).toBeTruthy();
         expect(m.html, where).toContain(`<html lang="${locale}"`);
         expect(m.html, where).toContain('max-width:600px');
-        expect(m.html, where).toContain('http://localhost:8787/email/mark.png');
-        expect(m.html, where).toContain('alt="Custock"');
+        // account mail carries the Custock mark, a business's mail to its customers its own logo
+        // or name, with Custock in the footer
+        if (BUSINESS_KINDS.has(kind)) {
+          expect(m.html, where).not.toContain('/email/mark.png');
+          expect(m.text, where).toMatch(/Custock/);
+        } else {
+          expect(m.html, where).toContain('http://localhost:8787/email/mark.png');
+          expect(m.html, where).toContain('alt="Custock"');
+        }
         expect(m.html, where).toContain('@media (prefers-color-scheme: dark)');
         expect(m.html, where).toContain('name="color-scheme" content="light dark"');
         expect(m.html, where).toContain('display:none;max-height:0');
@@ -88,10 +98,12 @@ describe('templates', () => {
   });
 
   it('escapes what people typed and drops links that are not web links', () => {
-    const m = joinConfirmEmail('en', { name: '<img src=x onerror=alert(1)>', scope: 'A & B "shop"', url: 'javascript:alert(1)' });
+    // the person's name is not in the email any more (pre launch review), the business name is typed by people too
+    const m = joinConfirmEmail('en', { name: 'Zoe', scope: 'A & B "shop" <img src=x onerror=alert(1)>', url: 'javascript:alert(1)' });
     expect(m.html).not.toContain('<img src=x');
     expect(m.html).toContain(esc('<img src=x onerror=alert(1)>'));
     expect(m.html).toContain('A &amp; B &quot;shop&quot;');
+    expect(m.html).not.toContain('Zoe');
     expect(m.html).not.toContain('javascript:');
     expect(m.text).not.toContain('javascript:');
   });
@@ -118,12 +130,12 @@ describe('templates', () => {
     expect(m.text).toContain(`Stop these emails: ${WEB}/unsubscribe/t`);
   });
 
-  it('the business logo sits beside its name when it has one, never a non web link', () => {
+  it('the business logo sits on top in place of the mark, its name when it has none, never a non web link', () => {
     const base = { sender: 'Lemoni', kind: 'news', title: 'Hi', body: 'Body.', coverUrl: null, url: null, products: [], currency: 'EUR', timezone: 'Europe/Athens', validUntil: null, unsubscribeUrl: `${WEB}/u/t` };
     const withLogo = postEmail('en', { ...base, senderLogo: 'https://img.example.com/orgs/x/logo/y.png' });
-    expect(withLogo.html).toContain('<img src="https://img.example.com/orgs/x/logo/y.png" width="24" height="24" alt=""');
-    expect(withLogo.html).toContain('>Lemoni</span>');
-    expect(postEmail('en', base).html).not.toContain('width="24" height="24"');
+    expect(withLogo.html).toContain('<img src="https://img.example.com/orgs/x/logo/y.png" width="48" height="48" alt="Lemoni"');
+    expect(withLogo.html).not.toContain('width="24" height="24"');
+    expect(postEmail('en', base).html).toMatch(/font-size:22px[^>]*>Lemoni<\/p>/);
     expect(postEmail('en', { ...base, senderLogo: 'javascript:alert(1)' }).html).not.toContain('javascript:');
     expect(joinConfirmEmail('en', { name: 'Anna', scope: 'Lemoni', url: `${WEB}/confirm/t`, logoUrl: 'https://img.example.com/l.png' }).html).toContain('src="https://img.example.com/l.png"');
   });
@@ -179,7 +191,7 @@ describe('emails from the api', () => {
     const join = last("to_address = 'mira@example.com'");
     expect(join.title).toContain('Confirm you want news from');
     expect(join.html).toMatch(/href="https:\/\/orestislef\.gr\/custock\/confirm\/[^"]+"/);
-    await call('POST', '/v1/me/email', tokens.maria, { email: 'maria.new@example.com' });
+    await call('POST', '/v1/me/email', tokens.maria, { email: 'maria.new@example.com', password: 'custock' });
     expect(last("to_address = 'maria.new@example.com'").html).toMatch(/user-select:all;">\d{6}<\/span>/);
   });
 
@@ -196,7 +208,7 @@ describe('emails from the api', () => {
     const row = last("channel = 'email' AND json_extract(payload, '$.postId') = ?", post.body.id);
     expect(row).toBeTruthy();
     expect(row.html).toMatch(/\/s\/lemoni\/p\/[0-9a-f-]{36}/);
-    expect(row.html).toContain(`${WEB}/s/lemoni?post=${post.body.id}`);
+    expect(row.html).toContain(`${WEB}/s/lemoni/news?post=${post.body.id}`);
     expect(row.html).toMatch(/href="https:\/\/orestislef\.gr\/custock\/unsubscribe\/[^"]+"/);
     const raw = (await rawMail(row)).replace(/\r\n[ \t]+/g, ' ');
     expect(raw).toMatch(/^List-Unsubscribe: <https:\/\/orestislef\.gr\/custock\/unsubscribe\/[^>]+>$/m);
@@ -256,7 +268,7 @@ describe('first owner by invite', () => {
     const token = out.lines[1]!.split('/').pop()!;
     const preview = await call('GET', `/v1/invites/${token}`, undefined, undefined, { 'Accept-Language': 'en' });
     expect(preview.body).toMatchObject({ orgName: 'Fourno', scopeName: 'Fourno', roleName: 'Owner', email: 'baker@example.com', accountExists: false });
-    const reg = await call('POST', '/v1/invites/register', undefined, { token, displayName: 'Bea Baker', password: 'fresh bread daily' });
+    const reg = await call('POST', '/v1/invites/register', undefined, { token, displayName: 'Bea Baker', password: 'fresh.bread.daily' });
     expect(reg.status).toBe(201);
     const me = await call('GET', '/v1/me/context', reg.body.accessToken);
     expect(me.body.orgs[0]).toMatchObject({ slug: 'fourno' });

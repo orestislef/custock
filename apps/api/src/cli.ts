@@ -28,6 +28,7 @@ import { DEFAULT_DB_PATH, hashPassword, migrate, openDb, type Db } from '@custoc
 import { setEmailAssetBase } from './email/layout';
 import { liveChannels } from './lib/live';
 import { platform } from './lib/tenant';
+import { clearAllLocks } from './lib/lockout';
 import { addShop, BootstrapError, createBusiness, ensureDefaultJoinLink, firstOwner, inviteOwner } from './services/bootstrap';
 import { deleteBusinessEverything, deleteEmptyBusiness, grantSuperAdmin, removeSuperAdmin } from './services/platform';
 import { s3Store, storageFromEnv } from './lib/storage';
@@ -162,7 +163,7 @@ export async function runCli(db: Db, argv: string[], io: CliIo): Promise<number>
         platform(db).run('UPDATE users SET password_hash = @h, updated_at = @now WHERE id = @id', { h: hashPassword(password), now, id: user.id });
         // every session ends, the new password is the only way back in
         platform(db).run('UPDATE sessions SET revoked_at = coalesce(revoked_at, @now) WHERE user_id = @u', { now, u: user.id });
-        platform(db).run("DELETE FROM auth_throttle WHERE key = @k", { k: `login:${email}` });
+        clearAllLocks(db, email);
       })();
       io.out(`password set for ${email}, every session signed out`);
       if (generated) io.out(`password (shown once): ${password}`);

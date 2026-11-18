@@ -111,10 +111,18 @@ export function loadAssignments(t: Tenant, membershipId: string, org: Pick<OrgRo
   );
   const byRole = new Map<string, string[]>();
   for (const p of perms) byRole.set(p.role_id, [...(byRole.get(p.role_id) ?? []), p.permission]);
+  // "posts need approval": the business setting covers everyone below admin, a role or a person
+  // can be held to it on top (policy posts.needApproval, set in the role editor or for one person)
+  const approval = t.all<{ level: string; target_id: string }>(
+    `SELECT v.level, v.target_id FROM policy_values v WHERE v.org_id = @org AND v.key = 'posts.needApproval' AND v.value_json = 'true'
+        AND (v.level = 'role' OR (v.level = 'user' AND v.target_id = (SELECT user_id FROM memberships WHERE id = @m)))`,
+    { m: membershipId },
+  );
+  const rolesHeld = new Set(approval.filter((a) => a.level === 'role').map((a) => a.target_id));
+  const personHeld = approval.some((a) => a.level === 'user');
   const assignments = rows.map((r) => {
     let list = byRole.get(r.role_id) ?? [];
-    // "posts need approval" takes publishing away from everyone below admin
-    if (org.posts_need_approval && r.rank < 80) list = list.filter((p) => p !== 'posts.publish');
+    if ((org.posts_need_approval && r.rank < 80) || rolesHeld.has(r.role_id) || personHeld) list = list.filter((p) => p !== 'posts.publish');
     return { id: r.id, roleId: r.role_id, rank: r.rank, permissions: list, scopeType: r.scope_type, scopeId: r.scope_id };
   });
   return { assignments, roleNames: [...new Set(rows.map((r) => r.template_key ?? r.name))] };

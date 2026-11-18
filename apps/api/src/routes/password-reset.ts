@@ -10,14 +10,16 @@
 // - these emails go out during a platform wide email pause too: they are about account safety
 
 import type { Hono } from 'hono';
-import { PasswordForgotInput, PasswordResetInput, uuidv7 } from '@custock/core';
-import { hashPassword, randomToken, sha256 } from '@custock/db';
+import { PasswordForgotInput, PasswordResetInput, passwordProblem, uuidv7 } from '@custock/core';
+import { hashPasswordAsync, randomToken, sha256 } from '@custock/db';
 import { pickLocale } from '@custock/i18n';
 import type { AppEnv } from '../types';
 import { issueTokens } from '../lib/auth';
 import { cfgOf, nowOf } from '../lib/context';
 import { ApiProblem } from '../lib/problem';
-import { clearThrottle, clientIp, rateLimit, throttle } from '../lib/ratelimit';
+import { policyNumber } from '../lib/policy';
+import { clientIp, rateLimit, throttle } from '../lib/ratelimit';
+import { clearAllLocks } from '../lib/lockout';
 import { platform } from '../lib/tenant';
 import { devOutboxTransport, emailMessage } from '../lib/transport';
 import { passwordChangedEmail, passwordResetEmail } from '../email/account';
@@ -76,7 +78,7 @@ export function passwordResetRoutes(app: Hono<AppEnv>) {
       db.run(
         `INSERT INTO password_resets (id, user_id, token_hash, created_at, expires_at, ip)
          VALUES (@id, @u, @h, @now, @exp, @ip)`,
-        { id: uuidv7(now), u: user.id, h: sha256(`reset:${token}`), now, exp: now + RESET_TTL, ip },
+        { id: uuidv7(now), u: user.id, h: sha256(`reset:${token}`), now, exp: now + policyNumber(cfg.db, 'auth.resetMinutes') * MIN, ip },
       );
       devOutboxTransport(cfg.db).send(emailMessage(mail, { to: email, userId: user.id, locale, payload: { type: 'password_reset' } }));
     }
@@ -101,7 +103,8 @@ export function passwordResetRoutes(app: Hono<AppEnv>) {
     const row = openReset(db, input.token, now);
     if (!row) throw expired();
     const user = db.get<{ id: string; email: string; locale: string | null }>('SELECT id, email, locale FROM users WHERE id = @id', { id: row.user_id })!;
-    const hash = hashPassword(input.password);
+    if (passwordProblem(input.password, user.email) === 'sameAsEmail') throw new ApiProblem(400, 'validation', 'the password is the email', { password: 'sameAsEmail' });
+    const hash = await hashPasswordAsync(input.password);
     const done = cfg.db.transaction(() => {
       // claim the link first: two tabs racing on the same link, only one wins
       const claimed = db.run('UPDATE password_resets SET used_at = @now WHERE id = @id AND used_at IS NULL', { now, id: row.id });
@@ -113,7 +116,7 @@ export function passwordResetRoutes(app: Hono<AppEnv>) {
       return true;
     })();
     if (!done) throw expired();
-    clearThrottle(cfg.db, `login:${user.email}`);
+    if (user.email) clearAllLocks(cfg.db, user.email);
     const locale = pickLocale(user.locale ?? undefined, c.get('locale'));
     const web = cfg.publicWebUrl.replace(/\/$/, '');
     devOutboxTransport(cfg.db).send(

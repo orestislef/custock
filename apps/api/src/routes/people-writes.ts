@@ -9,19 +9,23 @@ import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 import {
   AddCustomerInput, checkOwnersAfter, contactKey, effectiveAtScope, JoinInput, maskEmail, searchKey, uuidv7, type Customer, type JoinLink, type StockAlertItem,
+  zEmail, zOtp,
+  LIMITS, zLine, zText,
 } from '@custock/core';
-import { randomToken, sha256, type Db } from '@custock/db';
+import { randomToken, sha256, verifyPasswordAsync, type Db } from '@custock/db';
 import { pickLocale, translator } from '@custock/i18n';
 import type { AppEnv, Config, OrgRow } from '../types';
 import { audit } from '../lib/audit';
 import { cfgOf, need, nowOf, orgOf, ORG_COLUMNS, readerLocale, requireAuth } from '../lib/context';
 import { idempotent } from '../lib/idempotency';
 import { ApiProblem, badRequest, forbidden, notFound } from '../lib/problem';
+import { policyNumber } from '../lib/policy';
 import { retireFile } from './uploads';
 import { clientIp, throttle } from '../lib/ratelimit';
 import { platform, Tenant } from '../lib/tenant';
 import { pushReachableSql, recomputePushOk } from '../lib/webpush';
 import { changeCodeEmail, emailChangedEmail, joinConfirmEmail } from '../email/messages';
+import { deleteCodeEmail, emailRevertedEmail } from '../email/account';
 import { dayKey } from '../lib/time';
 import { devOutboxTransport, emailMessage } from '../lib/transport';
 import { readUnsubToken, unsubKey } from '../lib/unsub';
@@ -30,9 +34,8 @@ import { canSee, customerVisibility, loadSubscriptions, loadTags, reachedShops, 
 import { fileUrl, orgLogoUrl } from '../services/catalog';
 import { storefrontProducts } from '../services/storefront';
 import { followingOf } from './customer';
+import { confirmFiles } from '../lib/files';
 
-const CONFIRM_TTL = 7 * 86_400_000;
-const CODE_TTL = 15 * 60_000;
 const TEXT_VERSION = (locale: string) => `${locale}-2026-11`;
 
 export const DEV_TURNSTILE_TOKEN = 'dev-turnstile-ok';
@@ -160,15 +163,50 @@ function sendConfirmation(cfg: Config, t: Tenant, org: OrgRow, req: ConfirmReque
     `INSERT INTO join_confirmations (token_hash, org_id, customer_id, join_link_id, created_at, expires_at, scope_type, scope_id, email_news, push, locale, source, ip, user_agent)
      VALUES (@h, @org, @c, @l, @now, @exp, @st, @sid, @news, @push, @locale, @source, @ip, @ua)`,
     {
-      h: sha256(token), c: req.customerId, l: req.linkId, now, exp: now + CONFIRM_TTL, st: req.scopeType, sid: req.scopeId,
+      h: sha256(token), c: req.customerId, l: req.linkId, now, exp: now + policyNumber(cfg.db, 'join.confirmDays') * 86_400_000, st: req.scopeType, sid: req.scopeId,
       news: req.emailNews, push: req.push, locale: req.locale, source: req.source, ip: req.ip, ua: req.ua,
     },
   );
   const url = `${cfg.publicWebUrl.replace(/\/$/, '')}/confirm/${token}`;
   devOutboxTransport(cfg.db).send(
-    emailMessage(joinConfirmEmail(req.locale, { name, scope: scopeName, url, logoUrl: orgLogoUrl(cfg.db, org.id) }), { orgId: org.id, customerId: req.customerId, to: email, locale: req.locale, payload: { type: 'join_confirm' } }),
+    emailMessage(joinConfirmEmail(req.locale, { name, scope: scopeName, url, logoUrl: orgLogoUrl(cfg.db, org.id), org: org.name }), { orgId: org.id, customerId: req.customerId, to: email, locale: req.locale, payload: { type: 'join_confirm' } }),
   );
   return url;
+}
+
+// public join page limits (H3 of the pre launch review)
+export const JOIN_PER_IP_HOUR = 10;
+export const JOIN_PER_LINK_HOUR = 120;
+const REVERT_TTL = 7 * 24 * 3600_000;
+const DELETE_CODE_TTL = 10 * 60_000;
+const PASSWORD_TRIES = { max: 5, windowMs: 15 * 60_000 };
+
+// the current password, for changes that need more than a signed in session. wrong ones are
+// counted per person: 5 in 15 minutes and it waits.
+async function needCurrentPassword(db: Db, userId: string, password: string | undefined, now: number) {
+  const row = platform(db).get<{ password_hash: string | null }>('SELECT password_hash FROM users WHERE id = @id', { id: userId });
+  if (!row?.password_hash) return;
+  if (!password) throw new ApiProblem(400, 'validation', 'your current password is needed', { password: 'required' });
+  if (!throttle(db, `pwcheck:${userId}`, { ...PASSWORD_TRIES, now, count: false })) throw new ApiProblem(429, 'rate_limited');
+  if (!(await verifyPasswordAsync(password, row.password_hash))) {
+    throttle(db, `pwcheck:${userId}`, { ...PASSWORD_TRIES, now });
+    throw new ApiProblem(400, 'validation', 'wrong password', { password: 'wrong' });
+  }
+}
+
+function useDeleteCode(db: Db, userId: string, code: string | undefined, now: number) {
+  const p = platform(db);
+  if (!code) throw new ApiProblem(400, 'validation', 'the code from the email is needed', { code: 'required' });
+  const row = p.get<{ id: string; code_hash: string; attempts: number; expires_at: number }>(
+    "SELECT id, code_hash, attempts, expires_at FROM account_codes WHERE user_id = @u AND purpose = 'delete' AND used_at IS NULL ORDER BY created_at DESC LIMIT 1",
+    { u: userId },
+  );
+  if (!row || row.expires_at < now || row.attempts >= 5) throw new ApiProblem(410, 'invite_expired', 'code expired');
+  if (row.code_hash !== sha256(`delete:${userId}:${code.trim()}`)) {
+    p.run('UPDATE account_codes SET attempts = attempts + 1 WHERE id = @id', { id: row.id });
+    throw new ApiProblem(400, 'validation', 'wrong code', { code: 'wrong' });
+  }
+  p.run('UPDATE account_codes SET used_at = @now WHERE id = @id', { now, id: row.id });
 }
 
 export function eraseCustomer(db: Db, t: Tenant, customerId: string, now: number) {
@@ -263,7 +301,7 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
 
   app.post('/v1/orgs/:org/customers/:id/notes', async (c) => {
     need(c, 'customers.edit');
-    const { body } = z.object({ body: z.string().min(1).max(2000) }).parse(await c.req.json());
+    const { body } = z.object({ body: zText(LIMITS.customerNote).pipe(z.string().min(1, { message: 'empty' })) }).parse(await c.req.json());
     visibleCustomer(c, c.req.param('id'));
     const { t } = orgOf(c);
     t.run('INSERT INTO customer_notes (id, org_id, customer_id, body, author_id, created_at) VALUES (@id, @org, @c, @b, @u, @now)', { id: uuidv7(nowOf(c)), c: c.req.param('id'), b: body, u: c.get('user').id, now: nowOf(c) });
@@ -272,7 +310,7 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
 
   app.put('/v1/orgs/:org/customers/:id/tags', async (c) => {
     need(c, 'customers.edit');
-    const { tags } = z.object({ tags: z.array(z.string().min(1).max(40)).max(30) }).parse(await c.req.json());
+    const { tags } = z.object({ tags: z.array(zLine(LIMITS.tag)).max(30) }).parse(await c.req.json());
     const id = c.req.param('id');
     visibleCustomer(c, id);
     const { t } = orgOf(c);
@@ -297,7 +335,7 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
   });
 
   app.post('/v1/orgs/:org/join-links', async (c) => {
-    const input = z.object({ scopeType: z.enum(['org', 'group', 'shop']), scopeId: z.string().max(64), label: z.string().max(80).optional() }).parse(await c.req.json());
+    const input = z.object({ scopeType: z.enum(['org', 'group', 'shop']), scopeId: z.string().max(64), label: zLine(LIMITS.joinLabel, 0).optional() }).parse(await c.req.json());
     const { assignments, topology, t } = orgOf(c);
     if (!scopeExists(t, input.scopeType, input.scopeId)) throw notFound('scope');
     if (!effectiveAtScope(assignments, topology, input).perms.has('joinlinks.manage')) throw forbidden('joinlinks.manage', 'scope');
@@ -316,7 +354,7 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
   });
 
   app.patch('/v1/orgs/:org/join-links/:id', async (c) => {
-    const patch = z.object({ label: z.string().max(80).nullable().optional(), disabled: z.boolean().optional() }).parse(await c.req.json());
+    const patch = z.object({ label: zLine(LIMITS.joinLabel, 0).nullable().optional(), disabled: z.boolean().optional() }).parse(await c.req.json());
     const before = joinLinkView(c, c.req.param('id'));
     const { assignments, topology, t } = orgOf(c);
     if (!effectiveAtScope(assignments, topology, before).perms.has('joinlinks.manage')) throw forbidden('joinlinks.manage', 'scope');
@@ -340,7 +378,12 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
     const now = nowOf(c);
     if (link.disabled_at || (link.expires_at != null && link.expires_at < now)) throw new ApiProblem(410, 'join_link_disabled');
     const email = input.email.trim().toLowerCase();
-    // one confirmation email per address per hour per business, so the page cannot be used to flood someone
+    // the page sends email to whatever address is typed, so: a few signups per ip an hour, a cap per
+    // join link an hour, and at most 3 confirmations per address per business an hour
+    if (cfg.rateLimit !== false) {
+      if (!throttle(cfg.db, `join-ip:${ip}`, { max: JOIN_PER_IP_HOUR, windowMs: 3600_000, now })) throw new ApiProblem(429, 'rate_limited');
+      if (!throttle(cfg.db, `join-link:${link.id}`, { max: JOIN_PER_LINK_HOUR, windowMs: 3600_000, now })) throw new ApiProblem(429, 'rate_limited');
+    }
     if (!throttle(cfg.db, `join:${link.org_id}:${email}`, { max: 3, windowMs: 3600_000, now })) throw new ApiProblem(429, 'rate_limited');
     const org = orgBy(cfg.db, link.org_id);
     const t = new Tenant(cfg.db, org.id);
@@ -362,6 +405,40 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
       );
     })();
     return c.json(cfg.dev ? { pending: true, devConfirmLink: url } : { pending: true });
+  });
+
+  // the one click way back from the notice to the old address after a login email change: the old
+  // email comes back, every session of the account ends and open reset links stop working.
+  // it only works while the account still has the email it was changed to.
+  app.post('/v1/public/email-revert', async (c) => {
+    const { token } = z.object({ token: z.string().min(10).max(200) }).parse(await c.req.json());
+    const cfg = cfgOf(c);
+    const p = platform(cfg.db);
+    const now = nowOf(c);
+    const row = p.get<{ id: string; user_id: string; old_email: string; new_email: string; expires_at: number; used_at: number | null }>(
+      'SELECT id, user_id, old_email, new_email, expires_at, used_at FROM email_reverts WHERE token_hash = @h',
+      { h: sha256(`revert:${token}`) },
+    );
+    if (!row || row.used_at || row.expires_at < now) throw new ApiProblem(410, 'invite_expired', 'this link no longer works');
+    const user = p.get<{ id: string; email: string | null; locale: string | null; deleted_at: number | null }>('SELECT id, email, locale, deleted_at FROM users WHERE id = @id', { id: row.user_id });
+    if (!user || user.deleted_at || user.email !== row.new_email) throw new ApiProblem(410, 'invite_expired', 'the email was changed again since');
+    if (p.get('SELECT 1 FROM users WHERE email = @e AND id != @id AND deleted_at IS NULL', { e: row.old_email, id: user.id })) throw new ApiProblem(409, 'conflict', 'the old email is in use by another account');
+    cfg.db.transaction(() => {
+      const claimed = p.run('UPDATE email_reverts SET used_at = @now WHERE id = @id AND used_at IS NULL', { now, id: row.id });
+      if (!claimed.changes) throw new ApiProblem(410, 'invite_expired', 'this link no longer works');
+      p.run('UPDATE users SET email = @e, updated_at = @now WHERE id = @id', { e: row.old_email, now, id: user.id });
+      // linked customer records that followed the change go back too
+      const records = p.all<{ id: string; org_id: string; phone: string | null }>('SELECT id, org_id, phone FROM customers WHERE user_id = @u AND email = @e AND erased_at IS NULL', { u: user.id, e: row.new_email });
+      for (const r of records) {
+        new Tenant(cfg.db, r.org_id).run('UPDATE customers SET email = @e, contact_key = @ck, updated_at = @now WHERE org_id = @org AND id = @id', { e: row.old_email, ck: contactKey(row.old_email, r.phone), now, id: r.id });
+      }
+      p.run('UPDATE sessions SET revoked_at = coalesce(revoked_at, @now) WHERE user_id = @u', { now, u: user.id });
+      p.run('UPDATE password_resets SET used_at = coalesce(used_at, @now) WHERE user_id = @u', { now, u: user.id });
+      p.run('UPDATE email_changes SET used_at = coalesce(used_at, @now) WHERE user_id = @u', { now, u: user.id });
+      p.run('UPDATE email_reverts SET used_at = coalesce(used_at, @now) WHERE user_id = @u', { now, u: user.id });
+    })();
+    devOutboxTransport(cfg.db).send(emailMessage(emailRevertedEmail(user.locale, { email: maskEmail(row.old_email) ?? row.old_email }), { userId: user.id, to: row.old_email, locale: user.locale, payload: { type: 'email_reverted' } }));
+    return c.json({ email: maskEmail(row.old_email) ?? row.old_email });
   });
 
   // double opt in: only what this token asked for is applied, and nothing is ever withdrawn here
@@ -602,7 +679,7 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
 
   app.patch('/v1/me', requireAuth, async (c) => {
     const patch = z.object({
-      displayName: z.string().min(1).max(120).optional(),
+      displayName: zLine(LIMITS.personName).optional(),
       locale: z.enum(['en', 'el', 'ru']).optional(),
       // a profile photo this person uploaded (purpose avatar), or null to remove it
       avatarFileId: z.string().max(64).nullable().optional(),
@@ -622,6 +699,7 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
       const before = p.get<{ avatar_file_id: string | null }>('SELECT avatar_file_id FROM users WHERE id = @id', { id: userId })?.avatar_file_id ?? null;
       if (before !== patch.avatarFileId) {
         p.run('UPDATE users SET avatar_file_id = @f, updated_at = @now WHERE id = @id', { f: patch.avatarFileId, now, id: userId });
+        confirmFiles(cfgOf(c).db, [patch.avatarFileId], now);
         // the old photo is gone from the bucket too
         retireFile(cfg, before, now);
       }
@@ -632,24 +710,26 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
 
   // email change: a code goes to the new address. once confirmed the old address gets a notice.
   app.post('/v1/me/email', requireAuth, async (c) => {
-    const { email: raw } = z.object({ email: z.string().email().max(254) }).parse(await c.req.json());
+    const { email: raw, password } = z.object({ email: zEmail, password: z.string().max(200).optional() }).parse(await c.req.json());
     const cfg = cfgOf(c);
     const user = c.get('user');
     const email = raw.trim().toLowerCase();
     const now = nowOf(c);
+    // a stolen session alone must not be enough to move the account to another address
+    await needCurrentPassword(cfg.db, user.id, password, now);
     if (!throttle(cfg.db, `emailchange:${user.id}`, { max: 5, windowMs: 3600_000, now })) throw new ApiProblem(429, 'rate_limited');
     if (platform(cfg.db).get('SELECT 1 FROM users WHERE email = @e AND deleted_at IS NULL AND id != @id', { e: email, id: user.id })) throw new ApiProblem(409, 'conflict', 'email in use');
     const code = String(randomInt(100000, 1000000));
     platform(cfg.db).run(
       'INSERT INTO email_changes (id, user_id, new_email, code_hash, created_at, expires_at) VALUES (@id, @u, @e, @h, @now, @exp)',
-      { id: uuidv7(now), u: user.id, e: email, h: sha256(`${email}:${code}`), now, exp: now + CODE_TTL },
+      { id: uuidv7(now), u: user.id, e: email, h: sha256(`${email}:${code}`), now, exp: now + policyNumber(cfg.db, 'email.changeCodeMinutes') * 60_000 },
     );
     devOutboxTransport(cfg.db).send(emailMessage(changeCodeEmail(user.locale, { code }), { userId: user.id, to: email, locale: user.locale, payload: { type: 'email_change' } }));
     return c.json(cfg.dev ? { sent: true, devCode: code } : { sent: true });
   });
 
   app.post('/v1/me/email/verify', requireAuth, async (c) => {
-    const input = z.object({ email: z.string().email().max(254), code: z.string().length(6) }).parse(await c.req.json());
+    const input = z.object({ email: zEmail, code: zOtp }).parse(await c.req.json());
     const cfg = cfgOf(c);
     const p = platform(cfg.db);
     const user = c.get('user');
@@ -666,9 +746,19 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
     }
     if (p.get('SELECT 1 FROM users WHERE email = @e AND deleted_at IS NULL AND id != @id', { e: email, id: user.id })) throw new ApiProblem(409, 'conflict', 'email in use');
     const old = user.email;
+    const revertToken = randomToken();
     cfg.db.transaction(() => {
       p.run('UPDATE email_changes SET used_at = @now WHERE id = @id', { now, id: row.id });
       p.run('UPDATE users SET email = @e, email_verified_at = @now, updated_at = @now WHERE id = @id', { e: email, now, id: user.id });
+      // every other session ends: only the device that made the change stays signed in
+      const own = user.sessionId ? p.get<{ family_id: string }>('SELECT family_id FROM sessions WHERE id = @id', { id: user.sessionId })?.family_id ?? null : null;
+      p.run('UPDATE sessions SET revoked_at = coalesce(revoked_at, @now) WHERE user_id = @u AND revoked_at IS NULL AND (@f IS NULL OR family_id != @f)', { now, u: user.id, f: own });
+      if (old) {
+        p.run(
+          'INSERT INTO email_reverts (id, user_id, token_hash, old_email, new_email, created_at, expires_at) VALUES (@id, @u, @h, @old, @new, @now, @exp)',
+          { id: uuidv7(now), u: user.id, h: sha256(`revert:${revertToken}`), old, new: email, now, exp: now + REVERT_TTL },
+        );
+      }
       // linked customer records follow, unless that business already has someone with the new address
       const records = p.all<{ id: string; org_id: string; phone: string | null }>('SELECT id, org_id, phone FROM customers WHERE user_id = @u AND erased_at IS NULL', { u: user.id });
       for (const r of records) {
@@ -678,7 +768,8 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
       }
     })();
     if (old) {
-      devOutboxTransport(cfg.db).send(emailMessage(emailChangedEmail(user.locale, { email: maskEmail(email) ?? email }), { userId: user.id, to: old, locale: user.locale, payload: { type: 'email_changed' } }));
+      const revertUrl = `${cfg.publicWebUrl.replace(/\/$/, '')}/account/email-revert/${revertToken}`;
+      devOutboxTransport(cfg.db).send(emailMessage(emailChangedEmail(user.locale, { email: maskEmail(email) ?? email, revertUrl }), { userId: user.id, to: old, locale: user.locale, payload: { type: 'email_changed' } }));
     }
     return c.body(null, 204);
   });
@@ -711,12 +802,34 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
     });
   });
 
+  // how the person confirms deleting the account: their password, or a fresh code by email when
+  // the account has no password (customers who sign in with codes)
+  app.post('/v1/me/delete/start', requireAuth, (c) => {
+    const cfg = cfgOf(c);
+    const p = platform(cfg.db);
+    const user = c.get('user');
+    const now = nowOf(c);
+    if (p.get<{ password_hash: string | null }>('SELECT password_hash FROM users WHERE id = @id', { id: user.id })?.password_hash) return c.json({ method: 'password' as const });
+    if (!user.email) throw new ApiProblem(409, 'conflict', 'no email on the account');
+    if (!throttle(cfg.db, `deletecode:${user.id}`, { max: 3, windowMs: 3600_000, now })) throw new ApiProblem(429, 'rate_limited');
+    const code = String(randomInt(100000, 1000000));
+    p.run("UPDATE account_codes SET used_at = @now WHERE user_id = @u AND purpose = 'delete' AND used_at IS NULL", { now, u: user.id });
+    p.run(
+      "INSERT INTO account_codes (id, user_id, purpose, code_hash, created_at, expires_at) VALUES (@id, @u, 'delete', @h, @now, @exp)",
+      { id: uuidv7(now), u: user.id, h: sha256(`delete:${user.id}:${code}`), now, exp: now + DELETE_CODE_TTL },
+    );
+    devOutboxTransport(cfg.db).send(emailMessage(deleteCodeEmail(user.locale, { code }), { userId: user.id, to: user.email, locale: user.locale, payload: { type: 'delete_code' } }));
+    return c.json(cfg.dev ? { method: 'code' as const, sent: true, devCode: code } : { method: 'code' as const, sent: true });
+  });
+
   // in app account deletion (app store rule). the last owner of a business has to hand it over first.
-  app.delete('/v1/me', requireAuth, (c) => {
+  app.delete('/v1/me', requireAuth, async (c) => {
     const db = cfgOf(c).db;
     const p = platform(db);
     const user = c.get('user');
     const now = nowOf(c);
+    const confirm = z.object({ password: z.string().max(200).optional(), code: z.string().max(10).optional() })
+      .parse(await c.req.json().catch(() => ({})));
     const ownerOf = p.all<{ org_id: string }>(
       `SELECT DISTINCT a.org_id FROM role_assignments a JOIN roles r ON r.id = a.role_id JOIN memberships m ON m.id = a.membership_id
         WHERE m.user_id = @u AND m.status = 'active' AND r.template_key = 'owner'`,
@@ -731,6 +844,10 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
       const check = checkOwnersAfter(others.map((x) => x.user_id));
       if (!check.ok) throw new ApiProblem(409, 'last_owner');
     }
+    // the person really means it: their password, or the code from /v1/me/delete/start
+    const hasPassword = !!p.get<{ password_hash: string | null }>('SELECT password_hash FROM users WHERE id = @id', { id: user.id })?.password_hash;
+    if (hasPassword) await needCurrentPassword(db, user.id, confirm.password, now);
+    else useDeleteCode(db, user.id, confirm.code, now);
     db.transaction(() => {
       for (const f of followingOf(db, user.id)) {
         const t = new Tenant(db, f.org.id);

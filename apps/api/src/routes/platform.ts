@@ -7,8 +7,9 @@ import { z } from 'zod';
 import {
   Feature, NewBusinessInput, normalizeBarcode, OrgControlsPatch, PlatformInviteInput, PlatformSettingsPatch, uuidv7,
   type PlatformInvitePreview,
+  LIMITS, passwordProblem, zLine, zNewPassword,
 } from '@custock/core';
-import { hashPassword } from '@custock/db';
+import { hashPasswordAsync } from '@custock/db';
 import type { AppEnv } from '../types';
 import { issueTokens } from '../lib/auth';
 import { cfgOf, nowOf, requireAuth } from '../lib/context';
@@ -81,18 +82,27 @@ const orgGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
 };
 
+// a path part as text. a broken %-escape is a link that leads nowhere: 404, not a server error
+function decodePart(v: string): string {
+  try {
+    return decodeURIComponent(v);
+  } catch {
+    throw notFound();
+  }
+}
+
 // the business behind a customer facing route, when the path names one
 function orgForCustomerPath(c: Context<AppEnv>): string | null {
   const db = cfgOf(c).db;
   const p = platform(db);
   const path = c.req.path;
   let m = path.match(/^\/v1\/(?:public|c)\/join\/([^/]+)$/);
-  if (m) return p.get<{ org_id: string }>('SELECT org_id FROM join_links WHERE code = @c', { c: decodeURIComponent(m[1]!) })?.org_id ?? null;
+  if (m) return p.get<{ org_id: string }>('SELECT org_id FROM join_links WHERE code = @c', { c: decodePart(m[1]!) })?.org_id ?? null;
   m = path.match(/^\/v1\/(?:public|c)\/orgs\/([^/]+)/);
-  if (m) return p.get<{ id: string }>('SELECT id FROM organizations WHERE slug = @s', { s: decodeURIComponent(m[1]!) })?.id ?? null;
+  if (m) return p.get<{ id: string }>('SELECT id FROM organizations WHERE slug = @s', { s: decodePart(m[1]!) })?.id ?? null;
   m = path.match(/^\/v1\/public\/p\/([^/]+)$/);
   if (m) {
-    const raw = decodeURIComponent(m[1]!);
+    const raw = decodePart(m[1]!);
     const sep = raw.indexOf(':');
     const slug = sep > 0 && !/^https?$/i.test(raw.slice(0, sep)) ? raw.slice(0, sep) : null;
     const n = normalizeBarcode(slug ? raw.slice(sep + 1) : raw);
@@ -225,8 +235,8 @@ export function platformRoutes(app: Hono<AppEnv>) {
   app.post('/v1/platform-invites/register', inviteLimit, async (c) => {
     const input = z.object({
       token: z.string().min(10).max(200),
-      displayName: z.string().trim().min(1).max(80),
-      password: z.string().min(10).max(200),
+      displayName: zLine(LIMITS.personName),
+      password: zNewPassword,
       locale: z.enum(['en', 'el', 'ru']).optional(),
     }).parse(await c.req.json());
     const cfg = cfgOf(c);
@@ -236,10 +246,11 @@ export function platformRoutes(app: Hono<AppEnv>) {
     const inv = openPlatformInvite(db, input.token, now);
     const p = platform(db);
     if (p.get('SELECT 1 FROM users WHERE email = @e', { e: inv.email })) throw new ApiProblem(409, 'account_exists', 'sign in with that account, then accept');
+    if (passwordProblem(input.password, inv.email) === 'sameAsEmail') throw new ApiProblem(400, 'validation', 'the password is the email', { password: 'sameAsEmail' });
     // the email counts as verified only when the invite really went out by email
     const emailed = !!p.get("SELECT 1 FROM dev_outbox WHERE channel = 'email' AND sent_at IS NOT NULL AND json_extract(payload, '$.inviteId') = @id", { id: inv.id });
     const userId = uuidv7(now);
-    const hash = hashPassword(input.password);
+    const hash = await hashPasswordAsync(input.password);
     db.transaction(() => {
       p.run(
         `INSERT INTO users (id, email, display_name, password_hash, email_verified_at, locale, created_at, updated_at)

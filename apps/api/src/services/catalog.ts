@@ -73,6 +73,8 @@ export interface LoadOpts {
   locale?: string;
   // customer facing: name itself in the reader's language (staff keep the default name to edit)
   localizeName?: boolean;
+  // staff views: every shop in levelShops gets a level per variant, 0 when nothing moved there yet
+  fillLevels?: boolean;
 }
 
 export type ProductWithLevels = Product & { levels: StockLevel[] };
@@ -108,7 +110,7 @@ export function loadProducts(t: Tenant, ids: string[], opts: LoadOpts): ProductW
       WHERE p.org_id = @org AND tr.product_id IN (SELECT value FROM json_each(@ids))`,
     { ids },
   );
-  const levels = opts.levelShops.length ? loadLevels(t, variantIds, opts.levelShops) : [];
+  const levels = opts.levelShops.length ? loadLevels(t, variantIds, opts.levelShops, opts.fillLevels) : [];
 
   const byProduct = <T extends { product_id: string }>(rows: T[]) => {
     const m = new Map<string, T[]>();
@@ -163,7 +165,9 @@ export function loadProducts(t: Tenant, ids: string[], opts: LoadOpts): ProductW
     });
 }
 
-export function loadLevels(t: Tenant, variantIds: string[], shopIds: string[]): StockLevel[] {
+// stock_levels only has a row once something moved in a shop. with fill, a variant that never had
+// stock in one of the shops still gets a level there, at 0, so staff see every shop they work in.
+export function loadLevels(t: Tenant, variantIds: string[], shopIds: string[], fill = false): StockLevel[] {
   if (!variantIds.length || !shopIds.length) return [];
   const rows = t.all<{ shop_id: string; variant_id: string; on_hand: number; in_transit_in: number; last_movement_at: number | null; reorder_point: number | null }>(
     `SELECT l.shop_id, l.variant_id, l.on_hand, l.in_transit_in, l.last_movement_at, s.reorder_point
@@ -178,15 +182,36 @@ export function loadLevels(t: Tenant, variantIds: string[], shopIds: string[]): 
       GROUP BY variant_id, shop_id`,
     { vids: variantIds },
   );
-  return rows.map((r) => ({
+  const waitingFor = (variantId: string, shopId: string) =>
+    waiting.filter((w) => w.variant_id === variantId && (w.shop_id === shopId || w.shop_id === null)).reduce((a, w) => a + w.n, 0);
+  const out: StockLevel[] = rows.map((r) => ({
     shopId: r.shop_id,
     variantId: r.variant_id,
     onHand: r.on_hand,
     inTransitIn: r.in_transit_in,
     reorderPoint: r.reorder_point,
     lastMovementAt: r.last_movement_at,
-    waiting: waiting.filter((w) => w.variant_id === r.variant_id && (w.shop_id === r.shop_id || w.shop_id === null)).reduce((a, w) => a + w.n, 0),
+    waiting: waitingFor(r.variant_id, r.shop_id),
   }));
+  if (!fill) return out;
+  const have = new Set(rows.map((r) => `${r.variant_id}:${r.shop_id}`));
+  const visible = t.all<{ id: string }>(
+    `SELECT id FROM shops WHERE org_id = @org AND archived_at IS NULL AND id IN (SELECT value FROM json_each(@shops)) ORDER BY name`,
+    { shops: shopIds },
+  ).map((s) => s.id);
+  const missing = variantIds.flatMap((v) => visible.filter((s) => !have.has(`${v}:${s}`)).map((s) => ({ v, s })));
+  if (!missing.length) return out;
+  const points = new Map(
+    t.all<{ shop_id: string; variant_id: string; reorder_point: number | null }>(
+      `SELECT shop_id, variant_id, reorder_point FROM shop_variant_settings
+        WHERE org_id = @org AND variant_id IN (SELECT value FROM json_each(@vids)) AND shop_id IN (SELECT value FROM json_each(@shops))`,
+      { vids: variantIds, shops: shopIds },
+    ).map((r) => [`${r.variant_id}:${r.shop_id}`, r.reorder_point]),
+  );
+  for (const { v, s } of missing) {
+    out.push({ shopId: s, variantId: v, onHand: 0, inTransitIn: 0, reorderPoint: points.get(`${v}:${s}`) ?? null, lastMovementAt: null, waiting: waitingFor(v, s) });
+  }
+  return out;
 }
 
 // a readable variant name: product name plus option labels in the asked language

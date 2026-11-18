@@ -356,6 +356,8 @@ describe('public pages', () => {
     expect((await call('GET', '/v1/public/join/nope')).status).toBe(404);
   });
   it('shelf product follows stock and price settings', async () => {
+    // a visitor who does not follow sees price and stock only when the catalog is for everyone
+    setOrg('customer_catalog', 'public');
     const code = barcodeOf(s.variants['p-thyme-honey']!);
     const avail = await call('GET', `/v1/public/p/${code}`);
     const kif = (avail.body as PublicProduct).availability.find((a) => a.shopId === s.shops.kifisia)!;
@@ -364,6 +366,7 @@ describe('public pages', () => {
     setOrg('customer_stock', 'exact');
     const exact = await call('GET', `/v1/public/p/${code}`);
     expect((exact.body as PublicProduct).availability.every((a) => typeof a.qty === 'number')).toBe(true);
+    setOrg('customer_catalog', 'subscribers');
     setOrg('customer_stock', 'off');
     setOrg('customer_prices', 0);
     const off = await call('GET', `/v1/public/p/${code}`);

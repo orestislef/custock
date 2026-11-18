@@ -4,8 +4,7 @@ import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import {
   makeInternalEan13, MovementInput, normalizeBarcode, ProductInput, searchKey, ShopVariantSettingsInput, TransferInput,
-  UncountedPolicy, uuidv7, type MovementBatchResult, type StockCount, type SyncResult, type Transfer,
-} from '@custock/core';
+  UncountedPolicy, uuidv7, type MovementBatchResult, type StockCount, type SyncResult, type Transfer, zBarcode, zQtyBase } from '@custock/core';
 import type { AppEnv } from '../types';
 import { audit, nextStamp } from '../lib/audit';
 import { cfgOf, has, need, nowOf, orgOf, productNameSql, readerLocale, shopsFor } from '../lib/context';
@@ -108,8 +107,11 @@ function loadTransfer(c: Context<AppEnv>, id: string): Transfer {
       WHERE l.org_id = @org AND l.transfer_id = @id ORDER BY p.name`,
     { id, loc: readerLocale(c, orgOf(c).org.default_locale) },
   );
+  const shopName = (sid: string) => t.get<{ name: string }>('SELECT name FROM shops WHERE org_id = @org AND id = @sid', { sid })?.name ?? undefined;
   return {
-    id: row.id, fromShopId: row.from_shop_id, toShopId: row.to_shop_id, status: row.status, note: row.note, createdBy: row.created_by,
+    id: row.id, fromShopId: row.from_shop_id, toShopId: row.to_shop_id,
+    fromShopName: shopName(row.from_shop_id), toShopName: shopName(row.to_shop_id),
+    status: row.status, note: row.note, createdBy: row.created_by,
     createdAt: row.created_at, sentAt: row.sent_at, receivedAt: row.received_at,
     lines: lines.map((l) => ({
       variantId: l.variant_id, name: variantLabel(l.name, l.options, readerLocale(c, orgOf(c).org.default_locale)), qtySent: l.qty_sent, qtyReceived: l.qty_received,
@@ -193,7 +195,7 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
       t.run('UPDATE products SET updated_at = @now WHERE org_id = @org AND id = @id', { now, id });
       audit(t, { id: c.get('user').id }, 'product.updated', { type: 'product', id }, { name: row.name }, patch, now);
     })();
-    const [p] = loadProducts(t, [id], { withCost: has(c, 'products.cost.view'), levelShops: has(c, 'stock.view') ? shopsFor(c, 'stock.view') : [] });
+    const [p] = loadProducts(t, [id], { withCost: has(c, 'products.cost.view'), levelShops: has(c, 'stock.view') ? shopsFor(c, 'stock.view') : [], fillLevels: true });
     c.header('ETag', productEtag(now));
     return c.json(p);
   });
@@ -261,7 +263,7 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
 
   app.post('/v1/orgs/:org/variants/:variant/barcodes', async (c) => {
     need(c, 'products.edit');
-    const body = z.object({ code: z.string().min(1).max(500), packQty: z.number().int().positive().default(1), symbology: z.string().optional() }).parse(await c.req.json());
+    const body = z.object({ code: zBarcode, packQty: z.number().int().positive().max(10000).default(1), symbology: z.string().max(40).optional() }).parse(await c.req.json());
     const { t } = orgOf(c);
     if (!t.get('SELECT 1 FROM product_variants WHERE org_id = @org AND id = @v', { v: c.req.param('variant') })) throw notFound('variant');
     cfgOf(c).db.transaction(() => attach(c, c.req.param('variant'), body.code, body.packQty, body.symbology))();
@@ -355,7 +357,7 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
 
   // the server stamps what it expected at the moment the line is counted
   app.put('/v1/orgs/:org/counts/:id/lines/:variant', async (c) => {
-    const body = z.object({ countedQty: z.number().int(), mode: z.enum(['set', 'add']).default('set') }).parse(await c.req.json());
+    const body = z.object({ countedQty: zQtyBase, mode: z.enum(['set', 'add']).default('set') }).parse(await c.req.json());
     const { t } = orgOf(c);
     const count = t.get<{ shop_id: string; status: string }>('SELECT shop_id, status FROM stock_counts WHERE org_id = @org AND id = @id', { id: c.req.param('id') });
     if (!count) throw notFound('count');
@@ -385,7 +387,7 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
     const shopName = shopNameOf(t, count.shopId);
     notifyMembers(cfgOf(c).db, org.id, {
       perm: 'stock.count.approve', shopId: count.shopId, key: 'countReady', exceptUserId: c.get('user').id,
-      params: () => ({ shop: shopName, count: count.lines.length }), payload: { countId: count.id },
+      params: () => ({ shop: shopName, count: count.lines.length }), payload: { countId: count.id, shopId: count.shopId },
     });
     return c.json(loadCount(c, count.id));
   });
@@ -500,14 +502,14 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
     const from = shopNameOf(ctx.t, tr.fromShopId);
     notifyMembers(ctx.db, ctx.org.id, {
       perm: 'stock.transfer.receive', shopId: tr.toShopId, key: 'transferSent', exceptUserId: ctx.userId,
-      params: () => ({ shop: to, from, count: total }), payload: { transferId: tr.id },
+      params: () => ({ shop: to, from, count: total }), payload: { transferId: tr.id, shopId: tr.toShopId },
     });
     return c.json(loadTransfer(c, tr.id));
   });
 
   // what really arrived. the difference is lost in transit, no phantom stock anywhere.
   app.post('/v1/orgs/:org/transfers/:id/receive', async (c) => {
-    const body = z.object({ lines: z.array(z.object({ variantId: z.string().max(64), qtyReceived: z.number().int().min(0) })).max(500).default([]) }).parse(await c.req.json());
+    const body = z.object({ lines: z.array(z.object({ variantId: z.string().max(64), qtyReceived: zQtyBase.pipe(z.number().min(0, { message: 'negative' })) })).max(500).default([]) }).parse(await c.req.json());
     const tr = loadTransfer(c, c.req.param('id'));
     need(c, 'stock.transfer.receive', tr.toShopId);
     if (tr.status !== 'sent') throw new ApiProblem(409, 'conflict', 'transfer is not on the way');
@@ -528,7 +530,18 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
         }
       }
     })();
-    return c.json(loadTransfer(c, tr.id));
+    // the sending shop hears that it arrived, and how much went missing on the way
+    const after = loadTransfer(c, tr.id);
+    const sent = after.lines.reduce((a, l) => a + l.qtySent, 0);
+    const arrived = after.lines.reduce((a, l) => a + (l.qtyReceived ?? 0), 0);
+    const toName = shopNameOf(ctx.t, tr.toShopId);
+    notifyMembers(ctx.db, ctx.org.id, {
+      perm: 'stock.transfer.send', shopId: tr.fromShopId, key: 'transferReceived', exceptUserId: ctx.userId,
+      bodyKey: arrived < sent ? 'bodyShort' : 'body',
+      params: () => ({ shop: toName, from: shopNameOf(ctx.t, tr.fromShopId), count: arrived, short: sent - arrived }),
+      payload: { transferId: tr.id, shopId: tr.fromShopId },
+    });
+    return c.json(after);
   });
 
   app.post('/v1/orgs/:org/transfers/:id/cancel', (c) => {

@@ -13,8 +13,10 @@ import { createApp } from './app';
 import { createLiveSender, liveChannels, type LiveSender } from './lib/live';
 import { newVapidKeys, vapidProblems } from './lib/webpush';
 import { storageFromEnv } from './lib/storage';
+import { DEV_SECRET, secretProblems } from './lib/secrets';
 import type { Config } from './types';
 import { startWorker } from './worker';
+import { photoStoreOf } from './routes/uploads';
 
 const env = process.env;
 const fail = (msg: string): never => {
@@ -23,11 +25,9 @@ const fail = (msg: string): never => {
 };
 
 const dev = env.CUSTOCK_DEV === '1' || process.argv.includes('--dev');
-const DEV_SECRET = 'dev-only-secret-change-me-before-anything-real';
 const jwtSecret = env.CUSTOCK_JWT_SECRET ?? (dev ? DEV_SECRET : '');
-if (!dev && (jwtSecret.length < 32 || jwtSecret === DEV_SECRET)) {
-  fail('CUSTOCK_JWT_SECRET must be set to a random value of at least 32 characters (or run with CUSTOCK_DEV=1 locally)');
-}
+const secretIssues = secretProblems(env, dev);
+if (secretIssues.length) fail(secretIssues.join(' / '));
 
 // who signs the tokens
 let auth: Config['auth'] = { mode: 'local' };
@@ -108,7 +108,7 @@ rebuildSearch(db);
 const port = Number(env.PORT ?? 8787);
 const publicWebUrl = env.CUSTOCK_PUBLIC_WEB_URL ?? 'http://localhost:3000';
 const unsubSecret = env.CUSTOCK_UNSUB_SECRET;
-const app = createApp({
+const appConfig: Config = {
   db,
   dev,
   jwtSecret,
@@ -126,10 +126,11 @@ const app = createApp({
   vapidPublicKey,
   internalKey,
   ownDomains: (env.CUSTOCK_OWN_DOMAINS ?? '').split(',').map((x) => x.trim()).filter(Boolean),
-});
+};
+const app = createApp(appConfig);
 
 const stopWorker =
-  env.CUSTOCK_WORKER === '0' ? () => {} : startWorker({ cfg: { db, jwtSecret, unsubSecret, publicWebUrl }, live, log: (l) => console.log(l) });
+  env.CUSTOCK_WORKER === '0' ? () => {} : startWorker({ cfg: { db, jwtSecret, unsubSecret, publicWebUrl }, live, log: (l) => console.log(l), removeObject: (k) => photoStoreOf(appConfig).remove(k) });
 
 const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(`custock api on http://localhost:${info.port} (${dev ? 'dev' : 'production'}, auth ${authMode}, transport ${transport}, db ${dbPath})`);

@@ -10,11 +10,14 @@ import type Mail from 'nodemailer/lib/mailer';
 import webpush from 'web-push';
 import { isPushServiceEndpoint } from '@custock/core';
 import type { Db } from '@custock/db';
+import { PLATFORM_ALERT_TYPE } from './platform-notify';
 import { parseJson, platform } from './tenant';
 import { sendGate } from './platform-access';
 import { ACCOUNT_SAFETY_MAIL } from './account-safety';
+import { BUDGET_EXEMPT_MAIL, emailBudgetPerHour, emailsSentLastHour, noteBudgetReached } from './email-budget';
 import { buildWebPush, subscriptionsFor, vapidProblems, type VapidConfig } from './webpush';
 import { captureError } from './errors';
+import { policyNumber } from './policy';
 
 export interface OutboxRow {
   id: string;
@@ -224,6 +227,25 @@ export function createLiveSender(ch: LiveChannels): LiveSender {
 // user and every web push subscription for this business, dead ones are dropped. a row counts as
 // sent when it reached at least one target, or there was none; it is retried when every target
 // failed for a passing reason.
+// once a message is out, or given up, its text is not needed any more. the links in it can hold
+// live tokens (invites, password resets, join confirmations, sign in codes), so only what the
+// counts and the super admin need stays: channel, a masked recipient, title, kind, times, error.
+const REDACT = `UPDATE dev_outbox SET body = NULL, html = NULL,
+    to_address = CASE WHEN to_address LIKE '%@%' THEN substr(to_address, 1, 1) || '***' || substr(to_address, instr(to_address, '@')) ELSE NULL END`;
+
+export function redactOutboxRow(db: Db, id: string) {
+  platform(db).run(`${REDACT} WHERE id = @id`, { id });
+}
+
+// live mode housekeeping: anything sent or given up loses its text, sent rows go after 30 days
+export const OUTBOX_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
+export function tidyOutbox(db: Db, now: number): { redacted: number; deleted: number } {
+  const p = platform(db);
+  const redacted = p.run(`${REDACT} WHERE (sent_at IS NOT NULL OR attempts >= 5) AND (body IS NOT NULL OR html IS NOT NULL OR to_address NOT LIKE '_***@%')`).changes;
+  const deleted = p.run('DELETE FROM dev_outbox WHERE sent_at IS NOT NULL AND sent_at < @cut', { cut: now - policyNumber(db, 'retention.outboxDays') * 86_400_000 }).changes;
+  return { redacted, deleted };
+}
+
 export async function drainOutbox(db: Db, sender: LiveSender, now: number, limit = 200): Promise<{ sent: number; failed: number }> {
   const p = platform(db);
   const channels = [sender.email ? 'email' : null, sender.push || sender.webpush ? 'push' : null].filter(Boolean);
@@ -235,20 +257,31 @@ export async function drainOutbox(db: Db, sender: LiveSender, now: number, limit
   );
   let sent = 0;
   let failed = 0;
+  // the hourly email budget for the whole platform: over it, normal mail waits for the next hour
+  const budget = emailBudgetPerHour();
+  let emailsThisHour = channels.includes('email') ? emailsSentLastHour(db, now) : 0;
   for (const row of rows) {
+    if (row.channel === 'email' && emailsThisHour >= budget && !BUDGET_EXEMPT_MAIL.has(String(parseJson<{ type?: string }>(row.payload, {}).type))) {
+      noteBudgetReached(db, now, budget);
+      continue;
+    }
     // a platform pause holds the message, a paused business or a switched off channel drops it
     const held = sendGate(db, row.channel, row.org_id);
     // account safety mail (forgot password) goes out during a platform wide email pause too
     const safety = row.channel === 'email' && ACCOUNT_SAFETY_MAIL.has(String(parseJson<{ type?: string }>(row.payload, {}).type));
-    const gate = held === 'hold' && safety ? null : held;
+    // super admin alerts are how the platform owner hears about trouble, a push pause never holds them
+    const platformAlert = row.channel === 'push' && parseJson<{ type?: string }>(row.payload, {}).type === PLATFORM_ALERT_TYPE;
+    const gate = held === 'hold' && (safety || platformAlert) ? null : held;
     if (gate === 'hold') continue;
     if (gate) {
       p.run('UPDATE dev_outbox SET attempts = 5, last_error = @e WHERE id = @id', { e: gate, id: row.id });
+      redactOutboxRow(db, row.id);
       continue;
     }
     try {
       if (row.channel === 'email' && row.to_address && sender.email) {
         await sender.email(row);
+        emailsThisHour++;
       } else if (row.channel === 'push') {
         const userId = row.user_id ?? (row.customer_id ? p.get<{ user_id: string | null }>('SELECT user_id FROM customers WHERE id = @c', { c: row.customer_id })?.user_id ?? null : null);
         let reached = 0;
@@ -282,6 +315,7 @@ export async function drainOutbox(db: Db, sender: LiveSender, now: number, limit
         if (!reached && errors.length) throw new Error(errors[0]);
       }
       p.run('UPDATE dev_outbox SET sent_at = @now, attempts = attempts + 1, last_error = NULL WHERE id = @id', { now, id: row.id });
+      redactOutboxRow(db, row.id);
       sent++;
     } catch (err) {
       p.run('UPDATE dev_outbox SET attempts = attempts + 1, last_error = @e WHERE id = @id', { e: String(err).slice(0, 500), id: row.id });

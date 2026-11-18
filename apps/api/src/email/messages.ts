@@ -34,11 +34,16 @@ export function changeCodeEmail(locale: Locale, p: { code: string }, opts?: { fo
   }, opts);
 }
 
-export function emailChangedEmail(locale: Locale, p: { email: string }, opts?: { forceDark?: boolean }): RenderedEmail {
+// revertUrl: the one click way back for the old address (7 days)
+export function emailChangedEmail(locale: Locale, p: { email: string; revertUrl?: string | null }, opts?: { forceDark?: boolean }): RenderedEmail {
   const { l, t } = tr(locale);
   return renderEmail({
     locale: l, subject: t('email.emailChanged.subject'), preheader: t('email.emailChanged.preheader', p), heading: t('email.emailChanged.heading'),
-    paragraphs: [t('email.emailChanged.lead', p)], note: t('email.emailChanged.note'), footer: system(l, t),
+    paragraphs: [t('email.emailChanged.lead', p)],
+    ...(p.revertUrl
+      ? { button: { label: t('email.emailChanged.button'), url: p.revertUrl }, note: t('email.emailChanged.noteRevert'), fallback: { label: t('email.layout.linkFallback'), url: p.revertUrl } }
+      : { note: t('email.emailChanged.note') }),
+    footer: system(l, t),
   }, opts);
 }
 
@@ -65,10 +70,10 @@ function business(t: ReturnType<typeof translator>, sender: string, extra: strin
   return { lines: [sender, ...extra, t('email.layout.sentWith')] };
 }
 
-export function joinConfirmEmail(locale: Locale, p: { name: string; scope: string; url: string; logoUrl?: string | null }, opts?: { forceDark?: boolean }): RenderedEmail {
+export function joinConfirmEmail(locale: Locale, p: { name: string; scope: string; url: string; logoUrl?: string | null; org?: string }, opts?: { forceDark?: boolean }): RenderedEmail {
   const { l, t } = tr(locale);
   return renderEmail({
-    locale: l, subject: t('email.joinConfirm.subject', p), preheader: t('email.joinConfirm.preheader'), eyebrow: p.scope, eyebrowLogo: p.logoUrl ?? null, heading: t('email.joinConfirm.heading'),
+    locale: l, subject: t('email.joinConfirm.subject', p), preheader: t('email.joinConfirm.preheader'), eyebrow: p.scope, brand: { name: p.org ?? p.scope, logoUrl: p.logoUrl ?? null }, heading: t('email.joinConfirm.heading'),
     paragraphs: [t('email.joinConfirm.lead', p)], button: { label: t('email.joinConfirm.button'), url: p.url }, note: t('email.joinConfirm.note'),
     fallback: { label: t('email.layout.linkFallback'), url: p.url }, footer: business(t, p.scope),
   }, opts);
@@ -76,12 +81,12 @@ export function joinConfirmEmail(locale: Locale, p: { name: string; scope: strin
 
 export function backInStockEmail(
   locale: Locale,
-  p: { shop: string; product: string; url: string | null; imageUrl?: string | null; price?: string | null; logoUrl?: string | null },
+  p: { shop: string; product: string; url: string | null; imageUrl?: string | null; price?: string | null; logoUrl?: string | null; org?: string },
   opts?: { forceDark?: boolean },
 ): RenderedEmail {
   const { l, t } = tr(locale);
   return renderEmail({
-    locale: l, subject: t('email.backInStock.subject', p), preheader: t('email.backInStock.preheader'), eyebrow: p.shop, eyebrowLogo: p.logoUrl ?? null, heading: t('email.backInStock.heading', p),
+    locale: l, subject: t('email.backInStock.subject', p), preheader: t('email.backInStock.preheader'), eyebrow: p.shop, brand: { name: p.org ?? p.shop, logoUrl: p.logoUrl ?? null }, heading: t('email.backInStock.heading', p),
     paragraphs: [t('email.backInStock.lead', p)],
     products: p.imageUrl || p.price ? { title: '', items: [{ name: p.product, url: p.url, imageUrl: p.imageUrl ?? null, price: p.price ?? null, offerPrice: null, was: null }] } : null,
     button: p.url ? { label: t('email.backInStock.button'), url: p.url } : null, note: t('email.backInStock.note'), footer: business(t, p.shop),
@@ -102,6 +107,7 @@ export function postEmail(
   p: {
     sender: string; // "Lemoni Kifisia"
     senderLogo?: string | null;
+    org?: string; // "Lemoni", the name under a missing logo
     kind: string;
     title: string;
     body: string;
@@ -136,7 +142,7 @@ export function postEmail(
     subject: p.title,
     preheader: first.length > 120 ? `${first.slice(0, 117)}...` : first,
     eyebrow: p.sender,
-    eyebrowLogo: p.senderLogo ?? null,
+    brand: { name: p.org ?? p.sender, logoUrl: p.senderLogo ?? null },
     heading: p.title,
     paragraphs,
     cover: p.coverUrl ? { url: p.coverUrl, alt: p.title } : null,

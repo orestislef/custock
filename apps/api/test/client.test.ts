@@ -195,6 +195,9 @@ describe('client paths', () => {
     await api.logout();
     await expect(api.me()).rejects.toBeInstanceOf(ApiError);
     tokens.del = (await pub.verifyOtp('otp.person@example.com', (await pub.requestOtp('otp.person@example.com')).devCode!)).accessToken;
-    await as('del').deleteMyAccount();
+    // an account without a password confirms with a fresh code by email
+    const start = await as('del').startAccountDelete();
+    expect(start.method).toBe('code');
+    await as('del').deleteMyAccount({ code: start.method === 'code' ? start.devCode : undefined });
   });
 });

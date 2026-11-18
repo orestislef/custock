@@ -664,7 +664,8 @@ describe('the customer side', () => {
     expect(me.body.following.map((f: { orgName: string }) => f.orgName)).toEqual(['Lemoni']);
     const exp = await call('GET', '/v1/me/export', 'walkin');
     expect(exp.body.customerRecords[0].subscriptions[0].status).toBe('subscribed');
-    expect((await call('DELETE', '/v1/me', 'walkin')).status).toBe(204);
+    const start = await call('POST', '/v1/me/delete/start', 'walkin');
+    expect((await call('DELETE', '/v1/me', 'walkin', { code: start.body.devCode })).status).toBe(204);
     expect((await call('GET', '/v1/me/context', 'walkin')).status).toBe(401);
     expect(q("SELECT count(*) n FROM customers WHERE email = 'walk.in@example.com'").n).toBe(0);
   });

@@ -47,6 +47,9 @@ export interface EmailContent {
   eyebrow?: string | null;
   // the business's logo, shown small beside that name when it has one
   eyebrowLogo?: string | null;
+  // mail a business sends its customers: its logo on top instead of the Custock mark, its name
+  // there when it has no logo. Custock moves to the "Sent with Custock" footer line
+  brand?: { name: string; logoUrl: string | null } | null;
   heading: string;
   // paragraphs, plain text. single new lines stay as line breaks
   paragraphs: string[];
@@ -187,8 +190,15 @@ export function renderEmail(c: EmailContent, opts: { forceDark?: boolean } = {})
   // the preheader, then invisible padding so the body does not leak into the inbox preview
   const spacer = '&#847;&zwnj;&nbsp;'.repeat(80);
 
+  const brandLogo = c.brand?.logoUrl ? safeUrl(c.brand.logoUrl) : null;
+  const top = c.brand
+    ? brandLogo
+      ? `<img src="${esc(brandLogo)}" width="48" height="48" alt="${esc(c.brand.name)}" style="display:block;width:48px;height:48px;border:0;border-radius:11px;object-fit:contain;background-color:#FFFFFF;">`
+      : `<p class="ink" style="margin:0;font-family:${DISPLAY};font-size:22px;line-height:28px;font-weight:600;letter-spacing:-0.2px;color:${C.ink};">${esc(c.brand.name)}</p>`
+    : `<img src="${esc(mark)}" width="48" height="48" alt="Custock" style="display:block;width:48px;height:48px;border:0;border-radius:11px;">`;
   const body = [
-    c.eyebrow ? eyebrowLine(c.eyebrow, c.eyebrowLogo ? safeUrl(c.eyebrowLogo) : null) : '',
+    // with the business on top, the line above the heading is its name (or shop) without the logo again
+    c.eyebrow ? eyebrowLine(c.eyebrow, !c.brand && c.eyebrowLogo ? safeUrl(c.eyebrowLogo) : null) : '',
     `<h1 class="ink h1" style="margin:0 0 12px;font-family:${DISPLAY};font-size:28px;line-height:34px;font-weight:600;letter-spacing:-0.3px;color:${C.ink};">${esc(c.heading)}</h1>`,
     ...c.paragraphs.filter(Boolean).map((p) => `<p class="ink" style="margin:0 0 16px;font-family:${UI};font-size:17px;line-height:25px;color:${C.ink};">${para(p)}</p>`),
     c.code ? codeBox(c.code) : '',
@@ -225,7 +235,7 @@ export function renderEmail(c: EmailContent, opts: { forceDark?: boolean } = {})
 <tr><td align="center" class="outer" style="padding:32px 16px 40px;">
 <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;">
-<tr><td align="center" style="padding:0 0 20px;"><img src="${esc(mark)}" width="48" height="48" alt="Custock" style="display:block;width:48px;height:48px;border:0;border-radius:11px;"></td></tr>
+<tr><td align="center" style="padding:0 0 20px;">${top}</td></tr>
 <tr><td class="card" bgcolor="${C.surface}" style="background-color:${C.surface};border-radius:20px;overflow:hidden;">
 ${cover ? `<img src="${esc(cover)}" width="600" alt="${esc(c.cover!.alt)}" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:20px 20px 0 0;">` : ''}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="pad" style="padding:36px 32px 32px;">

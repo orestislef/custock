@@ -11,6 +11,7 @@ import { cfgOf, has, nowOf, orgOf } from '../lib/context';
 import { ApiProblem, badRequest, forbidden, notFound } from '../lib/problem';
 import { setFileBase, uploadKeyFromUrl } from './catalog';
 import { photoStoreOf } from '../routes/uploads';
+import { confirmFiles } from '../lib/files';
 
 export function attachBarcode(c: Context<AppEnv>, variantId: string, raw: string, packQty = 1, symbology?: string | null) {
   const { t } = orgOf(c);
@@ -187,6 +188,8 @@ export function applyImages(c: Context<AppEnv>, productId: string, urls: string[
   fileIds.forEach((fid, i) =>
     t.run('INSERT INTO product_images (id, org_id, product_id, variant_id, file_id, sort) VALUES (@id, @org, @p, NULL, @f, @i)', { id: uuidv7(now), p: productId, f: fid, i }),
   );
+  // the photos are in use now, so they count toward storage and are never purged as unused slots
+  confirmFiles(cfg.db, fileIds, now);
   dropUnusedFiles(c, before.filter((id) => !fileIds.includes(id)));
 }
 

@@ -137,12 +137,26 @@ export function orgRoutes(app: Hono<AppEnv>) {
   });
 
   app.get('/v1/orgs/:org/categories', (c) => {
-    const { t } = orgOf(c);
+    const { t, org, access } = orgOf(c);
+    const rows = t.all<{ id: string; parent_id: string | null; name: string; base: string }>(
+      `SELECT c.id, c.parent_id, ${categoryNameSql('c')} AS name, c.name AS base FROM categories c WHERE c.org_id = @org AND c.archived_at IS NULL ORDER BY c.sort, c.name`,
+      { loc: readerLocale(c, org.default_locale) },
+    );
+    // people who manage categories also get every language, for renaming
+    const manage = can(access, 'categories.manage');
+    const tr = manage && rows.length
+      ? t.all<{ category_id: string; locale: string; name: string }>(
+          'SELECT tr.category_id, tr.locale, tr.name FROM category_translations tr JOIN categories c ON c.id = tr.category_id WHERE c.org_id = @org AND tr.category_id IN (SELECT value FROM json_each(@ids))',
+          { ids: JSON.stringify(rows.map((r) => r.id)) },
+        )
+      : [];
     return c.json(
-      t.all<{ id: string; parent_id: string | null; name: string }>(
-        `SELECT c.id, c.parent_id, ${categoryNameSql('c')} AS name FROM categories c WHERE c.org_id = @org AND c.archived_at IS NULL ORDER BY c.sort, c.name`,
-        { loc: readerLocale(c, orgOf(c).org.default_locale) },
-      ).map((r) => ({ id: r.id, parentId: r.parent_id, name: r.name })),
+      rows.map((r) => ({
+        id: r.id,
+        parentId: r.parent_id,
+        name: r.name,
+        ...(manage ? { names: { [org.default_locale]: r.base, ...Object.fromEntries(tr.filter((x) => x.category_id === r.id).map((x) => [x.locale, x.name])) } } : {}),
+      })),
     );
   });
 }

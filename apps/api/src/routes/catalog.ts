@@ -39,7 +39,12 @@ export function catalogRoutes(app: Hono<AppEnv>) {
         where.push(levelExists('l.on_hand > 0 AND l.on_hand <= coalesce(ss.reorder_point, -1)'));
         break;
       case 'out':
-        where.push('p.track_stock = 1', levelExists('l.on_hand = 0'));
+        // a shop where it never arrived counts as out too, the same way the product page shows 0
+        where.push('p.track_stock = 1', `EXISTS (
+          SELECT 1 FROM product_variants v
+          JOIN shops sh ON sh.org_id = p.org_id AND sh.archived_at IS NULL AND sh.id IN (SELECT value FROM json_each(@shops))
+          LEFT JOIN stock_levels l ON l.variant_id = v.id AND l.shop_id = sh.id
+          WHERE v.product_id = p.id AND v.archived_at IS NULL AND coalesce(l.on_hand, 0) = 0)`);
         break;
       case 'negative':
         where.push(levelExists('l.on_hand < 0'));
@@ -51,7 +56,7 @@ export function catalogRoutes(app: Hono<AppEnv>) {
     const ids = t
       .all<{ id: string }>(`SELECT p.id FROM products p WHERE ${where.join(' AND ')} ORDER BY p.name LIMIT @lim OFFSET @off`, { ...named, lim: limit + 1, off: offset }, positional)
       .map((r) => r.id);
-    const items = loadProducts(t, ids, { withCost: has(c, 'products.cost.view'), levelShops: stockShops, locale: readerLocale(c, orgOf(c).org.default_locale) });
+    const items = loadProducts(t, ids, { withCost: has(c, 'products.cost.view'), levelShops: stockShops, fillLevels: true, locale: readerLocale(c, orgOf(c).org.default_locale) });
     return c.json(page(items, offset, limit));
   });
 
@@ -59,7 +64,7 @@ export function catalogRoutes(app: Hono<AppEnv>) {
     need(c, 'products.view');
     const { t } = orgOf(c);
     const stockShops = has(c, 'stock.view') ? shopsFor(c, 'stock.view') : [];
-    const [p] = loadProducts(t, [c.req.param('id')], { withCost: has(c, 'products.cost.view'), levelShops: stockShops, locale: readerLocale(c, orgOf(c).org.default_locale) });
+    const [p] = loadProducts(t, [c.req.param('id')], { withCost: has(c, 'products.cost.view'), levelShops: stockShops, fillLevels: true, locale: readerLocale(c, orgOf(c).org.default_locale) });
     if (!p) throw notFound('product');
     const stamp = t.get<{ updated_at: number }>('SELECT updated_at FROM products WHERE org_id = @org AND id = @id', { id: p.id });
     if (stamp) c.header('ETag', `W/"p-${stamp.updated_at}"`);
@@ -95,7 +100,7 @@ export function catalogRoutes(app: Hono<AppEnv>) {
       return c.json(res);
     }
     const stockShops = has(c, 'stock.view') ? shopsFor(c, 'stock.view') : [];
-    const [product] = loadProducts(t, [hit.product_id], { withCost: has(c, 'products.cost.view'), levelShops: stockShops, locale: readerLocale(c, orgOf(c).org.default_locale) });
+    const [product] = loadProducts(t, [hit.product_id], { withCost: has(c, 'products.cost.view'), levelShops: stockShops, fillLevels: true, locale: readerLocale(c, orgOf(c).org.default_locale) });
     const res: ScanResult = {
       codeNorm: n.codeNorm, kind: n.kind, valid: n.valid, match: hit.archived ? 'archived' : 'variant', packQty: hit.pack_qty,
       product: product ?? null, variantId: hit.variant_id,

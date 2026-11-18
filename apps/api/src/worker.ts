@@ -11,7 +11,7 @@ import { parseJson, platform, Tenant } from './lib/tenant';
 import { sendGate } from './lib/platform-access';
 import { dayKey, localDayStart, quietHoursEnd, inQuietHours } from './lib/time';
 import { devOutboxTransport, type Transport } from './lib/transport';
-import { drainOutbox, type LiveSender } from './lib/live';
+import { drainOutbox, tidyOutbox, type LiveSender } from './lib/live';
 import { setWebBase } from './lib/webpush';
 import { captureError, pruneErrors, setErrorWebBase } from './lib/errors';
 import { unsubKey, unsubToken } from './lib/unsub';
@@ -20,6 +20,9 @@ import { fileUrl, orgLogoUrl, variantLabel } from './services/catalog';
 import { loadPosts } from './services/posts';
 import { backInStockEmail, postEmail } from './email/messages';
 import { markWorkerRun } from './lib/runtime';
+import { policyNumber } from './lib/policy';
+import { purgeUnconfirmedFiles } from './lib/files';
+import { expireTokenMessages } from './lib/outbox-expiry';
 
 const DAY = 86_400_000;
 
@@ -46,7 +49,12 @@ export interface WorkerDeps {
   live?: LiveSender;
   transport?: Transport;
   log?: (line: string) => void;
+  // removes an object from photo storage (best effort), for upload slots nobody used
+  removeObject?: (key: string) => unknown;
 }
+
+let lastTidy = 0;
+let lastHousekeeping = 0;
 
 // runs every due job once. returns how many ran.
 export async function runJobs(deps: WorkerDeps, now: number = Date.now()): Promise<number> {
@@ -79,7 +87,20 @@ export async function runJobs(deps: WorkerDeps, now: number = Date.now()): Promi
       ran++;
     }
   }
-  if (deps.live) await drainOutbox(db, deps.live, now);
+  // every mode, at most once a minute: token links do not outlive their tokens, unused upload slots go
+  if (now - lastHousekeeping > 60_000) {
+    lastHousekeeping = now;
+    expireTokenMessages(db, now);
+    purgeUnconfirmedFiles(db, now, deps.removeObject);
+  }
+  if (deps.live) {
+    await drainOutbox(db, deps.live, now);
+    // at most once a minute, the rest of the time the drain redacts what it sends
+    if (now - lastTidy > 60_000) {
+      lastTidy = now;
+      tidyOutbox(db, now);
+    }
+  }
   return ran;
 }
 
@@ -217,11 +238,12 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
         const mail = postEmail(locale, {
           sender: shopName ? `${org.name} ${shopName}` : org.name,
           senderLogo: orgLogoUrl(deps.cfg.db, org.id),
+          org: org.name,
           kind: post?.kind ?? 'news',
           title: text?.title ?? org.name,
           body: text?.body ?? '',
           coverUrl: fileUrl(cover?.storage_key),
-          url: `${web}/s/${encodeURIComponent(org.slug)}?post=${encodeURIComponent(d.post_id)}`,
+          url: `${web}/s/${encodeURIComponent(org.slug)}/news?post=${encodeURIComponent(d.post_id)}`,
           products: (post?.products ?? []).map((x) => ({
             name: x.name, url: `${web}/s/${encodeURIComponent(org.slug)}/p/${encodeURIComponent(x.productId)}`, imageUrl: x.imageUrl,
             priceMinor: x.priceMinor, offerPriceMinor: x.offerPriceMinor, wasMinor: x.wasMinor,
@@ -246,19 +268,20 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
       const product = a ? variantLabel(trName ?? a.name, a.options, locale) : '';
       const shop = a?.shop_id ? t.get<{ name: string }>('SELECT name FROM shops WHERE org_id = @org AND id = @id', { id: a.shop_id })?.name : null;
       const shopLabel = shop ? `${org.name} ${shop}` : org.name;
+      // the product photo: big in the email, the large picture of the push on android and desktop
+      const extra = a
+        ? t.get<{ price_minor: number | null; storage_key: string | null }>(
+            `SELECT v.price_minor, (SELECT f.storage_key FROM product_images i JOIN files f ON f.id = i.file_id WHERE i.product_id = v.product_id AND f.deleted_at IS NULL ORDER BY i.sort LIMIT 1) AS storage_key
+               FROM product_variants v WHERE v.org_id = @org AND v.id = @v`,
+            { v: a.variant_id },
+          )
+        : undefined;
       if (d.channel === 'push') {
         title = tr('push.backInStock.title', { shop: shopLabel, product });
         body = tr('push.backInStock.body', { shop: shopLabel, product });
       } else {
-        const extra = a
-          ? t.get<{ price_minor: number | null; storage_key: string | null }>(
-              `SELECT v.price_minor, (SELECT f.storage_key FROM product_images i JOIN files f ON f.id = i.file_id WHERE i.product_id = v.product_id ORDER BY i.sort LIMIT 1) AS storage_key
-                 FROM product_variants v WHERE v.org_id = @org AND v.id = @v`,
-              { v: a.variant_id },
-            )
-          : undefined;
         const mail = backInStockEmail(locale, {
-          shop: shopLabel, product, logoUrl: orgLogoUrl(deps.cfg.db, org.id),
+          shop: shopLabel, product, logoUrl: orgLogoUrl(deps.cfg.db, org.id), org: org.name,
           url: a ? `${web}/s/${encodeURIComponent(org.slug)}/p/${encodeURIComponent(a.product_id)}` : null,
           imageUrl: fileUrl(extra?.storage_key),
           price: org.customer_prices && extra?.price_minor != null ? formatMoney(extra.price_minor, org.currency, locale) : null,
@@ -269,7 +292,7 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
       }
       payload = {
         type: 'back_in_stock', variantId: a?.variant_id, productId: a?.product_id, shopId: a?.shop_id, threadId: org.id,
-        link: a ? `custock://product/${a.product_id}` : null, ...senderOf(t, org, a?.shop_id ?? null),
+        link: a ? `custock://product/${a.product_id}` : null, image: fileUrl(extra?.storage_key), ...senderOf(t, org, a?.shop_id ?? null),
       };
     }
     const sent = transport.send({
@@ -398,7 +421,7 @@ export function purgeUnconfirmed(db: Db, now: number) {
     `SELECT c.id, c.org_id, c.email FROM customers c
       WHERE c.erased_at IS NULL AND c.email_verified_at IS NULL AND c.user_id IS NULL AND c.created_at < @cut
         AND NOT EXISTS (SELECT 1 FROM customer_subscriptions s WHERE s.customer_id = c.id AND s.status = 'subscribed')`,
-    { cut: now - 30 * DAY },
+    { cut: now - policyNumber(db, 'retention.unconfirmedDays') * DAY },
   );
   for (const r of old) {
     const t = new Tenant(db, r.org_id);

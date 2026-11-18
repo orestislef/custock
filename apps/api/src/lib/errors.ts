@@ -12,6 +12,8 @@ import type { AppEnv } from '../types';
 import { platform } from './tenant';
 import { devOutboxTransport, emailMessage } from './transport';
 import { errorNoticeEmail } from '../email/errors';
+import { pushSuperadmins } from './platform-notify';
+import { policyNumber } from './policy';
 
 const DAY = 86_400_000;
 export const ERROR_KEEP_MS = 30 * DAY;
@@ -205,7 +207,7 @@ const hash = (s: string) => createHash('sha256').update(s).digest('hex').slice(0
 // older than 30 days goes, and never more than 500 issues: the oldest seen go first
 export function pruneErrors(db: Db, now = Date.now()): number {
   const p = platform(db);
-  let gone = p.run('DELETE FROM error_events WHERE last_seen < @cut', { cut: now - ERROR_KEEP_MS }).changes;
+  let gone = p.run('DELETE FROM error_events WHERE last_seen < @cut', { cut: now - policyNumber(db, 'retention.errorDays') * DAY }).changes;
   const n = p.get<{ n: number }>('SELECT count(*) AS n FROM error_events')!.n;
   if (n > ERROR_MAX_ISSUES) {
     gone += p.run('DELETE FROM error_events WHERE id IN (SELECT id FROM error_events ORDER BY last_seen ASC LIMIT @over)', { over: n - ERROR_MAX_ISSUES }).changes;
@@ -230,6 +232,8 @@ function noticeSuperadmins(db: Db, issueId: string, now: number) {
     const r = errorNoticeEmail(a.locale, { kind: issue.kind, title: issue.title, route: issue.route, url });
     outbox.send(emailMessage(r, { userId: a.id, to: a.email, locale: a.locale, payload: { type: 'error_notice', issueId } }));
   }
+  // and a push on the devices where they turned alerts on, under the same once per issue rule
+  pushSuperadmins(db, 'error', { title: issue.title.slice(0, 120), kind: issue.kind }, { path: `/admin/platform/errors/${issueId}`, tag: `error-${issueId}` });
   p.run('UPDATE error_events SET notified_at = @now WHERE id = @id', { now, id: issueId });
 }
 

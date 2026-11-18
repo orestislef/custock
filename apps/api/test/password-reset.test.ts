@@ -107,7 +107,7 @@ describe('forgot password', () => {
 
     expect((await call('POST', '/v1/auth/password/reset', { body: { token, password: 'short' } })).status).toBe(400);
 
-    const done = await call('POST', '/v1/auth/password/reset', { body: { token, password: 'a new long password' } });
+    const done = await call('POST', '/v1/auth/password/reset', { body: { token, password: 'a.new.long.password' } });
     expect(done.status).toBe(200);
     expect(done.body.accessToken).toBeTruthy();
     expect(done.body.refreshToken).toBeTruthy();
@@ -119,10 +119,10 @@ describe('forgot password', () => {
     // the new one works, the old password does not
     expect((await call('GET', '/v1/me/context', { token: done.body.accessToken })).status).toBe(200);
     expect((await login('maria@example.com', 'custock')).status).toBe(401);
-    expect((await login('maria@example.com', 'a new long password')).status).toBe(200);
+    expect((await login('maria@example.com', 'a.new.long.password')).status).toBe(200);
 
     // used: the link never works again
-    const again = await call('POST', '/v1/auth/password/reset', { body: { token, password: 'yet another password' } });
+    const again = await call('POST', '/v1/auth/password/reset', { body: { token, password: 'yet.another.password' } });
     expect(again.status).toBe(410);
     expect(again.body.code).toBe('reset_expired');
     expect((await call('GET', `/v1/auth/password/reset/${token}`)).status).toBe(410);
@@ -140,7 +140,7 @@ describe('forgot password', () => {
     try {
       clock = start + RESET_TTL + 1000;
       expect((await call('GET', `/v1/auth/password/reset/${token}`)).status).toBe(410);
-      const late = await call('POST', '/v1/auth/password/reset', { body: { token, password: 'too late for this one' } });
+      const late = await call('POST', '/v1/auth/password/reset', { body: { token, password: 'too.late.for.this' } });
       expect(late.status).toBe(410);
       expect((await login('dimitris@example.com', 'custock')).status).toBe(200);
     } finally {

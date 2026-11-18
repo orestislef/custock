@@ -8,15 +8,26 @@ import type { Tokens } from '@custock/core';
 import type { Config } from '../types';
 import { platform } from './tenant';
 import { unauthorized } from './problem';
+import { policyIn, policyNumber } from './policy';
 
-const ACCESS_TTL_MS = 15 * 60_000;
-const REFRESH_TTL_MS = 30 * 86_400_000;
+// lifetimes come from the policy engine: auth.accessMinutes for everyone, auth.sessionDays the
+// shortest of the platform value and every business and role the person works in
+const accessTtl = (cfg: Config) => policyNumber(cfg.db, 'auth.accessMinutes') * 60_000;
+function refreshTtl(cfg: Config, userId: string): number {
+  let days = policyNumber(cfg.db, 'auth.sessionDays');
+  const orgs = platform(cfg.db).all<{ org_id: string }>("SELECT org_id FROM memberships WHERE user_id = @u AND status = 'active'", { u: userId });
+  for (const o of orgs) days = Math.min(days, Number(policyIn(cfg.db, o.org_id, 'auth.sessionDays', { userId })));
+  return days * 86_400_000;
+}
+
+// however often a session is refreshed, it ends this long after the first sign in
+export const SESSION_FAMILY_MAX_MS = 90 * 86_400_000;
 
 const key = (cfg: Config) => new TextEncoder().encode(cfg.jwtSecret);
 const now = (cfg: Config) => (cfg.now ? cfg.now() : Date.now());
 
 async function accessToken(cfg: Config, userId: string, sessionId: string): Promise<{ token: string; expiresAt: number }> {
-  const expiresAt = now(cfg) + ACCESS_TTL_MS;
+  const expiresAt = now(cfg) + accessTtl(cfg);
   const token = await new SignJWT({ sid: sessionId })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(userId)
@@ -27,14 +38,18 @@ async function accessToken(cfg: Config, userId: string, sessionId: string): Prom
   return { token, expiresAt };
 }
 
-export async function issueTokens(cfg: Config, userId: string, opts: { familyId?: string; userAgent?: string | null } = {}): Promise<Tokens & { sessionId: string }> {
+export async function issueTokens(cfg: Config, userId: string, opts: { familyId?: string; familyStartedAt?: number; userAgent?: string | null } = {}): Promise<Tokens & { sessionId: string }> {
   const db = platform(cfg.db);
   const sessionId = uuidv7(now(cfg));
   const refreshToken = randomToken();
+  const started = opts.familyStartedAt ?? now(cfg);
   db.run(
-    `INSERT INTO sessions (id, user_id, family_id, refresh_hash, user_agent, created_at, expires_at)
-     VALUES (@id, @user, @family, @hash, @ua, @now, @exp)`,
-    { id: sessionId, user: userId, family: opts.familyId ?? sessionId, hash: sha256(refreshToken), ua: opts.userAgent ?? null, now: now(cfg), exp: now(cfg) + REFRESH_TTL_MS },
+    `INSERT INTO sessions (id, user_id, family_id, refresh_hash, user_agent, created_at, expires_at, family_started_at)
+     VALUES (@id, @user, @family, @hash, @ua, @now, @exp, @started)`,
+    {
+      id: sessionId, user: userId, family: opts.familyId ?? sessionId, hash: sha256(refreshToken), ua: opts.userAgent ?? null, now: now(cfg),
+      exp: Math.min(now(cfg) + refreshTtl(cfg, userId), started + SESSION_FAMILY_MAX_MS), started,
+    },
   );
   const { token, expiresAt } = await accessToken(cfg, userId, sessionId);
   return { accessToken: token, refreshToken, expiresAt, sessionId };
@@ -44,6 +59,8 @@ interface SessionRow {
   id: string;
   user_id: string;
   family_id: string;
+  family_started_at: number | null;
+  created_at: number;
   expires_at: number;
   replaced_by: string | null;
   revoked_at: number | null;
@@ -52,13 +69,18 @@ interface SessionRow {
 // rotation: the old token is spent. presenting a spent token again kills the whole family.
 export async function rotate(cfg: Config, refreshToken: string, userAgent?: string | null): Promise<Tokens> {
   const db = platform(cfg.db);
-  const row = db.get<SessionRow>('SELECT id, user_id, family_id, expires_at, replaced_by, revoked_at FROM sessions WHERE refresh_hash = @h', { h: sha256(refreshToken) });
+  const row = db.get<SessionRow>('SELECT id, user_id, family_id, family_started_at, created_at, expires_at, replaced_by, revoked_at FROM sessions WHERE refresh_hash = @h', { h: sha256(refreshToken) });
   if (!row) throw unauthorized('unknown refresh token');
   if (row.revoked_at || row.replaced_by) {
     db.run('UPDATE sessions SET revoked_at = coalesce(revoked_at, @now) WHERE family_id = @f', { now: now(cfg), f: row.family_id });
     throw unauthorized('refresh token reused, session family revoked');
   }
   if (row.expires_at < now(cfg)) throw unauthorized('refresh token expired');
+  const started = row.family_started_at ?? row.created_at;
+  if (started + SESSION_FAMILY_MAX_MS < now(cfg)) {
+    db.run('UPDATE sessions SET revoked_at = coalesce(revoked_at, @now) WHERE family_id = @f', { now: now(cfg), f: row.family_id });
+    throw unauthorized('session too old, sign in again');
+  }
   // claim the old token first. if someone else already spent it, this is reuse.
   const marker = `pending:${uuidv7(now(cfg))}`;
   const claimed = db.run('UPDATE sessions SET replaced_by = @m WHERE id = @id AND replaced_by IS NULL AND revoked_at IS NULL', { m: marker, id: row.id });
@@ -66,7 +88,7 @@ export async function rotate(cfg: Config, refreshToken: string, userAgent?: stri
     db.run('UPDATE sessions SET revoked_at = coalesce(revoked_at, @now) WHERE family_id = @f', { now: now(cfg), f: row.family_id });
     throw unauthorized('refresh token reused, session family revoked');
   }
-  const next = await issueTokens(cfg, row.user_id, { familyId: row.family_id, userAgent });
+  const next = await issueTokens(cfg, row.user_id, { familyId: row.family_id, familyStartedAt: started, userAgent });
   db.run('UPDATE sessions SET replaced_by = @next WHERE id = @id', { next: next.sessionId, id: row.id });
   return { accessToken: next.accessToken, refreshToken: next.refreshToken, expiresAt: next.expiresAt };
 }

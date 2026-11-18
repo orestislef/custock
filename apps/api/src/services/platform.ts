@@ -16,6 +16,7 @@ import { encodeCursor, parseJson, platform, Tenant } from '../lib/tenant';
 import { localDayStart } from '../lib/time';
 import { devOutboxTransport, emailMessage } from '../lib/transport';
 import { superadminInviteEmail } from '../email/platform';
+import { policyNumber } from '../lib/policy';
 import { BootstrapError, createBusiness as bootstrapBusiness, inviteOwner as bootstrapInviteOwner, OWNER_INVITE_TTL, slugify, SLUG } from './bootstrap';
 
 const DAY = 86_400_000;
@@ -374,7 +375,7 @@ export function inviteSuperAdmin(
     p.run(
       `INSERT INTO platform_invites (id, email, token_hash, locale, invited_by, created_at, expires_at)
        VALUES (@id, @e, @h, @l, @by, @now, @exp)`,
-      { id, e: email, h: sha256(token), l: locale, by: actorId, now, exp: now + PLATFORM_INVITE_TTL },
+      { id, e: email, h: sha256(token), l: locale, by: actorId, now, exp: now + policyNumber(db, 'invites.superAdminDays') * DAY },
     );
     devOutboxTransport(db, () => {}).send(
       emailMessage(superadminInviteEmail(locale, { inviter: inviter?.name ?? inviter?.email ?? 'Custock', url: link }), { to: email, locale, payload: { type: 'platform_invite', inviteId: id } }),
@@ -526,7 +527,10 @@ export async function deleteBusinessEverything(
     `SELECT storage_key FROM files WHERE storage_key NOT LIKE 'http%' AND deleted_at IS NULL
         AND (org_id = @o OR id IN (SELECT avatar_file_id FROM users WHERE id IN (SELECT value FROM json_each(@u))))`,
     { o: orgId, u: accounts },
-  ).map((r) => r.storage_key);
+  ).map((r) => r.storage_key)
+    // only objects under this business's own prefixes, or the profile photos of the accounts that
+    // close. a row pointing anywhere else is never followed into the bucket
+    .filter((k) => k.startsWith(`orgs/${orgId}/`) || k.startsWith(`uploads/${orgId}/`) || accounts.some((u) => k.startsWith(`users/${u}/`) || k.startsWith(`uploads/${u}/`)));
 
   const tables = p
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' AND name NOT IN ('organizations', 'platform_audit')")

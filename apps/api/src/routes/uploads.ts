@@ -9,16 +9,21 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { PresignInput, uuidv7, type PresignResult, type UploadPurpose } from '@custock/core';
-import { DEFAULT_DB_PATH } from '@custock/db';
+import { DEFAULT_DB_PATH, type Db } from '@custock/db';
 import type { AppEnv, Config } from '../types';
 import { cfgOf, has, need, nowOf, orgOf } from '../lib/context';
+import { checkStorageAlert } from '../lib/platform-notify';
 import { ApiProblem, forbidden, notFound } from '../lib/problem';
+import { policyNumber } from '../lib/policy';
 import { localStore, offStore, s3Store, type PhotoStore } from '../lib/storage';
 import { platform } from '../lib/tenant';
 import { captureError } from '../lib/errors';
+import { PRESIGN_PER_HOUR } from '../lib/files';
+import { throttle } from '../lib/ratelimit';
 
 const TTL = 10 * 60_000;
-export const MAX_UPLOAD_BYTES = 5_000_000;
+// the hard ceiling for any upload body. the size in force comes from the policy uploads.maxMegabytes
+export const MAX_UPLOAD_BYTES = 10_000_000;
 const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const MIME: Record<string, string> = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
 
@@ -39,10 +44,22 @@ const LIMIT: Record<UploadPurpose, { bytes: number; mimes: string[] }> = {
   avatar: { bytes: 1_000_000, mimes: ['image/webp', 'image/jpeg', 'image/png'] },
 };
 
-function checkLimits(purpose: UploadPurpose, mime: string, bytes: number) {
+// product, post and shop photos follow the platform policy, logos and profile photos stay small
+function capFor(db: Db, purpose: UploadPurpose): number {
   const l = LIMIT[purpose];
+  return l.bytes === MAX_UPLOAD_BYTES ? Math.min(MAX_UPLOAD_BYTES, policyNumber(db, 'uploads.maxMegabytes') * 1_000_000) : l.bytes;
+}
+
+function checkLimits(db: Db, purpose: UploadPurpose, mime: string, bytes: number) {
+  const l = { ...LIMIT[purpose], bytes: capFor(db, purpose) };
   if (!l.mimes.includes(mime)) throw new ApiProblem(415 as 400, 'validation', `${purpose} photos must be ${l.mimes.join(' or ')}`);
-  if (bytes > l.bytes) throw new ApiProblem(413 as 400, 'validation', 'file too large');
+  // product, post and shop photos over the size answer like the old schema limit did (400), small squares 413
+  if (bytes > l.bytes) throw new ApiProblem((LIMIT[purpose].bytes === MAX_UPLOAD_BYTES ? 400 : 413) as 400, 'validation', 'file too large');
+}
+
+// a person asks for at most PRESIGN_PER_HOUR upload slots an hour, every kind of photo together
+function presignAllowed(db: Db, userId: string, now: number) {
+  if (!throttle(db, `presign:${userId}`, { max: PRESIGN_PER_HOUR, windowMs: 3600_000, now })) throw new ApiProblem(429, 'rate_limited');
 }
 
 export function uploadDir(cfg: Config): string {
@@ -115,11 +132,12 @@ export function uploadRoutes(app: Hono<AppEnv>) {
     if (input.purpose === 'avatar') throw new ApiProblem(400, 'validation', 'profile photos go to /v1/me/uploads/presign');
     const perm = PERM[input.purpose];
     if (!has(c, perm)) need(c, perm);
-    checkLimits(input.purpose, input.mime, input.bytes);
+    checkLimits(cfgOf(c).db, input.purpose, input.mime, input.bytes);
     const cfg = cfgOf(c);
     const store = photoStoreOf(cfg);
     if (store.kind === 'off') throw new ApiProblem(501 as 500, 'internal', 'photo storage is not set up on this server');
     const now = nowOf(c);
+    presignAllowed(cfg.db, c.get('user').id, now);
     const { org } = orgOf(c);
     const user = c.get('user').id;
     const fileId = uuidv7(now);
@@ -141,6 +159,8 @@ export function uploadRoutes(app: Hono<AppEnv>) {
       );
     }
     const body: PresignResult = { fileId, uploadUrl: slot.uploadUrl, method: 'PUT', headers: slot.headers, publicUrl: slot.publicUrl, expiresAt: now + TTL };
+    // crossing 70% or 90% of the free tier tells the super admins once
+    checkStorageAlert(cfg.db, now);
     return c.json(body, 201);
   });
 
@@ -153,7 +173,7 @@ export function uploadRoutes(app: Hono<AppEnv>) {
     if (!slot || slot.e < now || !slot.u) throw forbidden('upload slot expired or invalid');
     if ((c.req.header('Content-Type') ?? '').split(';')[0]!.trim() !== slot.m) throw new ApiProblem(415 as 400, 'validation', 'content type does not match the slot');
     const declared = Number(c.req.header('Content-Length') ?? '0');
-    const cap = Math.min(MAX_UPLOAD_BYTES, LIMIT[slot.p]?.bytes ?? MAX_UPLOAD_BYTES);
+    const cap = LIMIT[slot.p] ? capFor(cfgOf(c).db, slot.p) : Math.min(MAX_UPLOAD_BYTES, policyNumber(cfgOf(c).db, 'uploads.maxMegabytes') * 1_000_000);
     if (declared > slot.b || declared > cap) throw new ApiProblem(413 as 400, 'validation', 'file too large');
     const buf = Buffer.from(await c.req.arrayBuffer());
     if (!buf.length || buf.length > slot.b || buf.length > cap) throw new ApiProblem(413 as 400, 'validation', 'file too large');
@@ -165,9 +185,10 @@ export function uploadRoutes(app: Hono<AppEnv>) {
     const dir = join(uploadDir(cfg), slot.o);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, name), buf);
+    // the bytes are here, so the file counts right away
     db.run(
-      `INSERT INTO files (id, org_id, storage_key, purpose, is_public, mime, bytes, created_by, created_at)
-       VALUES (@id, @org, @key, @purpose, 1, @mime, @bytes, @u, @now)`,
+      `INSERT INTO files (id, org_id, storage_key, purpose, is_public, mime, bytes, created_by, created_at, confirmed_at)
+       VALUES (@id, @org, @key, @purpose, 1, @mime, @bytes, @u, @now, @now)`,
       { id: slot.f, org: slot.p === 'avatar' ? null : slot.o, key: storageKey, purpose: slot.p, mime: slot.m, bytes: buf.length, u: slot.u, now },
     );
     return c.body(null, 204);
@@ -178,11 +199,12 @@ export function uploadRoutes(app: Hono<AppEnv>) {
   app.post('/v1/me/uploads/presign', async (c) => {
     const input = PresignInput.parse(await c.req.json());
     if (input.purpose !== 'avatar') throw new ApiProblem(400, 'validation', 'only profile photos here');
-    checkLimits('avatar', input.mime, input.bytes);
+    checkLimits(cfgOf(c).db, 'avatar', input.mime, input.bytes);
     const cfg = cfgOf(c);
     const store = photoStoreOf(cfg);
     if (store.kind === 'off') throw new ApiProblem(501 as 500, 'internal', 'photo storage is not set up on this server');
     const now = nowOf(c);
+    presignAllowed(cfg.db, c.get('user').id, now);
     const user = c.get('user').id;
     const fileId = uuidv7(now);
     const ext = EXT[input.mime]!;
@@ -201,6 +223,8 @@ export function uploadRoutes(app: Hono<AppEnv>) {
       );
     }
     const body: PresignResult = { fileId, uploadUrl: slot.uploadUrl, method: 'PUT', headers: slot.headers, publicUrl: slot.publicUrl, expiresAt: now + TTL };
+    // crossing 70% or 90% of the free tier tells the super admins once
+    checkStorageAlert(cfg.db, now);
     return c.json(body, 201);
   });
 
@@ -227,4 +251,5 @@ export function retireFile(cfg: Config, fileId: string | null | undefined, now: 
   if (!row) return;
   db.run('UPDATE files SET deleted_at = @now WHERE id = @id', { now, id: fileId });
   void photoStoreOf(cfg).remove(row.storage_key);
+  checkStorageAlert(cfg.db, now);
 }

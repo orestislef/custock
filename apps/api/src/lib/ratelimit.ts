@@ -8,6 +8,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { isIP } from 'node:net';
 import type { Context, MiddlewareHandler } from 'hono';
 import { getConnInfo } from '@hono/node-server/conninfo';
+import { routePath } from 'hono/route';
 import type { Db } from '@custock/db';
 import type { AppEnv } from '../types';
 import { ApiProblem } from './problem';
@@ -36,18 +37,31 @@ export function clientIp(c: Context<AppEnv>): string {
   }
 }
 
-export function rateLimit(opts: { windowMs: number; max: number; prefix: string }): MiddlewareHandler<AppEnv> {
+// the route pattern the request matched (the handler's, not the middleware's), the raw path
+// when nothing matched
+export function routeKey(c: Context<AppEnv>): string {
+  try {
+    const r = routePath(c, -1);
+    if (r && r !== '*') return r;
+  } catch {}
+  return c.req.path;
+}
+
+// max can be a function, read on every request (limits from the policy engine)
+export function rateLimit(opts: { windowMs: number; max: number | ((c: Context<AppEnv>) => number); prefix: string }): MiddlewareHandler<AppEnv> {
   const hits = new Map<string, { count: number; reset: number }>();
   return async (c, next) => {
     if (c.get('cfg').rateLimit === false) return next();
-    const key = `${opts.prefix}:${clientIp(c)}:${c.req.path}`;
+    // one bucket per route, not per path: /v1/public/p/:code shares its limit across every code,
+    // so trying codes one after the other does not get a fresh allowance each time
+    const key = `${opts.prefix}:${clientIp(c)}:${routeKey(c)}`;
     const t = Date.now();
     const h = hits.get(key);
     if (!h || h.reset < t) {
       hits.set(key, { count: 1, reset: t + opts.windowMs });
     } else {
       h.count++;
-      if (h.count > opts.max) {
+      if (h.count > (typeof opts.max === 'function' ? opts.max(c) : opts.max)) {
         c.header('Retry-After', String(Math.ceil((h.reset - t) / 1000)));
         throw new ApiProblem(429, 'rate_limited');
       }

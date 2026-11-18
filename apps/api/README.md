@@ -386,3 +386,19 @@ The server runs a job loop every 5 seconds. Jobs live in the `jobs` table:
   confirm) are one shot: the update only happens from the expected status.
 - held and queued messages are checked again when they go out: consent, following, suppression.
 - unconfirmed signups are erased after 30 days by the nightly job.
+
+## Limits and options (the policy engine)
+
+Every limit and option lives in one registry, `packages/core/src/policies.ts`: its type, default,
+hard bounds, the levels it can be set at and how a narrower level is held by a wider one. Values
+are stored in `policy_values` (migration 0013), read through `src/lib/policy.ts` and changed through
+`/v1/platform/policies` (super admin), `/v1/platform/businesses/:orgId/policies` (super admin:
+ceiling and "owner can change" per business), `/v1/orgs/:org/policies` (business),
+`.../shops/:shop/policies`, `.../roles/:role/policies`, `.../members/:m/policies` and
+`.../me/policies` (a person's own alert choices).
+
+The narrowest value set wins and always stays inside the levels above it. Only someone above a
+role or a person changes it, never their own role or themselves (apart from personal preferences),
+nobody hands out more than they have, and super admin values bind owners. Business values of the
+older settings stay in their `organizations` columns and are written back inside the ceilings, so
+code that reads a column follows at once. Defaults equal what the app did before the engine.

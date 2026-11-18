@@ -7,6 +7,7 @@ import { audit, bumpPerms } from '../lib/audit';
 import { platform, Tenant } from '../lib/tenant';
 import { devOutboxTransport, emailMessage } from '../lib/transport';
 import { ownerInviteEmail } from '../email/messages';
+import { applyPlatformDefaults, policyNumber } from '../lib/policy';
 
 export const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 
@@ -60,6 +61,8 @@ export function createBusiness(db: Db, b: NewBusiness): { orgId: string; userId:
        VALUES (@id, @name, @slug, @country, @currency, @tz, @locale, @now)`,
       { id: orgId, name: b.name.trim(), slug: b.slug, country: b.country ?? 'GR', currency: b.currency ?? 'EUR', tz: b.timezone ?? 'Europe/Athens', locale: b.locale ?? 'el', now },
     );
+    // a new business starts from the super admin's platform values (lib/policy.ts)
+    applyPlatformDefaults(db, orgId);
     const roleIds: Record<string, string> = {};
     for (const r of DEFAULT_ROLES) {
       const rid = uuidv7(now);
@@ -110,7 +113,7 @@ export function inviteOwner(db: Db, orgId: string, email: string, locale: 'en' |
   t.run(
     `INSERT INTO invites (id, org_id, email, role_id, scope_type, scope_id, token_hash, locale, invited_by, created_at, expires_at)
      VALUES (@id, @org, @e, @r, 'org', @org, @h, @l, NULL, @now, @exp)`,
-    { id, e: address, r: role.id, h: sha256(token), l: locale, now, exp: now + OWNER_INVITE_TTL },
+    { id, e: address, r: role.id, h: sha256(token), l: locale, now, exp: now + policyNumber(db, 'invites.ownerDays') * 86_400_000 },
   );
   const url = `${webUrl.replace(/\/$/, '')}/invite/${token}`;
   devOutboxTransport(db, () => {}).send(emailMessage(ownerInviteEmail(locale, { org: org.name, url }), { orgId, to: address, locale, payload: { type: 'invite', inviteId: id } }));
