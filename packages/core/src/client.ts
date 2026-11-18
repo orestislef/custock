@@ -25,6 +25,8 @@ export interface ApiClientOptions {
   onUnauthorized?: () => void | Promise<void>;
   // called when the server says the caller's permissions changed
   onPermsStale?: (orgId: string) => void;
+  // extra headers on every request, for example the forwarded client address from a server
+  headers?: Record<string, string> | (() => Record<string, string> | undefined | Promise<Record<string, string> | undefined>);
   fetch?: typeof fetch;
 }
 
@@ -47,7 +49,8 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
   const doFetch = opts.fetch ?? globalThis.fetch.bind(globalThis);
 
   async function request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
-    const headers: Record<string, string> = { Accept: 'application/json' };
+    const extra = typeof opts.headers === 'function' ? await opts.headers() : opts.headers;
+    const headers: Record<string, string> = { ...(extra ?? {}), Accept: 'application/json' };
     const token = await opts.getAccessToken?.();
     if (token) headers.Authorization = `Bearer ${token}`;
     const locale = opts.getLocale?.();
@@ -98,7 +101,7 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     // org
     orgSettings: (orgId) => get(org(orgId)),
     updateOrgSettings: (orgId, p) => patch(org(orgId), p),
-    shops: (orgId) => get(`${org(orgId)}/shops`),
+    shops: (orgId, o) => get(`${org(orgId)}/shops`, { all: o?.all ? 1 : undefined }),
     groups: (orgId) => get(`${org(orgId)}/groups`),
     updateShop: (orgId, shopId, p) => patch(`${org(orgId)}/shops/${enc(shopId)}`, p),
 
@@ -226,5 +229,20 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     detachBarcode: (orgId, variantId, barcodeId) => del(`${org(orgId)}/variants/${enc(variantId)}/barcodes/${enc(barcodeId)}`),
     presignUpload: (orgId, input) => post(`${org(orgId)}/uploads/presign`, input),
     negativeReview: (orgId, shopId) => get(`${org(orgId)}/review/negative`, { shopId }),
+
+    pushKey: async () => {
+      try {
+        return await get<{ publicKey: string }>('/v1/push/key');
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+    savePushSubscription: (input) => request('POST', '/v1/me/push-subscriptions', input),
+    deletePushSubscription: (endpoint) => request('DELETE', '/v1/me/push-subscriptions', { endpoint }),
+
+    invitePreview: (token) => get(`/v1/invites/${enc(token)}`),
+    registerWithInvite: (input) => post('/v1/invites/register', input),
+    createShop: (orgId, input) => post(`${org(orgId)}/shops`, input),
   };
 }

@@ -44,7 +44,7 @@ export const ErrorCode = z.enum([
   'unauthorized', 'forbidden', 'not_found', 'validation', 'conflict', 'rate_limited',
   'perms_stale', 'scope', 'ceiling', 'rank', 'self', 'last_owner',
   'barcode_taken', 'negative_stock_blocked', 'invite_expired', 'invite_email_mismatch',
-  'join_link_disabled', 'already_subscribed', 'internal',
+  'join_link_disabled', 'already_subscribed', 'account_exists', 'internal',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 
@@ -657,7 +657,7 @@ export type AuditEntry = z.infer<typeof AuditEntry>;
 
 export const DevOutboxItem = z.object({
   id: z.string(),
-  channel: z.enum(['email', 'push', 'sms']),
+  channel: z.enum(['email', 'push', 'webpush', 'sms']),
   orgId: z.string().nullable(),
   userId: z.string().nullable(),
   customerId: z.string().nullable(),
@@ -726,3 +726,76 @@ export const PresignResult = z.object({
   expiresAt: z.number(),
 });
 export type PresignResult = z.infer<typeof PresignResult>;
+
+// ---------------------------------------------------------------- web push
+
+// the push services browsers use. a subscription endpoint must be https on one of these hosts,
+// so a stored endpoint can never make the server call somewhere else.
+export const PUSH_SERVICE_HOSTS = ['fcm.googleapis.com', 'updates.push.services.mozilla.com', 'web.push.apple.com'] as const;
+export const PUSH_SERVICE_SUFFIXES = ['.notify.windows.com', '.push.apple.com'] as const;
+
+export function isPushServiceEndpoint(endpoint: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'https:' || u.username || u.password || (u.port && u.port !== '443')) return false;
+  const host = u.hostname.toLowerCase();
+  return (PUSH_SERVICE_HOSTS as readonly string[]).includes(host) || PUSH_SERVICE_SUFFIXES.some((s) => host.endsWith(s) && host.length > s.length);
+}
+
+// the browser's PushSubscription.toJSON(), plus which business this home screen app belongs to
+export const PushSubscriptionInput = z.object({
+  endpoint: z.string().max(1000).refine(isPushServiceEndpoint, 'not a known push service'),
+  keys: z.object({
+    p256dh: z.string().min(16).max(200).regex(/^[A-Za-z0-9_-]+=*$/),
+    auth: z.string().min(8).max(100).regex(/^[A-Za-z0-9_-]+=*$/),
+  }),
+  orgId: z.string().max(64).nullable().optional(),
+  locale: Locale.optional(),
+});
+export type PushSubscriptionInput = z.infer<typeof PushSubscriptionInput>;
+
+// ---------------------------------------------------------------- invites without email
+
+// what the invite link page shows before anyone signs in
+export const InvitePreview = z.object({
+  orgName: z.string(),
+  scopeName: z.string(),
+  roleName: z.string(),
+  email: z.string(),
+  // true: sign in with that account and accept. false: set a name and password to make one
+  accountExists: z.boolean(),
+  expiresAt: z.number(),
+});
+export type InvitePreview = z.infer<typeof InvitePreview>;
+
+export const InviteRegisterInput = z.object({
+  token: z.string().min(10).max(200),
+  displayName: z.string().trim().min(1).max(80),
+  password: z.string().min(10).max(200),
+  locale: Locale.optional(),
+});
+export type InviteRegisterInput = z.infer<typeof InviteRegisterInput>;
+
+// the invite was created. link is the accept link for sharing by hand, emailed says whether it
+// also went out by email (only when sending is live)
+export const InviteCreated = z.object({
+  id: z.string(),
+  link: z.string(),
+  emailed: z.boolean(),
+  devLink: z.string().optional(),
+});
+export type InviteCreated = z.infer<typeof InviteCreated>;
+
+export const ShopInput = z.object({
+  name: z.string().trim().min(1).max(80),
+  slug: z.string().regex(/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/).optional(),
+  city: z.string().max(80).nullable().optional(),
+  address: z.string().max(200).nullable().optional(),
+  phone: z.string().max(40).nullable().optional(),
+  email: z.string().email().max(254).nullable().optional(),
+});
+export type ShopInput = z.infer<typeof ShopInput>;

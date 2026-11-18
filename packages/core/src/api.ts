@@ -10,6 +10,7 @@ import type {
   Tokens, ScopeType, Uom,
   AddCustomerInput, AuditEntry, DevOutboxItem, Invite, ShopVariantSettingsInput, StockAlertItem, StockCount,
   StockCountLine, SyncResult, Transfer, TransferInput, UncountedPolicy, UnsubscribePage, PresignInput, PresignResult,
+  PushSubscriptionInput, InviteCreated, InvitePreview, InviteRegisterInput, ShopInput,
 } from './contract';
 
 export interface Page<T> { items: T[]; nextCursor: string | null }
@@ -45,7 +46,9 @@ export interface CustockApi {
   // org
   orgSettings(orgId: string): Promise<OrgSettings>;
   updateOrgSettings(orgId: string, patch: Partial<OrgSettings>): Promise<OrgSettings>;
-  shops(orgId: string): Promise<Shop[]>;
+  // the caller's own shops. all: every shop of the org, for picking a transfer destination
+  // (needs stock.transfer.send at some shop)
+  shops(orgId: string, opts?: { all?: boolean }): Promise<Shop[]>;
   groups(orgId: string): Promise<ShopGroup[]>;
   updateShop(orgId: string, shopId: string, patch: Partial<Shop>): Promise<Shop>;
 
@@ -84,7 +87,8 @@ export interface CustockApi {
   members(orgId: string): Promise<Member[]>;
   roles(orgId: string): Promise<Role[]>;
   grantableRoles(orgId: string, scopeType: ScopeType, scopeId: string): Promise<GrantableRole[]>;
-  invite(orgId: string, input: InviteInput): Promise<{ id: string; devLink?: string }>;
+  // link is always returned so it can be shared by hand. emailed is true only when mail sending is live
+  invite(orgId: string, input: InviteInput): Promise<InviteCreated>;
   assignRole(orgId: string, membershipId: string, input: { roleId: string; scopeType: ScopeType; scopeId: string }): Promise<void>;
   removeAssignment(orgId: string, membershipId: string, assignmentId: string): Promise<void>;
   saveRole(orgId: string, input: { id?: string; name: string; rank: number; permissions: string[] }): Promise<Role>;
@@ -187,4 +191,23 @@ export interface CustockApi {
   // a signed upload slot for a photo. in dev the api stores the file itself and serves it under /files.
   presignUpload(orgId: string, input: PresignInput): Promise<PresignResult>;
   negativeReview(orgId: string, shopId?: string): Promise<{ movementId: string; shopId: string; variantId: string; name: string; qtyDelta: number; onHandAfter: number; createdByName: string | null; recordedAt: number }[]>;
+
+  // ---------------------------------------------------------------- web push
+
+  // the VAPID public key for PushManager.subscribe, null when web push is not set up
+  pushKey(): Promise<{ publicKey: string } | null>;
+  // stores this browser's subscription for the signed in user. orgId scopes it to one business,
+  // so a shop's home screen app only gets that shop's pushes. saving the same endpoint again updates it.
+  savePushSubscription(input: PushSubscriptionInput): Promise<void>;
+  deletePushSubscription(endpoint: string): Promise<void>;
+
+  // ---------------------------------------------------------------- production onboarding
+
+  // public: the invite link page. 410 invite_expired when used, revoked or old
+  invitePreview(token: string): Promise<InvitePreview>;
+  // public: a brand new person makes their account from the invite and lands in the org.
+  // 409 account_exists when the email already has an account: sign in, then acceptInvite(token)
+  registerWithInvite(input: InviteRegisterInput): Promise<Tokens & { orgId: string }>;
+  // needs shops.create
+  createShop(orgId: string, input: ShopInput): Promise<Shop>;
 }

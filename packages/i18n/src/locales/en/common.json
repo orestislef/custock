@@ -45,6 +45,7 @@
     "invite_email_mismatch": "This invite was sent to a different email.",
     "join_link_disabled": "This code is no longer active.",
     "already_subscribed": "You already follow this shop.",
+    "account_exists": "This email already has an account. Sign in to accept.",
     "internal": "Something went wrong on our side. Try again.",
     "offline": "No signal. Your scans are saved and will sync when you are back online."
   },
