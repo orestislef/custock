@@ -62,22 +62,39 @@ pnpm check        # typecheck, tests and missing translations
 shows every email and push that would have gone out. Nothing is ever sent from a dev setup. The API
 describes itself at `http://localhost:8787/v1/openapi.json`.
 
-Putting it on a server (Docker or systemd, litestream backups to R2) is in [deploy/](deploy/README.md).
-Real sending (FCM, SMTP) stays off unless it is explicitly allowed, see [apps/api](apps/api/README.md).
+Putting it on a server is in [deploy/](deploy/README.md): one Docker image with the api and the web,
+built by hand with `deploy/ship.sh`, behind the reverse proxy the server already has, best on its own
+subdomain. Sending (email, web push, FCM) and photo storage (any S3 compatible bucket) switch on per
+channel from the server's settings, see [apps/api](apps/api/README.md).
 
 ## What it does
 
-**IMS**: product catalog with variants, barcodes and photos. Stock per shop, kept as a ledger of
-movements so nothing gets overwritten. Scan to look up, receive, sell, count or transfer.
-Stock counts, transfers between shops, low stock alerts.
+**IMS**: product catalog with variants, categories, barcodes and photos. Stock per shop, kept as a
+ledger of movements so nothing gets overwritten. Scan with the phone camera to look up, receive,
+sell, count or transfer: factory barcodes (EAN, UPC, Code 128) and QR codes, or a usb scanner on a
+desk. Works without signal and syncs later. Stock counts, transfers between shops with shortages,
+low stock alerts, printable shelf labels with barcode, price and a QR for customers.
 
-**CRM**: customers sign up from a QR code or link. Consent per channel, double opt in, one tap
-unsubscribe. Posts and offers to a feed, push and email, linked to products. Notify me when
-back in stock, tags, notes, interests. Each business decides if customers see the catalog,
-prices and stock.
+**CRM**: customers join from a QR code or link. Consent per channel, double opt in, one tap
+unsubscribe. Posts and offers to a feed, by push (with the shop's logo and the product photo) and
+email in the shop's own look, linked to products, with the lowest price of the last 30 days on
+offers. Notify me when back in stock, favourites, tags, notes. Each business decides if customers
+see the catalog, prices and stock. Every business gets its own home screen app with its own icon.
 
 **Both together**: the most wanted out of stock products, which QR poster brings people in,
 what sells after an offer goes out. Reports and dashboards per role.
+
+**Roles and settings**: owner, admin, manager, staff and viewer, per business, shop group or shop,
+each handing out only what they have themselves. People only see what they can use. Every limit and
+option (push limits and quiet hours, approvals, stock rules, catalog visibility, alerts, sessions)
+is set from the level above: platform, business, shop, role, person.
+
+**Super admin**: every business in one place, new businesses with their owner invited by email,
+feature switches and limits per business, pausing a business, emergency switches for email, push,
+signups and invites, a meter for the free storage tier, an error log, the API docs and server
+health.
+
+English, Greek and Russian everywhere: screens, emails, push texts, dates and numbers.
 
 ## Stack
 

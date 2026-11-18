@@ -5,10 +5,11 @@
 #
 #   CUSTOCK_SSH=root@host CUSTOCK_SSH_KEY=~/.ssh/key sh deploy/ship.sh
 #
-# optional: CUSTOCK_BASE_PATH (default /custock), CUSTOCK_DIR (default /opt/custock)
+# optional: CUSTOCK_BASE_PATH (default empty, the root of its own domain; /custock for a path), CUSTOCK_DIR (default /opt/custock)
 set -eu
 : "${CUSTOCK_SSH:?set CUSTOCK_SSH=user@host}"
-base="${CUSTOCK_BASE_PATH:-/custock}"
+# an empty CUSTOCK_BASE_PATH serves the app at the root of its own domain
+base="${CUSTOCK_BASE_PATH-}"
 dir="${CUSTOCK_DIR:-/opt/custock}"
 key=""
 [ -n "${CUSTOCK_SSH_KEY:-}" ] && key="-i $CUSTOCK_SSH_KEY"
