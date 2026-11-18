@@ -78,6 +78,7 @@
     "reversal": "Undone"
   },
   "reason": {
+    "count": "Count difference",
     "found": "Found",
     "lost": "Lost",
     "damaged": "Damaged",
@@ -130,9 +131,10 @@
     "account_exists": "This email already has an account. Sign in to accept.",
     "internal": "Something went wrong on our side. Try again.",
     "offline": "No signal. Your scans are saved and will sync when you are back online.",
-    "feature_off": "This is switched off for your business.",
+    "network": "The connection dropped. Check the signal and try again.",
+    "feature_off": "This is not available right now.",
     "org_suspended": "This business is paused right now.",
-    "limit_reached": "This business has reached a limit.",
+    "limit_reached": "This is not available right now.",
     "platform_paused": "This is paused for now. Try again later.",
     "last_superadmin": "The last super admin cannot be removed.",
     "storage_full": "Photos cannot be added right now. Everything already uploaded stays.",
@@ -243,6 +245,10 @@
     "catalog.prices": {
       "title": "Show prices",
       "foot": "Prices on the shop page."
+    },
+    "catalog.offerPrices": {
+      "title": "Show prices in offers",
+      "foot": "With prices hidden on the shop page, offers still show their own price and the lowest price of the last 30 days."
     },
     "catalog.stock": {
       "title": "Stock customers see",

@@ -165,7 +165,14 @@
     "name": "Name",
     "changeName": "Change name",
     "nameSaved": "Name saved",
-    "nameFoot": "This is how your team and the people you write to see you."
+    "nameFoot": "This is how your team and the people you write to see you.",
+    "otherDevices": "Other devices",
+    "otherDevicesCount_one": "Signed in on {{count}} other device",
+    "otherDevicesCount_other": "Signed in on {{count}} other devices",
+    "onlyThisDevice": "Only this device is signed in",
+    "signOutOthers": "Sign out others",
+    "signedOutOthers_one": "Signed out on {{count}} other device",
+    "signedOutOthers_other": "Signed out on {{count}} other devices"
   },
   "nav": {
     "home": "Home",
@@ -445,7 +452,8 @@
     "needTime": "Pick a date and time.",
     "untilNone": "No end date",
     "capRule_one": "Nobody gets more than {{count}} push a day from you. Extra ones still reach the feed.",
-    "capRule_other": "Nobody gets more than {{count}} pushes a day from you. Extra ones still reach the feed."
+    "capRule_other": "Nobody gets more than {{count}} pushes a day from you. Extra ones still reach the feed.",
+    "belowCost": "Below cost ({{cost}}). Customers still get it."
   },
   "post": {
     "approve": "Approve and publish",
@@ -536,7 +544,8 @@
     "manageFoot": "People with this role can invite and manage the roles they sit above.",
     "diff": "{{added}} added, {{removed}} removed",
     "save": "Save role",
-    "limits": "Limits for this role"
+    "limits": "Limits for this role",
+    "affectsNamesMore": "{{names}} and {{count}} more"
   },
   "reports": {
     "title": "Reports",
@@ -740,7 +749,8 @@
     "photoN": "Photo {{n}}",
     "coverPhoto": "Cover, shown first",
     "barcodeOn": "Already on {{name}}.",
-    "barcodeOpen": "Open it"
+    "barcodeOpen": "Open it",
+    "conflict": "Someone else saved this product a moment ago. Save again to keep your changes, or reload to see theirs."
   },
   "shopSettings": {
     "open": "Settings for {{shop}}",
@@ -1878,5 +1888,15 @@
       "cta": "Browse {{org}}"
     },
     "shopPost": "This post is no longer available."
+  },
+  "list": {
+    "more": "Show more",
+    "loading": "Loading",
+    "countMore_one": "First {{count}} shown",
+    "countMore_other": "First {{count}} shown"
+  },
+  "draft": {
+    "restored": "Picked up where you left off.",
+    "startOver": "Start over"
   }
 }

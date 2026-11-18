@@ -19,28 +19,14 @@ import enWeb from './locales/en/web.json';
 import elWeb from './locales/el/web.json';
 import ruWeb from './locales/ru/web.json';
 
-export const LOCALES = ['en', 'el', 'ru'] as const;
-export type AppLocale = (typeof LOCALES)[number];
-export const NAMESPACES = ['common', 'server', 'web'] as const;
-export type Namespace = (typeof NAMESPACES)[number];
+export { LOCALES, NAMESPACES, LOCALE_NAMES, pickLocale, type AppLocale, type Namespace } from './meta';
+import { NAMESPACES, type AppLocale, type Namespace } from './meta';
 
 export const resources = {
   en: { common: enCommon, server: enServer, web: enWeb },
   el: { common: elCommon, server: elServer, web: elWeb },
   ru: { common: ruCommon, server: ruServer, web: ruWeb },
 } as const;
-
-export const LOCALE_NAMES: Record<AppLocale, string> = { en: 'English', el: 'Ελληνικά', ru: 'Русский' };
-
-// fallback chain from thinking/11-languages.md: chosen, device, org default, english
-export function pickLocale(...candidates: (string | null | undefined)[]): AppLocale {
-  for (const c of candidates) {
-    if (!c) continue;
-    const base = c.toLowerCase().split(/[-_]/)[0];
-    if ((LOCALES as readonly string[]).includes(base!)) return base as AppLocale;
-  }
-  return 'en';
-}
 
 // a fresh, isolated instance. use one per request on the server, one per app on clients.
 export function createI18n(locale: AppLocale, defaultNS: Namespace = 'common'): I18n {
