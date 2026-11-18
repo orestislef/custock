@@ -10,6 +10,7 @@ import { audit } from '../lib/audit';
 import { cfgOf, has, nowOf, orgOf } from '../lib/context';
 import { ApiProblem, badRequest, forbidden, notFound } from '../lib/problem';
 import { setFileBase, uploadKeyFromUrl } from './catalog';
+import { photoStoreOf } from '../routes/uploads';
 
 export function attachBarcode(c: Context<AppEnv>, variantId: string, raw: string, packQty = 1, symbology?: string | null) {
   const { t } = orgOf(c);
@@ -166,7 +167,7 @@ export function applyImages(c: Context<AppEnv>, productId: string, urls: string[
     const uploadKey = uploadKeyFromUrl(url);
     if (uploadKey) {
       const f = t.get<{ id: string }>('SELECT id FROM files WHERE org_id = @org AND storage_key = @k AND deleted_at IS NULL', { k: uploadKey });
-      if (!f || !uploadKey.startsWith(`uploads/${org.id}/`)) throw badRequest('unknown upload', { imageUrls: 'not_found' });
+      if (!f || !(uploadKey.startsWith(`uploads/${org.id}/`) || uploadKey.startsWith(`orgs/${org.id}/`))) throw badRequest('unknown upload', { imageUrls: 'not_found' });
       fileIds.push(f.id);
       continue;
     }
@@ -181,8 +182,36 @@ export function applyImages(c: Context<AppEnv>, productId: string, urls: string[
     }
     fileIds.push(f.id);
   }
+  const before = t.all<{ file_id: string }>('SELECT file_id FROM product_images WHERE org_id = @org AND product_id = @p AND variant_id IS NULL', { p: productId }).map((r) => r.file_id);
   t.run('DELETE FROM product_images WHERE org_id = @org AND product_id = @p AND variant_id IS NULL', { p: productId });
   fileIds.forEach((fid, i) =>
     t.run('INSERT INTO product_images (id, org_id, product_id, variant_id, file_id, sort) VALUES (@id, @org, @p, NULL, @f, @i)', { id: uuidv7(now), p: productId, f: fid, i }),
   );
+  dropUnusedFiles(c, before.filter((id) => !fileIds.includes(id)));
+}
+
+// photos we stored ourselves that nothing uses any more: the row is marked deleted and the object
+// goes, best effort, after the answer
+export function dropUnusedFiles(c: Context<AppEnv>, fileIds: string[]) {
+  if (!fileIds.length) return;
+  const { t } = orgOf(c);
+  const now = nowOf(c);
+  const keys: string[] = [];
+  for (const id of fileIds) {
+    const f = t.get<{ storage_key: string }>(
+      `SELECT storage_key FROM files f WHERE f.org_id = @org AND f.id = @id AND f.deleted_at IS NULL
+         AND (f.storage_key LIKE 'uploads/%' OR f.storage_key LIKE 'orgs/%')
+         AND NOT EXISTS (SELECT 1 FROM product_images i WHERE i.file_id = f.id)
+         AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.cover_file_id = f.id)
+         AND NOT EXISTS (SELECT 1 FROM post_media m WHERE m.file_id = f.id)
+         AND NOT EXISTS (SELECT 1 FROM shops s WHERE s.image_file_id = f.id)
+         AND NOT EXISTS (SELECT 1 FROM organizations o WHERE o.logo_file_id = f.id)`,
+      { id },
+    );
+    if (!f) continue;
+    t.run('UPDATE files SET deleted_at = @now WHERE org_id = @org AND id = @id', { now, id });
+    keys.push(f.storage_key);
+  }
+  const store = photoStoreOf(cfgOf(c));
+  for (const k of keys) void store.remove(k);
 }

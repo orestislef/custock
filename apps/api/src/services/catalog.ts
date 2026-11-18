@@ -4,25 +4,39 @@ import type { Product, StockLevel, Uom } from '@custock/core';
 import type { Tenant } from '../lib/tenant';
 import { parseJson } from '../lib/tenant';
 
-// where files stored by the api itself are served from (dev uploads). set from the config.
+// where files stored by the api itself are served from (local uploads), and the public address of
+// the bucket (s3). both set from the config.
 let fileBase = 'http://localhost:8787';
+let bucketBase: string | null = null;
 export function setFileBase(base: string | undefined) {
   if (base) fileBase = base.replace(/\/$/, '');
 }
+export function setBucketBase(base: string | null | undefined) {
+  bucketBase = base ? base.replace(/\/$/, '') : null;
+}
+
+const LOCAL_KEY = /^uploads\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+const BUCKET_KEY = /^orgs\/[0-9a-f-]{36}\/(products|posts|logos|shops)\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
 
 export function fileUrl(storageKey: string | null | undefined): string | null {
   if (!storageKey) return null;
   if (/^https?:\/\//.test(storageKey)) return storageKey;
-  // object storage keys get the public bucket url once storage is wired
+  if (storageKey.startsWith('orgs/')) return `${bucketBase ?? `${fileBase}/files`}/${storageKey}`;
   return `${fileBase}/files/${storageKey}`;
 }
 
-// the storage key behind one of our own upload urls, or null
+// the storage key behind one of our own upload urls (local or bucket), or null
 export function uploadKeyFromUrl(url: string): string | null {
-  const prefix = `${fileBase}/files/`;
-  if (!url.startsWith(prefix)) return null;
-  const key = url.slice(prefix.length);
-  return /^uploads\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp)$/.test(key) ? key : null;
+  const local = `${fileBase}/files/`;
+  if (url.startsWith(local)) {
+    const key = url.slice(local.length);
+    return LOCAL_KEY.test(key) ? key : null;
+  }
+  if (bucketBase && url.startsWith(`${bucketBase}/`)) {
+    const key = url.slice(bucketBase.length + 1);
+    return BUCKET_KEY.test(key) ? key : null;
+  }
+  return null;
 }
 
 interface ProductRow {
