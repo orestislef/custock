@@ -12,6 +12,8 @@ services:
     env_file: .env
     volumes:
       - data:/data
+      # service account files (fcm), read only, owned by uid 1000 on the host
+      - ./secrets:/run/secrets/custock:ro
     # localhost only, the reverse proxy is the way in
     ports:
       - "127.0.0.1:${CUSTOCK_WEB_PORT:-3090}:3000"
