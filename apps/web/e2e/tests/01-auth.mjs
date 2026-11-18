@@ -65,14 +65,14 @@ test('auth', 'forgot password, reset by email link, old sessions end', async (t)
   const page2 = await open(t);
   await page2.goto(link, { waitUntil: 'networkidle' });
   await see(page2, L('reset.title'), 8000);
-  await page2.locator('input[type=password]').first().fill('a brand new long password');
+  await page2.locator('input[type=password]').first().fill('a-brand-new-long-password');
   await page2.getByRole('button', { name: L('reset.save') }).click();
   await waitPath(page2, /^\/admin$/);
   const old = await api('/v1/me/context', { token: p.tokens.accessToken });
   expect(old.status === 401, 'session from before the reset', '401', old.status);
   const oldPw = await api('/v1/auth/login', { method: 'POST', body: { email: p.email, password: PW } });
   expect(oldPw.status === 401, 'old password after reset', '401', oldPw.status);
-  const newPw = await api('/v1/auth/login', { method: 'POST', body: { email: p.email, password: 'a brand new long password' } });
+  const newPw = await api('/v1/auth/login', { method: 'POST', body: { email: p.email, password: 'a-brand-new-long-password' } });
   expect(newPw.status === 200, 'new password', '200', newPw.status);
   const notice = outboxFor(p.email, { since }).length;
   expect(notice >= 2, 'reset email and password changed notice', '2 emails', notice);

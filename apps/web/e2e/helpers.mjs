@@ -3,7 +3,8 @@
 import { cli } from './env.mjs';
 import { L, Fail, api, esc, expect, go, lemoni, login, ok, one, path, seed } from './lib.mjs';
 
-export const PW = 'correct horse battery';
+// new passwords take no spaces (core validate.ts passwordProblem)
+export const PW = 'correct-horse-battery';
 
 // a brand new person, invited by the owner and registered from the link (never a seeded account)
 export async function newPerson(email, { role = 'staff', shop = 'kifisia', name = 'Test Person', password = PW, scope } = {}) {
@@ -63,7 +64,7 @@ export async function anyCode(shop = 'kifisia') {
   const r = one(
     `SELECT b.code, b.variant_id AS v FROM barcodes b JOIN stock_levels s ON s.variant_id = b.variant_id
       JOIN product_variants pv ON pv.id = b.variant_id JOIN products p ON p.id = pv.product_id
-      WHERE s.shop_id = @s AND s.on_hand > 5 AND length(b.code) = 13 AND p.uom = 'piece' AND b.pack_qty = 1 ORDER BY b.code LIMIT 1`, { s: l[shop] });
+      WHERE s.shop_id = @s AND s.on_hand > 5 AND length(b.code) = 13 AND p.uom = 'piece' AND b.pack_qty = 1 AND p.name NOT LIKE 'E2E%' ORDER BY b.code LIMIT 1`, { s: l[shop] });
   return { code: r.code, variantId: r.v };
 }
 

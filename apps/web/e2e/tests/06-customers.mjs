@@ -148,7 +148,16 @@ test('customers', 'export my data, then delete my account', async (t) => {
   const page = await open(t, { device: 'phone', tokens: st.tokens });
   await go(page, '/s/lemoni/me');
   const sheet = await openSheet(page, page.getByRole('button', { name: L('shopper.me.delete') }));
-  await sheet.getByRole('button', { name: L('shopper.me.deleteConfirm') }).or(primary(page)).first().click();
+  const since = Date.now();
+  t.step('continue, then confirm with the code from the email');
+  await sheet.getByRole('button', { name: L('shopper.me.deleteContinue') }).click();
+  const code = sheet.locator('input[autocomplete=one-time-code]');
+  await code.waitFor({ timeout: 8000 });
+  if (!(await code.inputValue())) {
+    const rows = await waitOutbox(st.email, { since });
+    await code.fill(`${rows[0].title ?? ''} ${rows[0].body ?? ''}`.match(/(\d{6})/)?.[1] ?? '');
+  }
+  await sheet.getByRole('button', { name: L('shopper.me.deleteConfirm') }).click();
   await sleep(1500);
   const me = await api('/v1/me/context', { token: st.tokens });
   expect(me.status === 401, 'session after deleting the account', '401', me.status);

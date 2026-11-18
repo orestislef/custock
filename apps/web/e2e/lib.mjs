@@ -302,6 +302,21 @@ export async function a11y(page) {
   });
 }
 
+// what a screen reader gets: form controls in chrome's own accessibility tree that have no name.
+// this is the tree assistive tech reads, so a label that only looks tied but is not shows up here
+export async function unnamedControls(page) {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    const { nodes } = await cdp.send('Accessibility.getFullAXTree');
+    const roles = new Set(['textbox', 'searchbox', 'combobox', 'spinbutton', 'checkbox', 'switch', 'radio', 'slider', 'listbox', 'button', 'link']);
+    return nodes
+      .filter((n) => !n.ignored && roles.has(n.role?.value) && !(n.name?.value ?? '').trim())
+      .map((n) => `${n.role.value}${n.value?.value ? ` (${String(n.value.value).slice(0, 20)})` : ''}`);
+  } finally {
+    await cdp.detach().catch(() => {});
+  }
+}
+
 // buttons in an open sheet footer keep room between them
 export async function sheetGaps(page) {
   return page.evaluate(() => {

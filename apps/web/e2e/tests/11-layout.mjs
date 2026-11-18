@@ -1,4 +1,4 @@
-import { L, a11y, expect, go, login, open, overflow, pageProblems, seed, sheetGaps, shot, test, text, underTabBar } from '../lib.mjs';
+import { L, a11y, expect, go, login, open, overflow, pageProblems, seed, sheetGaps, shot, test, text, underTabBar, unnamedControls } from '../lib.mjs';
 import { openSheet, superAdmin } from '../helpers.mjs';
 
 const STAFF_PAGES = ['/admin', '/admin/stock', '/admin/scan', '/admin/customers', '/admin/posts', '/admin/posts/new', '/admin/reports', '/admin/team', '/admin/team/roles', '/admin/join-links', '/admin/settings', '/admin/audit', '/admin/stock/counts', '/admin/stock/transfers', '/admin/stock/new', '/admin/stock/categories'];
@@ -19,6 +19,8 @@ async function sweep(t, page, pages, { checkBar = true } = {}) {
     const a = await a11y(page);
     if (a.imgs.length) found.imgs.push(`${p}: ${a.imgs.join(', ')}`);
     if (a.inputs.length) found.inputs.push(`${p}: ${a.inputs.join(', ')}`);
+    const tree = await unnamedControls(page);
+    if (tree.length) found.inputs.push(`${p} (accessibility tree): ${[...new Set(tree)].join(', ')}`);
   }
   return found;
 }
@@ -114,4 +116,40 @@ for (const locale of ['el', 'ru']) {
 test('layout', 'no page errors or failed requests during the whole run', async () => {
   const real = pageProblems.filter((p) => p.problems.some((x) => /pageerror|http 5|console/.test(x)));
   expect(real.length === 0, 'page errors seen by earlier tests', 'none', real.slice(0, 6).map((p) => `${p.test} ${p.page}: ${p.problems.join(' / ').slice(0, 160)}`).join(' | '));
+});
+
+// the same checks inside sheets, which a page sweep never opens
+test('layout', 'controls inside open sheets have names in the accessibility tree', async (t) => {
+  const found = [];
+  const owner = await login(seed.owner);
+  const page = await open(t, { tokens: owner, device: 'phone' });
+  const sheets = [
+    ['/admin/stock/categories', new RegExp(L('categories.new'))],
+    ['/admin/team', new RegExp(L('team.invite'))],
+    ['/admin/stock/counts', new RegExp(L('counts.start'))],
+    ['/admin/stock/transfers', new RegExp(L('transfers.new'))],
+    ['/admin/join-links', new RegExp(L('links.new'))],
+  ];
+  for (const [p, name] of sheets) {
+    t.step(`${p} sheet`);
+    await go(page, p);
+    const btn = page.getByRole('button', { name }).filter({ visible: true }).first();
+    if (!(await btn.isVisible().catch(() => false))) { found.push(`${p}: no button ${name}`); continue; }
+    await openSheet(page, btn).catch(() => found.push(`${p}: sheet did not open`));
+    const a = await page.locator('[role=dialog]').last().evaluate((d) => [...d.querySelectorAll('input, select, textarea')]
+      .filter((e) => e.type !== 'hidden' && e.type !== 'file')
+      .filter((e) => !(e.getAttribute('aria-label')?.trim() || (e.id && document.querySelector(`label[for="${CSS.escape(e.id)}"]`)?.textContent?.trim()) || e.closest('label')?.textContent?.trim() || e.getAttribute('aria-labelledby') || e.getAttribute('placeholder')?.trim()))
+      .map((e) => `${e.tagName.toLowerCase()}[${e.type ?? ''}]`)).catch(() => []);
+    const tree = await unnamedControls(page);
+    if (a.length) found.push(`${p}: ${a.join(', ')}`);
+    if (tree.length) found.push(`${p} tree: ${[...new Set(tree)].join(', ')}`);
+  }
+  const product = (await (await fetch(`http://127.0.0.1:8811/v1/orgs/${(await (await fetch('http://127.0.0.1:8811/v1/me/context', { headers: { Authorization: `Bearer ${owner.accessToken}` } })).json()).orgs[0].orgId}/products?limit=1`, { headers: { Authorization: `Bearer ${owner.accessToken}` } })).json()).items?.[0];
+  if (product) {
+    await go(page, `/admin/stock/${product.id}`);
+    await openSheet(page, page.getByRole('button', { name: L('product.receive') }).first()).catch(() => found.push('receive sheet did not open'));
+    const tree = await unnamedControls(page);
+    if (tree.length) found.push(`receive sheet tree: ${[...new Set(tree)].join(', ')}`);
+  }
+  expect(found.length === 0, 'controls without a name in sheets', 'none', found.join('; '));
 });

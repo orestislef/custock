@@ -37,7 +37,7 @@ test('deep links', 'a return path that leaves the app is ignored', async (t) => 
   await waitPath(page, /^\/admin$/);
   await go(page, '/admin/login');
   await go(page, `/admin/login?next=${encodeURIComponent('//evil.example/x')}`);
-  expect(new URL(page.url()).host.includes('evil'), 'still on our own site', 'our host', new URL(page.url()).host);
+  expect(!new URL(page.url()).host.includes('evil'), 'still on our own site', 'our host', new URL(page.url()).host);
 });
 
 test('deep links', 'a link names its business: the super admin lands inside it', async (t) => {
