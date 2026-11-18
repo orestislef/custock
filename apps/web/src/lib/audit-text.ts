@@ -2,7 +2,7 @@
 // the api writes has a sentence (see packages/core audit-actions.ts and its test); anything else
 // gets a readable sentence built from what it is about, never the raw key.
 
-import type { TFunction } from '@custock/i18n';
+import type { TFunction } from '@custock/i18n/client';
 
 type T = TFunction;
 

@@ -4,13 +4,15 @@ import Link from '@/components/admin/org-link';
 import { useOrgRouter as useRouter } from '@/components/admin/org-link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Customer, Locale } from '@custock/core';
-import { LOCALES, LOCALE_NAMES } from '@custock/i18n';
+import { LOCALES, LOCALE_NAMES } from '@custock/i18n/client';
 import { Picker, Sheet, isMac, useShortcuts, useToast } from '@/components/ui/client-kit';
 import { useAdmin, useShopFilter } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { Avatar, Empty, Segmented, Switch } from '@/components/ui/kit';
 import { IconBell, IconBellOff, IconMail, IconMailOff, IconPeople, IconPlus, IconSearch } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
+import { usePaged } from '@/lib/use-paged';
+import { MoreRows } from '@/components/ui/more-rows';
 import { useMedia } from '@/lib/use-media';
 import { date } from '@/lib/format';
 import { RedirectHome } from '@/components/admin/redirect-home';
@@ -49,9 +51,10 @@ export default function CustomersPage() {
   const canAdd = can('customers.add', null);
   useShortcuts({ search: useCallback(() => searchRef.current?.focus(), []), create: useCallback(() => { if (canAdd) setAdding(true); }, [canAdd]) });
 
-  const list = useAsync(() => api.customers(org.orgId, { q: debounced || undefined, shopId, channel: channel === 'all' ? undefined : channel, limit: 200 }), [debounced, shopId, channel]);
+  // pages of 100, more as you scroll: tens of thousands of customers never load at once
+  const list = usePaged((cursor) => api.customers(org.orgId, { q: debounced || undefined, shopId, channel: channel === 'all' ? undefined : channel, limit: 100, cursor }), [debounced, shopId, channel]);
   const groups = useAsync(() => api.groups(org.orgId), []);
-  const items = list.data?.items ?? [];
+  const items = list.items ?? [];
   // contact details only for those who may see them. nobody else gets a column of stars
   const showEmail = items.some((c) => !c.contactMasked);
   const scopeName = (c: Customer) => c.subscriptions.filter((s) => s.status !== 'unsubscribed').map((s) =>
@@ -60,7 +63,7 @@ export default function CustomersPage() {
   if (!can('customers.view', null)) return <RedirectHome />;
 
   return (
-    <Page title={t('customers.title')} subtitle={list.data ? t('customers.count', { count: items.length }) : undefined}
+    <Page title={t('customers.title')} subtitle={list.data ? (list.hasMore ? t('list.countMore', { count: items.length }) : t('customers.count', { count: items.length })) : undefined}
       actions={canAdd ? <button type="button" className="btn btn-tinted" title={`${t('customers.add')} (${isMac() ? '⌘' : 'Ctrl+'}N)`} onClick={() => setAdding(true)}><IconPlus size={18} />{t('customers.add')}</button> : null}
       phoneAction={canAdd ? <button type="button" className="icon-btn" style={{ background: 'var(--c-accent-tint)' }} aria-label={t('customers.add')} onClick={() => setAdding(true)}><IconPlus size={22} /></button> : undefined}>
       <div className="sticky top-[52px] z-10 -mx-4 px-4 md:mx-0 md:px-0 pt-1 pb-3 flex flex-col gap-3" style={{ background: 'var(--c-shelf)' }}>
@@ -101,6 +104,7 @@ export default function CustomersPage() {
               ))}
             </tbody>
           </table>
+          <MoreRows {...list.more} />
         </>
       ) : (
         <section className="inset-group">
@@ -122,6 +126,7 @@ export default function CustomersPage() {
               <li key={i} className="row"><span className="w-9 h-9 rounded-full skel" /><span className="row-main"><span className="block h-4 w-1/2 skel" /><span className="block h-3 w-2/3 skel mt-2" /></span></li>
             )) : null}
           </ul>
+          <MoreRows {...list.more} />
         </section>
       )}
       {adding ? <AddCustomer onClose={() => setAdding(false)} onAdded={() => { setAdding(false); void list.reload(); }} /> : null}

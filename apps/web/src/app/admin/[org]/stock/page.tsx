@@ -15,6 +15,8 @@ import { CategoryPicture } from '@/components/ui/category-picture';
 import { Tally } from '@/components/ui/tally';
 import { IconBarcode, IconBell, IconPlus, IconSearch, IconChevronDown, IconTag } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
+import { usePaged } from '@/lib/use-paged';
+import { MoreRows } from '@/components/ui/more-rows';
 import { useMedia } from '@/lib/use-media';
 import { productName } from '@/lib/names';
 import { qtyNumber, relative } from '@/lib/format';
@@ -49,8 +51,9 @@ function StockList() {
     create: useCallback(() => { if (canCreate) router.push('/admin/stock/new'); }, [canCreate, router]),
   });
 
-  const list = useAsync(
-    () => api.products(org.orgId, { q: debounced || undefined, shopId, filter: filter === 'all' || filter === 'unknown' ? undefined : filter, categoryId: category || undefined, limit: 200 }),
+  // pages of 100: a big catalog loads as you scroll instead of stopping silently at 200
+  const list = usePaged(
+    (cursor) => api.products(org.orgId, { q: debounced || undefined, shopId, filter: filter === 'all' || filter === 'unknown' ? undefined : filter, categoryId: category || undefined, limit: 100, cursor }),
     [debounced, shopId, filter, category],
   );
   const unknown = useAsync(() => (can('products.create', null) || can('products.edit', null) ? api.unknownScans(org.orgId, shopId) : Promise.resolve([])), [shopId]);
@@ -71,14 +74,19 @@ function StockList() {
     return { state, label: state === 'out' && !shopId ? t('stock.outSomewhere') : t(`common:stock.${state}`), onHand, waiting };
   };
 
+  // the pages come in name order; any other order (a stock column, or names from z) needs the whole
+  // list, so the rest is loaded first
+  const { hasMore, loadAll } = list;
+  const ownOrder = wide && (sort.key !== 'name' || sort.dir !== 1);
+  useEffect(() => { if (ownOrder && hasMore) void loadAll(); }, [ownOrder, hasMore, loadAll]);
   const items = useMemo(() => {
-    const rows = [...(list.data?.items ?? [])];
+    const rows = [...(list.items ?? [])];
     if (!wide) return rows;
     const val = (p: Row_) => sort.key === 'name' ? productName(p, locale).toLowerCase()
       : sort.key === 'total' ? p.levels.reduce((a, l) => a + l.onHand, 0)
       : p.levels.filter((l) => l.shopId === sort.key).reduce((a, l) => a + l.onHand, 0);
     return rows.sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * sort.dir; });
-  }, [list.data, wide, sort, locale]);
+  }, [list.items, wide, sort, locale]);
 
   const header = (key: string, label: string, num = false) => (
     <th className={num ? 'num' : ''} aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
@@ -199,10 +207,12 @@ function StockList() {
               <li key={i} className="row"><span className="thumb skel" /><span className="row-main"><span className="block h-4 w-2/3 skel" /><span className="block h-3 w-1/3 skel mt-2" /></span></li>
             )) : null}
           </ul>
-          {list.data ? <p className="inset-group-foot">{t('stock.count', { count: items.length })}</p> : null}
+          <MoreRows {...list.more} />
+          {list.data ? <p className="inset-group-foot">{list.hasMore ? t('list.countMore', { count: items.length }) : t('stock.count', { count: items.length })}</p> : null}
         </section>
       )}
-      {wide && list.data ? <p className="t-foot t-2 -mt-3 mb-6">{t('stock.count', { count: items.length })}</p> : null}
+      {wide ? <MoreRows {...list.more} /> : null}
+      {wide && list.data ? <p className="t-foot t-2 -mt-3 mb-6">{list.hasMore ? t('list.countMore', { count: items.length }) : t('stock.count', { count: items.length })}</p> : null}
 
       <ProductPicker open={resolving != null} title={t('stock.attachTo')} onClose={() => setResolving(null)} onPick={({ variantId }) => {
         const id = resolving;

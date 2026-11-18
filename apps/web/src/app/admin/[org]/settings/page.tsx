@@ -14,7 +14,7 @@ import { useRef, useState } from 'react';
 import { RedirectHome } from '@/components/admin/redirect-home';
 import { PolicyGroups, policyText, usePolicySaver } from '@/components/policy/policy-list';
 import { LIMITS, cleanLine, policyDef, type PolicyEntry } from '@custock/core';
-import { LOCALE_NAMES } from '@custock/i18n';
+import { LOCALE_NAMES } from '@custock/i18n/client';
 import { IconChevronRight } from '@/components/ui/icons';
 
 export default function SettingsPage() {

@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/client-kit';
 import { IconBell, IconMail, IconInfo } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { relative } from '@/lib/format';
-import { LOCALE_NAMES, type AppLocale } from '@custock/i18n';
+import { LOCALE_NAMES, type AppLocale } from '@custock/i18n/client';
 import { RedirectHome } from '@/components/admin/redirect-home';
 
 // development only: the emails and pushes that would have gone out. nothing leaves this machine.

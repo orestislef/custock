@@ -41,6 +41,10 @@ function Editor({ role, all }: { role: Role | null; all: Role[] }) {
   const [perms, setPerms] = useState<Set<string>>(new Set(role?.permissions ?? []));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // who this role reaches, so the save bar can name them before the change lands
+  const impact = useAsync(() => (role && role.memberCount > 0 ? api.roleImpact(org.orgId, role.id) : Promise.resolve(null)), [role?.id]);
+  const people = impact.data?.names ?? [];
+  const named = people.length ? (people.length > 3 ? t('roles.affectsNamesMore', { names: people.slice(0, 3).join(', '), count: people.length - 3 }) : people.join(', ')) : null;
 
   const managed = manages === 'none' ? null : below.find((r) => r.id === manages) ?? null;
   const rank = Math.min(myRank - 1, managed ? managed.rank + 1 : 1);
@@ -105,6 +109,7 @@ function Editor({ role, all }: { role: Role | null; all: Role[] }) {
             {error ? <span className="t-sub block" role="alert" style={{ color: 'var(--c-error)' }}>{error}</span> : null}
             <span className="t-sub block">{t('roles.diff', { added: diff.added, removed: diff.removed })}</span>
             {role && role.memberCount > 0 ? <span className="t-foot t-2 block">{t('roles.affects', { count: role.memberCount })}</span> : null}
+            {role && role.memberCount > 0 && named ? <span className="t-foot t-2 block">{named}</span> : null}
           </span>
           <button type="button" className="btn btn-primary" disabled={busy || !name.trim() || !changed} onClick={() => void save()}>{t('roles.save')}</button>
         </div>

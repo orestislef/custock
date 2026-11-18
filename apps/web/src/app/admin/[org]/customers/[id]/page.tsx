@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/client-kit';
 import { IconBell, IconChevronLeft, IconHeart, IconMail, IconPhone, IconPlus } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { date, dateTime, relative } from '@/lib/format';
-import { LOCALE_NAMES } from '@custock/i18n';
+import { LOCALE_NAMES } from '@custock/i18n/client';
 import { cleanLine, cleanText, LIMITS } from '@custock/core';
 import { Counter } from '@/components/ui/field-kit';
 

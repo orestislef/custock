@@ -679,6 +679,10 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       let list = movements.filter((m) => ids.has(m.shopId));
       if (q.shopId) list = list.filter((m) => m.shopId === q.shopId);
       if (q.variantId) list = list.filter((m) => m.variantId === q.variantId);
+      if (q.productId) {
+        const vids = new Set(products.find((p) => p.id === q.productId)?.variants.map((v) => v.id) ?? []);
+        list = list.filter((m) => vids.has(m.variantId));
+      }
       return page(list, q.cursor, q.limit ?? 30);
     },
     async unknownScans(_org, shopId) { return unknownScans.filter((u) => !shopId || u.shopId === shopId); },
@@ -1155,6 +1159,8 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async savePushSubscription() { /* kept on the real api */ },
     async deletePushSubscription() { /* kept on the real api */ },
     async testPush() { return { devices: 0 }; },
+    async otherSessions() { return { others: 0 }; },
+    async signOutOthers() { return { signedOut: 0 }; },
     // invites from a link: the sample invite belongs to a new person
     async invitePreview(token) {
       if (token.length < 8) throw new FixtureError(410, 'invite_expired');

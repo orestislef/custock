@@ -1,9 +1,9 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useOrgRouter as useRouter } from '@/components/admin/org-link';
 import { cleanLine, cleanText, formatMoneyInput, futureProblem, LIMITS, parseMoneyInput, type AudiencePreview, type Channel, type FieldError, type Locale, type PostKind, type PostInput, type Product, type ScopeType } from '@custock/core';
-import { LOCALES, LOCALE_NAMES } from '@custock/i18n';
+import { LOCALES, LOCALE_NAMES } from '@custock/i18n/client';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { Chips, Group, Row, Segmented, Switch } from '@/components/ui/kit';
@@ -17,10 +17,16 @@ import { RedirectHome } from '@/components/admin/redirect-home';
 import { DatePicker, DateTimePicker } from '@/components/ui/date-time-picker';
 import { decimalExample } from '@/lib/fields';
 import { Counter, FieldMessage } from '@/components/ui/field-kit';
+import { clearDraft, readDraft, useDraft } from '@/lib/draft';
+import { DraftNote } from '@/components/ui/draft-note';
 
 const KINDS: PostKind[] = ['news', 'offer', 'new_arrival', 'back_in_stock', 'event'];
 
 interface Line { product: Product; variantId: string; offer: string }
+interface Draft {
+  kind: PostKind; texts: Partial<Record<Locale, { title: string; body: string }>>; lines: Line[];
+  scopes: { scopeType: ScopeType; scopeId: string }[]; push: boolean; email: boolean; when: 'now' | 'later'; at: number | null; until: number | null;
+}
 
 export default function ComposerPage() {
   const { api, org, t, locale, can, shops, settings } = useAdmin();
@@ -28,21 +34,32 @@ export default function ComposerPage() {
   const toast = useToast();
   const groups = useAsync(() => api.groups(org.orgId), []);
 
-  const [kind, setKind] = useState<PostKind>('news');
+  // a draft from before a sign in in the middle (or a reload) comes back as it was
+  const draftKey = `post.new.${org.orgId}`;
+  const [draft] = useState(() => readDraft<Draft>(draftKey));
+  const [kind, setKind] = useState<PostKind>(draft?.kind ?? 'news');
   const [tab, setTab] = useState<Locale>(org.defaultLocale);
-  const [texts, setTexts] = useState<Partial<Record<Locale, { title: string; body: string }>>>({});
-  const [lines, setLines] = useState<Line[]>([]);
+  const [texts, setTexts] = useState<Partial<Record<Locale, { title: string; body: string }>>>(draft?.texts ?? {});
+  const [lines, setLines] = useState<Line[]>(draft?.lines ?? []);
   const [offerErrors, setOfferErrors] = useState<Record<string, FieldError>>({});
-  const [scopes, setScopes] = useState<{ scopeType: ScopeType; scopeId: string }[]>(() => {
+  const [startScopes] = useState<{ scopeType: ScopeType; scopeId: string }[]>(() => {
     const first = shops.find((s) => can('posts.create', s.id));
     return first ? [{ scopeType: 'shop', scopeId: first.id }] : [];
   });
-  const [push, setPush] = useState(can('posts.channel.push', null));
-  const [email, setEmail] = useState(false);
-  const [when, setWhen] = useState<'now' | 'later'>('now');
+  // what the draft picked, as far as this person may still use it (rights can change in between)
+  const [scopes, setScopes] = useState<{ scopeType: ScopeType; scopeId: string }[]>(() => {
+    const kept = draft?.scopes.filter((x) => can('posts.create', x.scopeType === 'shop' ? x.scopeId : null));
+    return kept?.length ? kept : startScopes;
+  });
+  const [startPush] = useState(() => can('posts.channel.push', null));
+  const [push, setPush] = useState((draft?.push ?? startPush) && can('posts.channel.push', null));
+  const [email, setEmail] = useState((draft?.email ?? false) && can('posts.channel.email', null));
+  const [when, setWhen] = useState<'now' | 'later'>(draft?.when ?? 'now');
   // both as moments in time, picked in the business's time zone
-  const [at, setAt] = useState<number | null>(null);
-  const [until, setUntil] = useState<number | null>(null);
+  const [at, setAt] = useState<number | null>(draft?.at ?? null);
+  const [until, setUntil] = useState<number | null>(draft?.until ?? null);
+  useDraft(draftKey, { kind, texts, lines, scopes, push, email, when, at, until } satisfies Draft,
+    { kind: 'news', texts: {}, lines: [], scopes: startScopes, push: startPush, email: false, when: 'now', at: null, until: null } satisfies Draft);
   const zone = settings?.timezone ?? org.timezone;
   const [picker, setPicker] = useState(false);
   const [preview, setPreview] = useState<AudiencePreview | null>(null);
@@ -70,7 +87,12 @@ export default function ComposerPage() {
     setScopes((x) => (x.some((s) => s.scopeType === scopeType && s.scopeId === scopeId) ? x.filter((s) => !(s.scopeType === scopeType && s.scopeId === scopeId)) : [...x, { scopeType, scopeId }]));
   const has = (scopeType: ScopeType, scopeId: string) => scopes.some((s) => s.scopeType === scopeType && s.scopeId === scopeId);
 
+  // one save at a time. an offer keeps the start time of the first try, so sending it again after
+  // the network dropped is the same post and the server answers it once
+  const saving = useRef(false);
+  const firstTry = useRef<number | null>(null);
   async function save(publish: boolean) {
+    if (saving.current) return;
     // offer prices with the shared money rules, a wrong one is marked on its line
     const offers: Record<string, number | null> = {};
     const bad: Record<string, FieldError> = {};
@@ -84,6 +106,7 @@ export default function ComposerPage() {
     if (Object.keys(bad).length) return;
     const late = when === 'later' ? futureProblem(at ?? null) : null;
     if (late) { setError(t(`common:field.${late}`)); return; }
+    saving.current = true;
     setBusy(true);
     try {
       // titles are one line, bodies keep their inside, both trimmed at the edges
@@ -95,10 +118,11 @@ export default function ComposerPage() {
         products: lines.map((l) => ({ variantId: l.variantId, offerPriceMinor: offers[l.variantId] ?? null })),
         coverUrl: lines[0]?.product.images[0]?.url ?? null,
         scheduledAt: when === 'later' && at != null ? at : null,
-        validFrom: kind === 'offer' ? Date.now() : null,
+        validFrom: kind === 'offer' ? (firstTry.current ??= Date.now()) : null,
         validUntil: kind === 'offer' && until != null ? until : null,
       };
       const post = await api.createPost(org.orgId, input);
+      clearDraft(draftKey);
       if (publish) {
         const done = await api.publishPost(org.orgId, post.id);
         toast(done.status === 'pending_approval' ? t('composer.submitted') : done.status === 'scheduled' ? t('composer.scheduled') : t('composer.published', { count: done.recipientsCount ?? 0 }));
@@ -109,6 +133,7 @@ export default function ComposerPage() {
     } catch (e) {
       setError(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
       setBusy(false);
+      saving.current = false;
     }
   }
 
@@ -118,6 +143,7 @@ export default function ComposerPage() {
 
   return (
     <Page title={t('composer.title')} back={{ href: '/admin/posts', label: t('posts.title') }}>
+      {draft ? <DraftNote draftKey={draftKey} /> : null}
       <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_380px] gap-x-8">
         <div>
           <section className="inset-group">
@@ -179,6 +205,14 @@ export default function ComposerPage() {
                     <button type="button" className="icon-btn" aria-label={t('common:action.remove')} onClick={() => setLines((x) => x.filter((_, j) => j !== i))}><IconClose size={18} /></button>
                   </div>
                   <FieldMessage id={`offer-${l.variantId}`} kind="money" error={offerErrors[l.variantId]} params={{ example: decimalExample(locale) }} />
+                  {(() => {
+                    // an offer below cost is allowed, but the author should know (cost only comes to people who may see it)
+                    if (kind !== 'offer' || !l.offer.trim() || v?.costMinor == null) return null;
+                    const r = parseMoneyInput(l.offer);
+                    return r.ok && r.value < v.costMinor
+                      ? <p className="t-foot px-4 pb-2 m-0" role="status" style={{ color: 'var(--c-few-text)' }}>{t('composer.belowCost', { cost: money(v.costMinor, org.currency, locale) })}</p>
+                      : null;
+                  })()}
                   </Fragment>
                 );
               })}

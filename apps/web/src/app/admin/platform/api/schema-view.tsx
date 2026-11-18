@@ -4,7 +4,7 @@
 // required, allowed values. references to named schemas show the name and open on demand, so a
 // big contract never renders all at once. depth is capped so cycles cannot run away.
 
-import type { TFunction } from '@custock/i18n';
+import type { TFunction } from '@custock/i18n/client';
 
 type S = Record<string, unknown>;
 const MAX_DEPTH = 5;

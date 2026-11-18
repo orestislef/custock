@@ -188,6 +188,9 @@
   }
   a { color: var(--c-accent); text-decoration: none; }
   a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  /* a long word without spaces (a code, a pasted link, a name at 200 letters) wraps where it has
+     to, instead of pushing a card, a table or the whole page sideways */
+  h1, h2, h3, p, td:not(.num) { overflow-wrap: anywhere; }
   :focus-visible {
     outline: 3px solid color-mix(in srgb, var(--c-accent) 70%, transparent);
     outline-offset: 2px;
@@ -765,7 +768,7 @@ html[data-kb] .toast { bottom: calc(var(--kb-page, 0px) + 12px); }
 .dtp-nav[disabled] { color: var(--c-ink-3); opacity: 0.5; cursor: default; }
 .dtp-grid { display: flex; flex-direction: column; }
 .dtp-week { display: grid; grid-template-columns: repeat(7, 1fr); }
-.dtp-wd { display: grid; place-items: center; height: 28px; font-size: 13px; font-weight: 600; color: var(--c-ink-3); text-transform: uppercase; letter-spacing: 0.02em; }
+.dtp-wd { display: grid; place-items: center; height: 28px; font-size: 13px; font-weight: 600; color: var(--c-ink-3); }
 .dtp-cell { display: grid; place-items: center; }
 .dtp-day {
   width: 44px; height: 44px; border: 0; border-radius: 22px; background: transparent; color: var(--c-ink);

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { PublicProduct } from '@custock/core';
-import type { TFunction } from '@custock/i18n';
+import type { TFunction } from '@custock/i18n/client';
 import { Photo } from '@/components/ui/client-kit';
 import { CategoryPlaceholder } from '@/components/ui/category-picture';
 import { PriceLine } from './product-view';

@@ -6,7 +6,10 @@ import Link from '@/components/admin/org-link';
 // vat rates come from the business country. variants and photos by url are sent when the api
 // contract has them (it does now), and always with the sample data.
 
-import { useMemo, useState, useId, cloneElement } from 'react';
+import { useMemo, useRef, useState, useId, cloneElement } from 'react';
+import { parseMoneyInput } from '@custock/core';
+import { clearDraft, readDraft, useDraft } from '@/lib/draft';
+import { DraftNote } from '@/components/ui/draft-note';
 import { useOrgRouter as useRouter } from '@/components/admin/org-link';
 import { cleanLine, featureOn, httpsUrlProblem, LIMITS, ProductInput as ProductInputSchema, type Product, type ProductInput, type StockLevel, type Uom } from '@custock/core';
 import { useAdmin } from './admin-context';
@@ -52,6 +55,11 @@ function Field({ label, children, sep, after }: { label: string; children: React
   );
 }
 
+interface ProductDraft {
+  name: string; brand: string; description: string; cat: string; uom: Uom; vat: string; track: boolean;
+  price: string; cost: string; barcode: string; options: Option[]; images: string[];
+}
+
 export function ProductForm({ product, initialBarcode }: { product?: Product & { levels: StockLevel[] }; initialBarcode?: string }) {
   const { api, org, t, locale, can, settings } = useAdmin();
   const router = useRouter();
@@ -64,23 +72,31 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
   const canPrice = can('products.price.edit', null);
   const canCost = can('products.cost.edit', null);
 
-  const nameF = useLineField(product?.name, { max: LIMITS.productName, required: true });
-  const brandF = useLineField(product?.brand, { max: LIMITS.brand, capitalize: 'words' });
-  const descF = useTextField(product?.description, { max: LIMITS.description });
+  // a new product being typed comes back after a sign in in the middle or a reload
+  const draftKey = product ? null : `product.new.${org.orgId}`;
+  const [draft] = useState(() => (draftKey && !initialBarcode ? readDraft<ProductDraft>(draftKey) : null));
+  const minorOf = (txt: string | undefined) => {
+    if (!txt?.trim()) return undefined;
+    const r = parseMoneyInput(txt);
+    return r.ok ? r.value : undefined;
+  };
+  const nameF = useLineField(draft?.name ?? product?.name, { max: LIMITS.productName, required: true });
+  const brandF = useLineField(draft?.brand ?? product?.brand, { max: LIMITS.brand, capitalize: 'words' });
+  const descF = useTextField(draft?.description ?? product?.description, { max: LIMITS.description });
   const name = nameF.text;
-  const [cat, setCat] = useState(product?.categoryId ?? '');
+  const [cat, setCat] = useState(draft?.cat ?? product?.categoryId ?? '');
   const [newCat, setNewCat] = useState(false);
-  const [uom, setUom] = useState<Uom>(product?.uom ?? 'piece');
-  const [vat, setVat] = useState(String(product?.taxRateBp ?? rates[0]));
-  const [track, setTrack] = useState(product?.trackStock ?? true);
-  const priceF = useMoneyField(v0?.priceMinor, locale);
-  const costF = useMoneyField(v0?.costMinor, locale);
-  const barcodeF = useBarcodeField(initialBarcode ?? '');
+  const [uom, setUom] = useState<Uom>(draft?.uom ?? product?.uom ?? 'piece');
+  const [vat, setVat] = useState(draft?.vat ?? String(product?.taxRateBp ?? rates[0]));
+  const [track, setTrack] = useState(draft?.track ?? product?.trackStock ?? true);
+  const priceF = useMoneyField(minorOf(draft?.price) ?? v0?.priceMinor, locale);
+  const costF = useMoneyField(minorOf(draft?.cost) ?? v0?.costMinor, locale);
+  const barcodeF = useBarcodeField(initialBarcode ?? draft?.barcode ?? '');
   const setBarcode = barcodeF.setText;
   const owner = useBarcodeOwner(api, org.orgId, barcodeF.text, product?.id ?? null, locale);
   const [imageError, setImageError] = useState<string | null>(null);
-  const [options, setOptions] = useState<Option[]>([]);
-  const [images, setImages] = useState<string[]>(product?.images.map((i) => i.url) ?? []);
+  const [options, setOptions] = useState<Option[]>(draft?.options ?? []);
+  const [images, setImages] = useState<string[]>(draft?.images ?? product?.images.map((i) => i.url) ?? []);
   const [imageUrl, setImageUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -89,6 +105,10 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
   // the last code made with "Make a shop barcode", so each variant can get its own one on save
   const [ownMade, setOwnMade] = useState<string | null>(null);
   const zero = money(0, org.currency, locale);
+  const [startVat] = useState(() => String(rates[0]));
+  useDraft(draftKey ?? 'product.none',
+    draftKey ? { name: nameF.text, brand: brandF.text, description: descF.text, cat, uom, vat, track, price: priceF.text, cost: costF.text, barcode: barcodeF.text, options, images } satisfies ProductDraft : null,
+    draftKey ? { name: '', brand: '', description: '', cat: '', uom: 'piece', vat: startVat, track: true, price: '', cost: '', barcode: initialBarcode ?? '', options: [], images: [] } satisfies ProductDraft : null);
 
   // every combination of the option values: size S, M x color black, white = 4 variants
   const combos = useMemo(() => {
@@ -97,7 +117,10 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
   }, [options]);
   const imagesChanged = product ? images.join('|') !== product.images.map((i) => i.url).join('|') : images.length > 0;
 
+  // Enter in the last field and a tap on the button in the same moment start one save, not two
+  const saving = useRef(false);
   async function save() {
+    if (saving.current) return;
     // every field checked first, the first one that is not right gets the focus
     const checks = [nameF, brandF, descF, barcodeF, ...(canPrice ? [priceF] : []), ...(canCost ? [costF] : [])];
     if (!checkAll(checks)) return;
@@ -105,6 +128,7 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
     const brandV = brandF.check() ?? '';
     const descV = descF.check() ?? '';
     const barcodeV = barcodeF.check() ?? null;
+    saving.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -124,6 +148,7 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
           ...(supportsImages && images.length ? { imageUrls: images } : {}),
         };
         const p = await api.createProduct(org.orgId, input);
+        if (draftKey) clearDraft(draftKey);
         if (supportsVariants && combos.length > 1 && barcodeV && barcodeV === ownMade) {
           for (const v of p.variants.slice(1)) {
             const next = await api.nextInternalBarcode(org.orgId);
@@ -152,8 +177,10 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
       const fields = (e as { problem?: { fields?: Record<string, string> } }).problem?.fields ?? {};
       const show: [string, { setError: (x: never) => void }][] = [['name', nameF], ['brand', brandF], ['description', descF], ['barcode', barcodeF], ['priceMinor', priceF], ['costMinor', costF]];
       for (const [k, f] of show) if (fields[k]) f.setError(fields[k] as never);
-      setError(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
+      // someone else saved in between: what was typed stays, a second save keeps it
+      setError((e as { status?: number }).status === 412 ? t('productForm.conflict') : t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
       setBusy(false);
+      saving.current = false;
     }
   }
 
@@ -184,6 +211,7 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
 
   return (
     <FormNav onDone={() => void save()} last="done">
+    {draft && draftKey ? <DraftNote draftKey={draftKey} /> : null}
     <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_340px] gap-x-8 items-start">
       <div>
         <section className="inset-group">

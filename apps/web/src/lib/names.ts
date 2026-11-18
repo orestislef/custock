@@ -1,5 +1,5 @@
 import type { Post, Product, Role } from '@custock/core';
-import type { TFunction } from '@custock/i18n';
+import type { TFunction } from '@custock/i18n/client';
 
 // user content: the viewer's language when the business wrote one, the default otherwise
 export function productName(p: Pick<Product, 'name' | 'translations'> & { displayName?: string }, locale: string): string {

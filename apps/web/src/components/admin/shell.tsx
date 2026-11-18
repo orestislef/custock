@@ -16,6 +16,7 @@ import { OutboxBadge } from './outbox-badge';
 import { Avatar } from '@/components/ui/kit';
 import { LocaleSwitch, Picker, Sheet, useToast } from '@/components/ui/client-kit';
 import { AppearanceRow } from '@/components/ui/appearance-switch';
+import { OtherDevicesRow } from '@/components/ui/other-devices-row';
 import {
   IconBox, IconChart, IconChevronDown, IconChevronLeft, IconChevronRight, IconGear, IconHome, IconLink, IconLogout, IconMegaphone, IconMore, IconPeople, IconShield, IconShop, IconHistory, IconMail, IconScan, IconWifiOff, IconPhoneApp,
 } from '@/components/ui/icons';
@@ -289,6 +290,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <ul className="list mb-2" role="list">
           <li className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></li>
           <AppearanceRow />
+          <OtherDevicesRow api={api} />
           <li>
             <button type="button" className="row" onClick={() => (unsynced && !confirmOut ? setConfirmOut(true) : void logout())} style={{ color: 'var(--c-error)' }}>
               <IconLogout size={20} />

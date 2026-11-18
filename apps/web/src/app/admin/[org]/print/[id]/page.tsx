@@ -2,24 +2,30 @@
 
 import Link from '@/components/admin/org-link';
 import { use } from 'react';
-import { translator } from '@custock/i18n';
+import { clientMessages, clientTranslator, type AppLocale } from '@custock/i18n/client';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Qr } from '@/components/ui/qr';
 import { IconChevronLeft, IconPrint } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { basePath } from '@/lib/api-client';
 
+// the poster speaks all three languages, so this page alone loads the other two as well
+const POSTER_LOCALES = ['el', 'en', 'ru'] as const satisfies readonly AppLocale[];
+let allMessages: Promise<unknown> | null = null;
+const loadAll = () => (allMessages ??= Promise.all(POSTER_LOCALES.map((lc) => clientMessages(lc))));
+
 // an A4 poster for the shop window: the qr, the shop name and one line in each language,
 // so greek, english and russian speaking customers all know what it is
 export default function PosterPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { api, org, t, shops } = useAdmin();
+  use(loadAll());
   const links = useAsync(() => api.joinLinks(org.orgId), []);
   const l = links.data?.find((x) => x.id === id);
   if (!l) return <div className="p-10"><div className="h-[400px] skel" /></div>;
   const shop = l.scopeType === 'shop' ? shops.find((s) => s.id === l.scopeId)?.name : null;
   const url = `${window.location.origin}${basePath}${l.url}`;
-  const lines = (['el', 'en', 'ru'] as const).map((lc) => translator(lc, 'web')('poster.line', { org: org.name }));
+  const lines = POSTER_LOCALES.map((lc) => clientTranslator(lc, clientMessages(lc).value!)('poster.line', { org: org.name }));
 
   return (
     <div className="min-h-dvh" style={{ background: 'var(--c-shelf)' }}>

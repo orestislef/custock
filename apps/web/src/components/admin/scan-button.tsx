@@ -5,13 +5,15 @@
 // or typing into the field works everywhere too.
 
 import { useState, useSyncExternalStore } from 'react';
+import dynamic from 'next/dynamic';
 import { Sheet } from '@/components/ui/client-kit';
 import { IconBarcode } from '@/components/ui/icons';
-import { Camera } from '@/components/scan/camera';
 import { useT } from '@/lib/i18n-client';
 import { hasCamera } from '@/lib/scanner';
 
 const noop = () => () => {};
+// the camera and its reader load when the sheet opens, not with the product form
+const Camera = dynamic(() => import('@/components/scan/camera').then((m) => m.Camera), { ssr: false, loading: () => <div className="skel" style={{ height: 'min(52vh, 360px)', borderRadius: 16 }} /> });
 
 export function ScanButton({ onCode }: { onCode: (code: string, format: string) => void }) {
   const t = useT();

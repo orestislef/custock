@@ -9,10 +9,13 @@ import { Empty } from '@/components/ui/kit';
 import { IconWarning } from '@/components/ui/icons';
 import { useT } from '@/lib/i18n-client';
 import { reportError } from '@/lib/report-error';
+import { isStaleChunk, reloadForNewVersion } from '@/lib/new-version';
 
 export function ErrorScreen({ error, reset, home }: { error: Error & { digest?: string }; reset: () => void; home: string }) {
   const t = useT();
   useEffect(() => {
+    // a screen of the old version after a deploy: the new version loads instead of an error
+    if (isStaleChunk(error) && reloadForNewVersion()) return;
     reportError({ source: 'boundary', error });
   }, [error]);
   return (

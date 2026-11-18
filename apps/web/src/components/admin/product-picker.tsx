@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Product, StockLevel } from '@custock/core';
 import { useAdmin } from './admin-context';
 import { Photo, Sheet } from '@/components/ui/client-kit';
@@ -14,7 +14,10 @@ export type PickedVariant = { product: Product & { levels: StockLevel[] }; varia
 export function ProductPicker({ open, onClose, onPick, title }: { open: boolean; onClose: () => void; onPick: (x: PickedVariant) => void; title: string }) {
   const { api, org, t, locale } = useAdmin();
   const [q, setQ] = useState('');
-  const list = useAsync(() => (open ? api.products(org.orgId, { q: q || undefined, limit: 60 }) : Promise.resolve(null)), [open, q]);
+  // one request when typing pauses, not one per letter
+  const [debounced, setDebounced] = useState('');
+  useEffect(() => { const id = setTimeout(() => setDebounced(q.trim()), 180); return () => clearTimeout(id); }, [q]);
+  const list = useAsync(() => (open ? api.products(org.orgId, { q: debounced || undefined, limit: 60 }) : Promise.resolve(null)), [open, debounced]);
   return (
     <Sheet open={open} onClose={onClose} title={title}>
       <div className="search mb-3"><IconSearch size={18} /><input type="search" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} maxLength={200} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('stock.search')} aria-label={t('stock.search')} /></div>

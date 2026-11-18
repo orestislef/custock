@@ -10,7 +10,8 @@ import { Page } from '@/components/admin/shell';
 import { Chips, Empty } from '@/components/ui/kit';
 import { Photo, isMac, useShortcuts } from '@/components/ui/client-kit';
 import { IconMegaphone, IconPlus } from '@/components/ui/icons';
-import { useAsync } from '@/lib/use-async';
+import { usePaged } from '@/lib/use-paged';
+import { MoreRows } from '@/components/ui/more-rows';
 import { postText } from '@/lib/names';
 import { relative, number } from '@/lib/format';
 
@@ -29,10 +30,11 @@ function Posts() {
   const params = useSearchParams();
   const router = useRouter();
   const [f, setF] = useState<F>((params.get('status') as F) ?? 'all');
-  const list = useAsync(() => api.posts(org.orgId, f === 'all' ? undefined : { status: f }), [f]);
+  // every post, in pages as you scroll (only the first page showed before)
+  const list = usePaged((cursor) => api.posts(org.orgId, { ...(f === 'all' ? {} : { status: f }), cursor }), [f]);
   const canCreate = can('posts.create', null);
   useShortcuts({ create: useCallback(() => { if (canCreate) router.push('/admin/posts/new'); }, [canCreate, router]) });
-  const items = list.data?.items ?? [];
+  const items = list.items ?? [];
 
   return (
     <Page
@@ -78,6 +80,7 @@ function Posts() {
           })}
         </ul>
       )}
+      <MoreRows {...list.more} className="flex justify-center py-5" />
     </Page>
   );
 }

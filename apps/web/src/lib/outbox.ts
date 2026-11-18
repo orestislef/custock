@@ -103,6 +103,15 @@ export function flush(api: CustockApi): Promise<number> {
             res = await api.postMovements(orgId, chunk.map((r) => r.payload));
           } catch (e) {
             if (isNetworkError(e)) return sent;
+            const err = e as { status?: number; code?: string };
+            // the person no longer works for this business (removed, or the business is gone):
+            // what still waits for it is kept as not sent instead of being tried forever
+            if (err.status === 404 || (err.status === 403 && err.code === 'forbidden')) {
+              await idbPut('outbox', list.slice(i).map((r) => ({ ...r, status: 'rejected' as const, reason: 'forbidden' })));
+              break;
+            }
+            // a paused business keeps its work for later, the other businesses still go now
+            if (err.status && err.status < 500) break;
             throw e;
           }
           await idbDelete('outbox', [...res.accepted, ...res.duplicates]);

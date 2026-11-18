@@ -10,6 +10,7 @@ import { usePlatform } from '@/components/admin/admin-context';
 import { Avatar } from '@/components/ui/kit';
 import { LocaleSwitch, Sheet } from '@/components/ui/client-kit';
 import { AppearanceRow } from '@/components/ui/appearance-switch';
+import { OtherDevicesRow } from '@/components/ui/other-devices-row';
 import { IconLogout, IconShield } from '@/components/ui/icons';
 import { PlatformBanners } from './bits';
 import { PushRow } from '@/components/pwa/push-row';
@@ -65,6 +66,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
         <ul className="list mb-2" role="list">
           <li className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></li>
           <AppearanceRow />
+          <OtherDevicesRow api={api} />
           <li>
             <button type="button" className="row" onClick={() => void logout()} style={{ color: 'var(--c-error)' }}>
               <IconLogout size={20} />

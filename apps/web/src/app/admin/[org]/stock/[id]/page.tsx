@@ -13,6 +13,8 @@ import { CategoryPlaceholder } from '@/components/ui/category-picture';
 import { Tally } from '@/components/ui/tally';
 import { IconBell, IconChevronLeft, IconPlus, IconEdit, IconTruck, IconGear, IconPrint } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
+import { usePaged } from '@/lib/use-paged';
+import { MoreRows } from '@/components/ui/more-rows';
 import { StaffMissing, missingFrom } from '@/components/ui/gone';
 import { productName, variantLabel } from '@/lib/names';
 import { money, qtyNumber, relative } from '@/lib/format';
@@ -26,7 +28,13 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const { api, org, t, locale, can, shops, shopId, settings } = useAdmin();
   const toast = useToast();
   const product = useAsync(() => api.product(org.orgId, id), [id]);
-  const history = useAsync(() => (can('stock.history.view', null) ? api.movements(org.orgId, { shopId: shopId ?? undefined, limit: 30 }) : Promise.resolve(null)), [id, shopId]);
+  // this product's own movements, newest first, in pages. (asking for the shop's latest 30 and
+  // filtering them here left busy products with an empty history)
+  const mayHistory = can('stock.history.view', null);
+  const history = usePaged(
+    (cursor) => (mayHistory ? api.movements(org.orgId, { productId: id, shopId: shopId ?? undefined, limit: 20, cursor }) : Promise.resolve({ items: [], nextCursor: null })),
+    [id, shopId, mayHistory],
+  );
   const [sheet, setSheet] = useState<StockMode | null>(null);
   const [told, setTold] = useState<Record<string, number>>({});
   const [shopEdit, setShopEdit] = useState<StockLevel | null>(null);
@@ -40,8 +48,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
     return <div className="pt-6"><div className="h-[240px] skel mb-4" style={{ borderRadius: 16 }} /><div className="h-8 w-1/2 skel" /></div>;
   }
 
-  const variantIds = new Set(p.variants.map((v) => v.id));
-  const moves = (history.data?.items ?? []).filter((m) => variantIds.has(m.variantId));
+  const moves = history.items ?? [];
   const threshold = (settings?.fewLeftThreshold ?? 3) * (p.uom === 'piece' ? 1 : 1000);
   const v0 = p.variants[0];
   const canReceive = shops.some((s) => can('stock.receive', s.id));
@@ -156,7 +163,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         <div>
           {!can('stock.history.view', null) ? null : history.data ? (
             <Group title={t('product.history')} footer={moves.length ? t('product.historyFoot') : undefined}>
-              {moves.length ? moves.slice(0, 15).map((m) => (
+              {moves.length ? moves.map((m) => (
                 <Row
                   key={m.id}
                   title={t(`common:movement.${m.kind}`)}
@@ -164,6 +171,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                   value={<span style={{ color: m.qtyDelta > 0 ? 'var(--c-success)' : 'var(--c-ink-2)' }}>{signed(m.qtyDelta, qtyNumber(Math.abs(m.qtyDelta), p.uom, locale))}</span>}
                 />
               )) : <Row title={t('product.noHistory')} />}
+              {history.hasMore ? <MoreRows {...history.more} /> : null}
             </Group>
           ) : (
             <Group title={t('product.history')}><Row title={<span className="inline-block h-4 w-40 skel" />} /></Group>

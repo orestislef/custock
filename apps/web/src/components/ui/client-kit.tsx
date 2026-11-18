@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, us
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
-import { LOCALES, LOCALE_NAMES, type AppLocale } from '@custock/i18n';
+import { LOCALES, LOCALE_NAMES, type AppLocale } from '@custock/i18n/client';
 import { setLocaleCookie, useLocale, useT } from '@/lib/i18n-client';
 import { IconChevronDown, IconClose, IconEye, IconEyeOff, IconGlobe, IconInfo } from './icons';
 

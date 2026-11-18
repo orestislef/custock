@@ -26,16 +26,21 @@ export default function TeamPage() {
   const invites = useAsync(() => (org.orgPerms.includes('members.invite') || org.shops.some((s) => s.perms.includes('members.invite')) ? api.invites(org.orgId) : Promise.resolve([])), [inviting]);
   const canInvite = !org.staffFull && (org.orgPerms.includes('members.invite') || org.shops.some((s) => s.perms.includes('members.invite')));
   // a notification about someone who just joined opens them (?member=), once, then the link is dropped
-  useEffect(() => {
-    if (!members.data) return;
-    const u = new URL(window.location.href);
-    const wanted = u.searchParams.get('member');
-    if (!wanted) return;
-    const m = members.data.find((x) => x.membershipId === wanted);
+  // (decided while rendering once the list is in, the address is tidied in an effect)
+  const [linkHandled, setLinkHandled] = useState(false);
+  if (!linkHandled && members.data && typeof window !== 'undefined') {
+    setLinkHandled(true);
+    const wanted = new URL(window.location.href).searchParams.get('member');
+    const m = wanted ? members.data.find((x) => x.membershipId === wanted) : undefined;
     if (m?.canManage) setManaging(m);
+  }
+  useEffect(() => {
+    if (!linkHandled) return;
+    const u = new URL(window.location.href);
+    if (!u.searchParams.has('member')) return;
     u.searchParams.delete('member');
     window.history.replaceState(window.history.state, '', `${u.pathname}${u.search}${u.hash}`);
-  }, [members.data]);
+  }, [linkHandled]);
   if (!org.orgPerms.includes('members.view') && !org.shops.some((s) => s.perms.includes('members.view'))) return <RedirectHome />;
 
   return (

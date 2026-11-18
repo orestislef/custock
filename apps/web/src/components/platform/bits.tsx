@@ -5,7 +5,7 @@
 
 import Link from 'next/link';
 import type { MeContext, MoneyByCurrency } from '@custock/core';
-import type { TFunction } from '@custock/i18n';
+import type { TFunction } from '@custock/i18n/client';
 import { useToast } from '@/components/ui/client-kit';
 import { IconCopy, IconShare, IconWarning } from '@/components/ui/icons';
 import { money, number, intlLocale } from '@/lib/format';

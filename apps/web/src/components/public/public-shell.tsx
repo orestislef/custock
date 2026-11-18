@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import type { TFunction } from '@custock/i18n';
+import type { TFunction } from '@custock/i18n/client';
 import { LocaleSwitch } from '@/components/ui/client-kit';
 import { IconChevronLeft } from '@/components/ui/icons';
 

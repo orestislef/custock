@@ -11,7 +11,7 @@ import { PlatformShell } from '@/components/platform/platform-shell';
 import { Chips, Empty, Group, Row, Segmented } from '@/components/ui/kit';
 import { IconCheck, IconSearch, IconWarning } from '@/components/ui/icons';
 import { relative } from '@/lib/format';
-import type { TFunction } from '@custock/i18n';
+import type { TFunction } from '@custock/i18n/client';
 
 const KINDS: IssueKind[] = ['api', 'worker', 'send', 'storage', 'client'];
 type StatusFilter = IssueStatus | 'all';

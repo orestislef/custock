@@ -2,7 +2,7 @@
 
 import Link from '@/components/admin/org-link';
 import { useState } from 'react';
-import type { TFunction } from '@custock/i18n';
+import type { TFunction } from '@custock/i18n/client';
 import { uuidv7, type Movement, type Transfer } from '@custock/core';
 import { useAdmin, useShopFilter } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';

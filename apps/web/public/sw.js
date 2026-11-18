@@ -36,12 +36,21 @@ function isStatic(path) {
     || /\.(woff2?|ttf)$/.test(path);
 }
 
+// built files never change under the same name, so every deploy adds new ones. the oldest go once
+// there are many, so the cache does not grow forever on the phone
+const STATIC_MAX = 400;
+async function trimStatic(cache) {
+  const keys = await cache.keys();
+  if (keys.length <= STATIC_MAX) return;
+  await Promise.all(keys.slice(0, keys.length - STATIC_MAX + 50).map((k) => cache.delete(k)));
+}
+
 async function cacheFirst(request) {
   const cache = await caches.open(STATIC);
   const hit = await cache.match(request);
   if (hit) return hit;
   const res = await fetch(request);
-  if (res.ok && res.type === 'basic') cache.put(request, res.clone());
+  if (res.ok && res.type === 'basic') cache.put(request, res.clone()).then(() => trimStatic(cache)).catch(() => {});
   return res;
 }
 

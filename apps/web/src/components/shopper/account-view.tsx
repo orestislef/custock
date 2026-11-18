@@ -13,6 +13,7 @@ import { ProfilePhoto } from '@/components/ui/profile-photo';
 import { NameRow } from '@/components/ui/name-row';
 import { LocaleSwitch, PasswordField, Photo, Sheet, useToast } from '@/components/ui/client-kit';
 import { AppearanceRow } from '@/components/ui/appearance-switch';
+import { OtherDevicesRow } from '@/components/ui/other-devices-row';
 import { Empty, Switch } from '@/components/ui/kit';
 import { IconBell, IconChevronRight, IconDownload, IconHeart, IconLogout, IconMail, IconPeople, IconPhoneApp, IconTrash } from '@/components/ui/icons';
 import { useT } from '@/lib/i18n-client';
@@ -188,6 +189,7 @@ export function AccountView() {
         <ul className="list" role="list">
           <li className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></li>
           <AppearanceRow />
+          <OtherDevicesRow api={api} />
           <InstallRow appName={orgName} icon={icon} render={(open, label) => (
             <li>
               <button type="button" className="row has-icon" onClick={open}>

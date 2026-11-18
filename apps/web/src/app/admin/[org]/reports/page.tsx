@@ -19,9 +19,8 @@ export default function ReportsPage() {
   const top = useAsync(() => (allowed ? api.topSellers(org.orgId, shopId, 14) : none([])), [shopId, allowed]);
   const wanted = useAsync(() => (allowed ? api.mostWanted(org.orgId, shopId) : none([])), [shopId, allowed]);
   const links = useAsync(() => (allowed && can('customers.view', null) && org.orgPerms.includes('reports.view') ? api.joinLinkStats(org.orgId) : none([])), [allowed]);
-  // top sellers come without a unit for now, so the unit is looked up from the catalog
-  const catalog = useAsync(() => (allowed ? api.products(org.orgId, { limit: 500 }) : Promise.resolve(null)), [allowed]);
-  const uomOf = (variantId: string, row?: { uom?: Uom }): Uom => row?.uom ?? catalog.data?.items.find((p) => p.variants.some((v) => v.id === variantId))?.uom ?? 'piece';
+  // top sellers carry their unit; the page no longer downloads 200 whole products to look it up
+  const uomOf = (_variantId: string, row?: { uom?: Uom }): Uom => row?.uom ?? 'piece';
   const units = (variantId: string, qty: number, row?: { uom?: Uom }) => { const u = uomOf(variantId, row); return u === 'piece' ? number(qty, locale) : `${qtyNumber(qty, u, locale)} ${t(`common:uom.${u}`)}`; };
   const cards = useAsync(() => (allowed && moneyOk ? api.dashboard(org.orgId, shopId) : Promise.resolve(null)), [shopId, allowed]);
   const shrink = useAsync(() => (allowed ? api.shrinkage(org.orgId, shopId, 30) : none([])), [shopId, allowed]);

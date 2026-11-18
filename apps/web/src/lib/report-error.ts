@@ -5,7 +5,8 @@
 // browser and system family and the build. never the user agent, never anything typed or stored.
 // quiet by design: the same error once a minute, at most 20 a page visit, never blocking.
 
-import { CLIENT_BROWSERS, CLIENT_OSES, type ClientErrorInput } from '@custock/core';
+import type { CLIENT_BROWSERS, CLIENT_OSES, ClientErrorInput } from '@custock/core';
+import { isStaleChunk, reloadForNewVersion } from './new-version';
 
 type Browser = (typeof CLIENT_BROWSERS)[number];
 type Os = (typeof CLIENT_OSES)[number];
@@ -99,10 +100,13 @@ export function installErrorReporting() {
   window.addEventListener('error', (e) => {
     // a failed image or script load has no error object, the page handles those itself
     if (!e.error && !e.message) return;
+    // the old version's files after a deploy: load the new version instead of reporting
+    if (isStaleChunk(e.error ?? e.message) && reloadForNewVersion()) return;
     reportError({ source: 'error', error: e.error ?? e.message });
   });
   window.addEventListener('unhandledrejection', (e) => {
     const reason = e.reason as unknown;
+    if (isStaleChunk(reason) && reloadForNewVersion()) return;
     // a failed api call already reported itself as 5xx, a 4xx is an answer and not an error
     if (reason && typeof reason === 'object' && 'status' in reason && typeof (reason as { status: unknown }).status === 'number') return;
     reportError({ source: 'rejection', error: reason });

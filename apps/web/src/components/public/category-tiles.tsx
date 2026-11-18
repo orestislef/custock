@@ -2,7 +2,7 @@
 // or icon and its name in the visitor's language. tapping one filters the catalog, "All" clears it.
 
 import Link from 'next/link';
-import type { TFunction } from '@custock/i18n';
+import type { TFunction } from '@custock/i18n/client';
 import { CategoryPicture } from '@/components/ui/category-picture';
 import { IconBox, IconTag } from '@/components/ui/icons';
 

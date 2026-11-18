@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { PublicProduct } from '@custock/core';
-import type { TFunction } from '@custock/i18n';
+import type { TFunction } from '@custock/i18n/client';
 import { money, date } from '@/lib/format';
 import { Group, Row, StockBadge } from '@/components/ui/kit';
 import { Photo } from '@/components/ui/client-kit';

@@ -29,14 +29,20 @@ function offsetAt(ms: number, tz: string): number {
   return asUtc - Math.floor(ms / 60_000) * 60_000;
 }
 
+const sameWall = (a: Wall, b: Wall) => a.y === b.y && a.m === b.m && a.d === b.d && a.h === b.h && a.min === b.min;
+
 // the instant when the wall clock in tz shows w. in the hour skipped by a clock change the time
-// moves forward, in the hour that repeats the first one wins.
+// moves forward (02:30 does not exist on the spring night, it becomes 03:30), in the hour that
+// repeats the first one wins.
 export function fromWall(w: Wall, tz: string): number {
   const guess = Date.UTC(w.y, w.m - 1, w.d, w.h, w.min);
-  let ms = guess - offsetAt(guess, tz);
-  const second = guess - offsetAt(ms, tz);
-  if (second !== ms) ms = Math.min(ms, second);
-  return ms;
+  const a = guess - offsetAt(guess, tz);
+  const b = guess - offsetAt(a, tz);
+  // every instant within an hour either side that really shows this wall time
+  const shows = [a, b, a - 3_600_000, a + 3_600_000, b - 3_600_000, b + 3_600_000].filter((ms) => sameWall(toWall(ms, tz), w));
+  if (shows.length) return Math.min(...shows);
+  // the wall time does not exist: the clocks jumped over it, so take the later reading
+  return Math.max(a, b);
 }
 
 export const daysInMonth = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();

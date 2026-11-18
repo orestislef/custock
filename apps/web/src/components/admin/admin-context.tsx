@@ -6,7 +6,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { CustockApi, MeContext, OrgAccess, OrgSettings, Shop } from '@custock/core';
-import type { TFunction } from '@custock/i18n';
+import type { TFunction } from '@custock/i18n/client';
 import { basePath, createBrowserApi, loadTokens, saveTokens, takeHandedMe } from '@/lib/api-client';
 import { returnParam } from '@custock/core';
 import { useLocale, useT } from '@/lib/i18n-client';
