@@ -6,9 +6,48 @@
 // business for a shop's home screen app (orgId) or to the staff app (orgId null).
 
 import type { CustockApi, Locale } from '@custock/core';
-import { basePath } from './api-client';
+import { basePath, loadTokens } from './api-client';
 import { kvGet, kvSet } from './idb';
 import { isIOS, isStandalone } from './pwa';
+
+// which people want alerts on this device. signing out removes the subscription from the server
+// and the browser, signing in again brings it back for the same person without asking again.
+// another person signing in on the same device does not get them until they turn them on.
+const WANTED_KEY = 'custock.push.wanted';
+
+function currentUserId(): string | null {
+  const token = loadTokens()?.accessToken;
+  if (!token || token.split('.').length !== 3) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/'))) as { sub?: string };
+    return payload.sub ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function wantedList(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(WANTED_KEY) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function setWanted(orgId: string | null, on: boolean) {
+  const user = currentUserId();
+  if (!user) return;
+  const key = `${user}:${orgId ?? 'staff'}`;
+  const list = wantedList().filter((x) => x !== key);
+  if (on) list.push(key);
+  try { localStorage.setItem(WANTED_KEY, JSON.stringify(list.slice(-20))); } catch {}
+}
+
+function isWanted(orgId: string | null): boolean {
+  const user = currentUserId();
+  return !!user && wantedList().includes(`${user}:${orgId ?? 'staff'}`);
+}
 
 export type PushState = 'unsupported' | 'install' | 'denied' | 'default' | 'granted';
 
@@ -99,13 +138,16 @@ export async function enablePush(api: CustockApi, opts: { orgId: string | null; 
     const sub = await subscribe(reg, key.publicKey);
     await api.savePushSubscription(toInput(sub, opts.orgId, opts.locale));
     await kvSet('push.saved', { at: Date.now(), orgId: opts.orgId }).catch(() => {});
+    setWanted(opts.orgId, true);
     return 'on';
   } catch {
     return 'failed';
   }
 }
 
-export async function disablePush(api: CustockApi): Promise<void> {
+// signing out keeps the wish (forget false), turning the switch off forgets it
+export async function disablePush(api: CustockApi, opts: { forget?: boolean; orgId?: string | null } = {}): Promise<void> {
+  if (opts.forget) setWanted(opts.orgId ?? null, false);
   const sub = await currentSubscription().catch(() => null);
   if (!sub) return;
   await api.deletePushSubscription(sub.endpoint).catch(() => {});
@@ -123,11 +165,19 @@ export async function pushIsOn(): Promise<boolean> {
 export async function refreshSubscription(api: CustockApi, opts: { orgId: string | null; locale?: Locale }): Promise<void> {
   if (pushState() !== 'granted') return;
   const reg = await registration();
-  const existing = reg ? await reg.pushManager.getSubscription().catch(() => null) : null;
-  if (!reg || !existing) return;
+  if (!reg) return;
+  const existing = await reg.pushManager.getSubscription().catch(() => null);
+  // signed out and back in: the same person had alerts on here, so they come back on their own
+  if (!existing && !isWanted(opts.orgId)) return;
   const key = await api.pushKey().catch(() => undefined);
   if (key === undefined) return; // offline, try next time
   if (key === null) return; // the server stopped sending push, nothing to do here
+  if (!existing) {
+    await activated(reg);
+    const fresh = await subscribe(reg, key.publicKey).catch(() => null);
+    if (fresh) await api.savePushSubscription(toInput(fresh, opts.orgId, opts.locale)).then(() => kvSet('push.refreshed', { at: Date.now(), endpoint: fresh.endpoint }), () => {});
+    return;
+  }
   let sub = existing;
   if (!sameKey(existing, key.publicKey)) sub = await subscribe(reg, key.publicKey).catch(() => existing);
   const last = await kvGet<{ at: number; endpoint?: string }>('push.refreshed').catch(() => null);

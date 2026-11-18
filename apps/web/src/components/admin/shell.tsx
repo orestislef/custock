@@ -21,6 +21,7 @@ import {
 import { AppIcon, InstallRow, InstallSteps } from '@/components/pwa/install-coach';
 import { PushRow } from '@/components/pwa/push-row';
 import { ProfilePhoto } from '@/components/ui/profile-photo';
+import { NameRow } from '@/components/ui/name-row';
 import { basePath } from '@/lib/api-client';
 import { devBuild } from '@/lib/env';
 import { startOfflineSync, useOnline, useOutbox } from '@/lib/outbox';
@@ -261,6 +262,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </ProfilePhoto>
         {/* where they work and as what, nothing about permissions */}
         <ul className="list mb-4" role="list">
+          <li><NameRow api={api} name={me.user.displayName} onSaved={() => void refresh()} /></li>
           <li className="row">
             <span className="row-main row-title">{t('admin.role')}</span>
             <span className="t-body t-2 text-right">{org.roleNames.map((r) => t(`common:role.${r}`, { defaultValue: r })).join(', ')}</span>

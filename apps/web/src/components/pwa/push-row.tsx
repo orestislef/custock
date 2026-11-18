@@ -33,7 +33,7 @@ export function usePushSwitch(api: CustockApi, orgId: string | null) {
     setWhy(null);
     try {
       if (!next) {
-        await disablePush(api);
+        await disablePush(api, { forget: true, orgId });
         setOn(false);
         return false;
       }

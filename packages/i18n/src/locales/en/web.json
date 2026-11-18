@@ -150,7 +150,11 @@
     "offlineBody": "Your session is fine. Check the connection and try again.",
     "businessSection": "Business",
     "role": "Role",
-    "shops": "Shops"
+    "shops": "Shops",
+    "name": "Name",
+    "changeName": "Change name",
+    "nameSaved": "Name saved",
+    "nameFoot": "This is how your team and the people you write to see you."
   },
   "nav": {
     "home": "Home",

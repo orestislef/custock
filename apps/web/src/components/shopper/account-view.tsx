@@ -9,6 +9,7 @@ import type { PublicProduct, StockAlertItem } from '@custock/core';
 import { AppIcon, InstallRow, InstallSteps } from '@/components/pwa/install-coach';
 import { PushRow } from '@/components/pwa/push-row';
 import { ProfilePhoto } from '@/components/ui/profile-photo';
+import { NameRow } from '@/components/ui/name-row';
 import { LocaleSwitch, Photo, Sheet, useToast } from '@/components/ui/client-kit';
 import { Empty, Switch } from '@/components/ui/kit';
 import { IconBell, IconChevronRight, IconDownload, IconHeart, IconLogout, IconMail, IconPeople, IconPhoneApp, IconTrash } from '@/components/ui/icons';
@@ -88,6 +89,7 @@ export function AccountView() {
               <span className="row-sub block truncate">{me.user.email}</span>
             </ProfilePhoto>
           </div>
+          <NameRow api={api} name={me.user.displayName} onSaved={reload} />
         </div>
       </section>
 
