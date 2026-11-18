@@ -4,6 +4,65 @@
 
 import { z } from 'zod';
 
+// in the browser the pages run under a Content-Security-Policy without 'unsafe-eval'. zod would try
+// Function('') once to see if it may compile schemas, which the policy refuses (and reports), so the
+// browser parses without compiling. the server keeps the faster compiled parsers.
+if (typeof (globalThis as { window?: unknown }).window !== 'undefined') z.config({ jitless: true });
+import {
+  LIMITS, MAX_MONEY_MINOR, MAX_QTY_BASE, cleanLine, cleanText, emailProblem, httpsUrlProblem, isAllowedVat,
+  normalizeEmail, normalizeOtp, parseBarcodeInput, parsePhone, passwordProblem,
+} from './validate';
+
+// ---------------------------------------------------------------- shared field rules
+// the same rules as the forms (validate.ts), so the server refuses what a form refuses. a custom
+// issue carries the field error code (common.json field.*) as its message.
+
+const str = (v: unknown) => (typeof v === 'string' ? v : v);
+// an email, trimmed and lowercased, checked properly
+export const zEmail = z.preprocess((v) => (typeof v === 'string' ? normalizeEmail(v) : v), z.string().max(LIMITS.email).superRefine((v, ctx) => {
+  const p = emailProblem(v);
+  if (p) ctx.addIssue({ code: 'custom', message: p });
+}));
+// a new password: 10 to 128 characters, no spaces. existing passwords at sign in are not checked
+export const zNewPassword = z.string().max(LIMITS.passwordMax + 72).superRefine((v, ctx) => {
+  const p = passwordProblem(v);
+  if (p) ctx.addIssue({ code: 'custom', message: p });
+});
+// a single line of text: edges trimmed, spaces collapsed, control characters out
+export const zLine = (max: number, min = 1) =>
+  z.preprocess((v) => (typeof v === 'string' ? cleanLine(v) : str(v)), z.string().min(min, { message: min ? 'empty' : undefined }).max(max, { message: 'tooLong' }));
+// multi line text: only the edges trimmed
+export const zText = (max: number) => z.preprocess((v) => (typeof v === 'string' ? cleanText(v) : str(v)), z.string().max(max, { message: 'tooLong' }));
+// a phone number, stored as E.164 (+30 for greek numbers without a code)
+export const zPhone = z.preprocess((v) => {
+  if (typeof v !== 'string') return v;
+  if (!v.trim()) return v.trim();
+  const r = parsePhone(v);
+  return r.ok ? r.value : `!${r.error}`;
+}, z.string().max(LIMITS.phone).superRefine((v, ctx) => {
+  if (v.startsWith('!')) ctx.addIssue({ code: 'custom', message: v.slice(1) });
+}));
+// a barcode as typed: spaces and dashes out, check digit for gtin lengths
+export const zBarcode = z.preprocess((v) => {
+  if (typeof v !== 'string') return v;
+  // a scanned gs1 digital link stays a link, the server reads the gtin out of it
+  if (/^https?:\/\//i.test(v.trim())) return v.trim();
+  const r = parseBarcodeInput(v);
+  return r.ok ? r.value : `!${r.error}`;
+}, z.string().min(1).max(500).superRefine((v, ctx) => {
+  if (v.startsWith('!')) ctx.addIssue({ code: 'custom', message: v.slice(1) });
+}));
+// a one time code: digits only, spaces and dashes from a paste removed
+export const zOtp = z.preprocess((v) => (typeof v === 'string' ? normalizeOtp(v) : v), z.string().length(LIMITS.otp, { message: 'invalid' }));
+// an https link
+export const zHttpsUrl = z.string().max(LIMITS.url).superRefine((v, ctx) => {
+  const p = httpsUrlProblem(v, { required: true });
+  if (p) ctx.addIssue({ code: 'custom', message: p });
+});
+export const zMoneyMinor = z.number().int().min(0, { message: 'negative' }).max(MAX_MONEY_MINOR, { message: 'tooLarge' });
+export const zQtyBase = z.number().int().min(-MAX_QTY_BASE, { message: 'tooLarge' }).max(MAX_QTY_BASE, { message: 'tooLarge' });
+export const zVatBp = z.number().int().refine((n) => isAllowedVat(n), { message: 'invalid' });
+
 export const Locale = z.enum(['en', 'el', 'ru']);
 export type Locale = z.infer<typeof Locale>;
 
@@ -64,14 +123,14 @@ export type Problem = z.infer<typeof Problem>;
 
 // ---------------------------------------------------------------- auth and context
 
-export const LoginInput = z.object({ email: z.string().email().max(254), password: z.string().min(1).max(200) });
+export const LoginInput = z.object({ email: zEmail, password: z.string().min(1).max(200) });
 // forgot password. the answer is the same whether or not the email has an account
-export const PasswordForgotInput = z.object({ email: z.string().email().max(254), locale: Locale.optional() });
+export const PasswordForgotInput = z.object({ email: zEmail, locale: Locale.optional() });
 export type PasswordForgotInput = z.infer<typeof PasswordForgotInput>;
-export const PasswordResetInput = z.object({ token: z.string().min(10).max(200), password: z.string().min(10).max(200) });
+export const PasswordResetInput = z.object({ token: z.string().min(10).max(200), password: zNewPassword });
 export type PasswordResetInput = z.infer<typeof PasswordResetInput>;
-export const OtpRequestInput = z.object({ email: z.string().email().max(254), locale: Locale.optional() });
-export const OtpVerifyInput = z.object({ email: z.string().email().max(254), code: z.string().length(6) });
+export const OtpRequestInput = z.object({ email: zEmail, locale: Locale.optional() });
+export const OtpVerifyInput = z.object({ email: zEmail, code: zOtp });
 
 export const Tokens = z.object({
   accessToken: z.string(),
@@ -222,32 +281,35 @@ export const Product = z.object({
 });
 export type Product = z.infer<typeof Product>;
 
-export const Category = z.object({ id: z.string(), parentId: z.string().nullable(), name: z.string() });
+// names: every language that has one, only for people who manage categories
+export const Category = z.object({ id: z.string(), parentId: z.string().nullable(), name: z.string(), names: z.record(z.string(), z.string()).optional() });
+export const CategoryInput = z.object({ name: zLine(LIMITS.categoryName), translations: z.partialRecord(z.enum(['en', 'el', 'ru']), zLine(LIMITS.categoryName, 0).nullable()).optional() });
+export type CategoryInput = z.infer<typeof CategoryInput>;
 export type Category = z.infer<typeof Category>;
 
 // one variant in a product form. with an id it updates that variant, without one it adds a variant.
 // barcodes are the full list for that variant.
 export const VariantInput = z.object({
   id: z.string().max(64).optional(),
-  sku: z.string().max(64).nullable().optional(),
-  options: z.record(z.string().max(40), z.string().max(80)).nullable().optional(),
-  priceMinor: z.number().int().min(0).nullable().optional(),
-  costMinor: z.number().int().min(0).nullable().optional(),
-  barcodes: z.array(z.object({ code: z.string().min(1).max(200), packQty: z.number().int().positive().max(10000).default(1) })).max(20).optional(),
+  sku: zLine(LIMITS.sku, 0).nullable().optional(),
+  options: z.record(zLine(LIMITS.optionName), zLine(LIMITS.optionValue)).nullable().optional(),
+  priceMinor: zMoneyMinor.nullable().optional(),
+  costMinor: zMoneyMinor.nullable().optional(),
+  barcodes: z.array(z.object({ code: zBarcode, packQty: z.number().int().positive().max(10000).default(1) })).max(20).optional(),
 });
 export type VariantInput = z.infer<typeof VariantInput>;
 
 export const ProductInput = z.object({
-  name: z.string().min(1).max(200),
-  description: z.string().max(5000).nullable().optional(),
-  brand: z.string().max(120).nullable().optional(),
+  name: zLine(LIMITS.productName),
+  description: zText(LIMITS.description).nullable().optional(),
+  brand: zLine(LIMITS.brand, 0).nullable().optional(),
   categoryId: z.string().nullable().optional(),
   uom: Uom.default('piece'),
-  taxRateBp: z.number().int().default(2400),
+  taxRateBp: zVatBp.default(2400),
   trackStock: z.boolean().default(true),
-  priceMinor: z.number().int().nullable().optional(),
-  costMinor: z.number().int().nullable().optional(),
-  barcode: z.string().max(200).optional(),
+  priceMinor: zMoneyMinor.nullable().optional(),
+  costMinor: zMoneyMinor.nullable().optional(),
+  barcode: zBarcode.optional(),
   // the full list of variants. leave it out to keep the variants as they are (or one default variant on create).
   // variants left out of the list are archived when they have history, deleted otherwise.
   variants: z.array(VariantInput).min(1).max(50).optional(),
@@ -273,10 +335,10 @@ export const MovementInput = z.object({
   id: z.string().min(8).max(64), // uuid v7 made on the device, idempotency key
   shopId: z.string(),
   variantId: z.string(),
-  qtyDelta: z.number().int().refine((n) => n !== 0, 'zero'),
+  qtyDelta: zQtyBase.refine((n) => n !== 0, 'zero'),
   kind: MovementKind,
   reason: AdjustReason.optional(),
-  note: z.string().max(500).optional(),
+  note: zText(LIMITS.note).optional(),
   unitPriceMinor: z.number().int().optional(),
   unitCostMinor: z.number().int().optional(),
   batchId: z.string().optional(),
@@ -380,7 +442,7 @@ export type JoinLink = z.infer<typeof JoinLink>;
 
 // ---------------------------------------------------------------- posts
 
-export const PostText = z.object({ title: z.string().min(1).max(200), body: z.string().max(5000) });
+export const PostText = z.object({ title: zLine(LIMITS.postTitle), body: zText(LIMITS.postBody) });
 
 export const Audience = z.object({
   scopes: z.array(z.object({ scopeType: ScopeType, scopeId: z.string().max(64) })).min(1).max(50),
@@ -398,7 +460,7 @@ export const PostInput = z.object({
   translations: z.partialRecord(Locale, PostText), // only the default language is required
   channels: z.array(Channel).min(1),
   audience: Audience,
-  products: z.array(z.object({ variantId: z.string().max(64), offerPriceMinor: z.number().int().min(0).nullable().default(null) })).max(100).default([]),
+  products: z.array(z.object({ variantId: z.string().max(64), offerPriceMinor: zMoneyMinor.nullable().default(null) })).max(100).default([]),
   coverUrl: z.string().max(2000).nullable().default(null),
   scheduledAt: z.number().nullable().default(null),
   validFrom: z.number().nullable().default(null),
@@ -475,7 +537,7 @@ export const Member = z.object({
 export type Member = z.infer<typeof Member>;
 
 export const InviteInput = z.object({
-  email: z.string().email().max(254),
+  email: zEmail,
   roleId: z.string(),
   scopeType: ScopeType,
   scopeId: z.string(),
@@ -501,6 +563,8 @@ export const PublicProduct = z.object({
   id: z.string(),
   orgId: z.string(),
   orgName: z.string(),
+  // the business's time zone, for dates like the end of an offer
+  timezone: z.string().optional(),
   name: z.string(),
   description: z.string().nullable(),
   images: z.array(ProductImage),
@@ -537,9 +601,12 @@ export const JoinPage = z.object({
 });
 export type JoinPage = z.infer<typeof JoinPage>;
 
+// a person's name on the public join page: letters (any script), spaces and . ' - only, so the
+// page cannot be used to put links or other text in front of people
+export const PERSON_NAME = /^[\p{L}\p{M}][\p{L}\p{M} .'’-]*$/u;
 export const JoinInput = z.object({
-  name: z.string().min(1).max(120),
-  email: z.string().email().max(254),
+  name: zLine(40).pipe(z.string().regex(PERSON_NAME, { message: 'invalid' })),
+  email: zEmail,
   locale: Locale,
   emailNews: z.boolean(),
   push: z.boolean(),
@@ -576,10 +643,10 @@ export const Paged = <T extends z.ZodTypeAny>(item: T) =>
 // ---------------------------------------------------------------- stage 2 additions
 
 export const ShopVariantSettingsInput = z.object({
-  priceOverrideMinor: z.number().int().nullable().optional(),
+  priceOverrideMinor: zMoneyMinor.nullable().optional(),
   isListed: z.boolean().optional(),
-  reorderPoint: z.number().int().nullable().optional(),
-  reorderQty: z.number().int().nullable().optional(),
+  reorderPoint: zQtyBase.pipe(z.number().min(0, { message: 'negative' })).nullable().optional(),
+  reorderQty: zQtyBase.pipe(z.number().min(0, { message: 'negative' })).nullable().optional(),
 });
 export type ShopVariantSettingsInput = z.infer<typeof ShopVariantSettingsInput>;
 
@@ -629,6 +696,9 @@ export const Transfer = z.object({
   id: z.string(),
   fromShopId: z.string(),
   toShopId: z.string(),
+  // both names, so a shop that only receives still sees where it comes from
+  fromShopName: z.string().optional(),
+  toShopName: z.string().optional(),
   status: z.enum(['draft', 'sent', 'received', 'cancelled']),
   note: z.string().nullable(),
   createdBy: z.string(),
@@ -642,15 +712,15 @@ export type Transfer = z.infer<typeof Transfer>;
 export const TransferInput = z.object({
   fromShopId: z.string(),
   toShopId: z.string(),
-  note: z.string().max(500).optional(),
-  lines: z.array(z.object({ variantId: z.string().max(64), qty: z.number().int().positive() })).min(1).max(500),
+  note: zText(LIMITS.note).optional(),
+  lines: z.array(z.object({ variantId: z.string().max(64), qty: zQtyBase.pipe(z.number().positive()) })).min(1).max(500),
 });
 export type TransferInput = z.infer<typeof TransferInput>;
 
 export const AddCustomerInput = z.object({
-  name: z.string().min(1).max(120),
-  email: z.string().email().max(254).optional(),
-  phone: z.string().max(30).optional(),
+  name: zLine(120),
+  email: zEmail.optional(),
+  phone: zPhone.optional(),
   locale: Locale.default('el'),
   shopId: z.string().max(64),
   emailNews: z.boolean().default(false),
@@ -748,7 +818,8 @@ export type UploadPurpose = z.infer<typeof UploadPurpose>;
 export const PresignInput = z.object({
   purpose: UploadPurpose,
   mime: z.enum(['image/jpeg', 'image/png', 'image/webp']),
-  bytes: z.number().int().positive().max(5_000_000),
+  // the hard ceiling, the size in force is the policy uploads.maxMegabytes
+  bytes: z.number().int().positive().max(10_000_000),
 });
 export type PresignInput = z.infer<typeof PresignInput>;
 
@@ -810,8 +881,8 @@ export type InvitePreview = z.infer<typeof InvitePreview>;
 
 export const InviteRegisterInput = z.object({
   token: z.string().min(10).max(200),
-  displayName: z.string().trim().min(1).max(80),
-  password: z.string().min(10).max(200),
+  displayName: zLine(LIMITS.personName),
+  password: zNewPassword,
   locale: Locale.optional(),
 });
 export type InviteRegisterInput = z.infer<typeof InviteRegisterInput>;
@@ -827,11 +898,11 @@ export const InviteCreated = z.object({
 export type InviteCreated = z.infer<typeof InviteCreated>;
 
 export const ShopInput = z.object({
-  name: z.string().trim().min(1).max(80),
+  name: zLine(LIMITS.shopName),
   slug: z.string().regex(/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/).optional(),
-  city: z.string().max(80).nullable().optional(),
-  address: z.string().max(200).nullable().optional(),
-  phone: z.string().max(40).nullable().optional(),
-  email: z.string().email().max(254).nullable().optional(),
+  city: zLine(LIMITS.city, 0).nullable().optional(),
+  address: zLine(LIMITS.address, 0).nullable().optional(),
+  phone: zPhone.nullable().optional(),
+  email: zEmail.nullable().optional(),
 });
 export type ShopInput = z.infer<typeof ShopInput>;

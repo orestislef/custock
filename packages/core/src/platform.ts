@@ -2,7 +2,8 @@
 // features and limits they set per business, and the emergency switches for the whole platform.
 
 import { z } from 'zod';
-import { Locale } from './contract';
+import { Locale, zEmail, zLine } from './contract';
+import { LIMITS } from './validate';
 
 // features a super admin can switch off for one business. on unless listed in disabledFeatures
 export const FEATURES = ['customer_pages', 'posts', 'email', 'push', 'transfers', 'counts', 'reports', 'uploads'] as const;
@@ -121,11 +122,11 @@ export const StorageUse = z.object({
 export type StorageUse = z.infer<typeof StorageUse>;
 
 export const NewBusinessInput = z.object({
-  name: z.string().trim().min(1).max(80),
+  name: zLine(LIMITS.shopName),
   slug: z.string().regex(/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/).optional(),
-  shopName: z.string().trim().min(1).max(80).optional(),
-  ownerEmail: z.string().trim().toLowerCase().email().max(254),
-  ownerName: z.string().trim().max(80).optional(),
+  shopName: zLine(LIMITS.shopName).optional(),
+  ownerEmail: zEmail,
+  ownerName: zLine(LIMITS.personName, 0).optional(),
   locale: Locale.optional(),
 });
 export type NewBusinessInput = z.infer<typeof NewBusinessInput>;
@@ -140,7 +141,7 @@ export const BusinessCreated = z.object({
 export type BusinessCreated = z.infer<typeof BusinessCreated>;
 
 export const PlatformInviteInput = z.object({
-  email: z.string().trim().toLowerCase().email().max(254),
+  email: zEmail,
   locale: Locale.optional(),
 });
 export type PlatformInviteInput = z.infer<typeof PlatformInviteInput>;

@@ -93,7 +93,7 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
   const post = <T>(path: string, body?: unknown) => request<T>('POST', path, body ?? {});
   const patch = <T>(path: string, body: unknown) => request<T>('PATCH', path, body);
   const put = <T>(path: string, body: unknown) => request<T>('PUT', path, body);
-  const del = <T>(path: string) => request<T>('DELETE', path);
+  const del = <T>(path: string, body?: unknown) => request<T>('DELETE', path, body);
   const org = (orgId: string) => `/v1/orgs/${enc(orgId)}`;
 
   return {
@@ -119,6 +119,9 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
 
     // catalog and stock
     categories: (orgId) => get(`${org(orgId)}/categories`),
+    createCategory: (orgId, input) => post(`${org(orgId)}/categories`, input),
+    updateCategory: (orgId, id, p) => patch(`${org(orgId)}/categories/${enc(id)}`, p),
+    deleteCategory: (orgId, id) => del(`${org(orgId)}/categories/${enc(id)}`),
     products: (orgId, q?: ProductQuery) => get(`${org(orgId)}/products`, q as Query),
     product: (orgId, productId) => get(`${org(orgId)}/products/${enc(productId)}`),
     createProduct: (orgId, input) => post(`${org(orgId)}/products`, input),
@@ -178,7 +181,8 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     unfollow: (scopeType, scopeId) => post('/v1/c/unfollow', { scopeType, scopeId }),
     setChannel: (orgId, channel, on) => put('/v1/c/channels', { orgId, channel, on }),
     exportMyData: () => get('/v1/me/export'),
-    deleteMyAccount: () => del('/v1/me'),
+    startAccountDelete: () => post('/v1/me/delete/start'),
+    deleteMyAccount: (confirm) => del('/v1/me', confirm ?? {}),
 
     // public
     joinPage: (code) => get(`/v1/public/join/${enc(code)}`),
@@ -236,7 +240,8 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     unsubscribePage: (token) => get(`/v1/public/subscription/${enc(token)}`),
     unsubscribe: (token, everything) => post(`/v1/public/subscription/${enc(token)}`, { everything: !!everything }),
 
-    requestEmailChange: (newEmail) => post('/v1/me/email', { email: newEmail }),
+    requestEmailChange: (newEmail, password) => post('/v1/me/email', { email: newEmail, ...(password ? { password } : {}) }),
+    revertEmailChange: (token) => post('/v1/public/email-revert', { token }),
     confirmEmailChange: (newEmail, code) => post('/v1/me/email/verify', { email: newEmail, code }),
     detachBarcode: (orgId, variantId, barcodeId) => del(`${org(orgId)}/variants/${enc(variantId)}/barcodes/${enc(barcodeId)}`),
     presignUpload: (orgId, input) => post(`${org(orgId)}/uploads/presign`, input),
@@ -279,6 +284,20 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     revokeSuperAdminInvite: (inviteId) => del(`/v1/platform/superadmin-invites/${enc(inviteId)}`),
     removeSuperAdmin: (userId) => del(`/v1/platform/superadmins/${enc(userId)}`),
     orgControls: (orgId) => get(`${org(orgId)}/controls`),
+    orgPolicies: (orgId, shopId) => get(`${org(orgId)}/policies`, shopId ? { shop: shopId } : undefined),
+    setOrgPolicies: (orgId, body) => patch(`${org(orgId)}/policies`, body),
+    shopPolicies: (orgId, shopId) => get(`${org(orgId)}/shops/${enc(shopId)}/policies`),
+    setShopPolicies: (orgId, shopId, body) => patch(`${org(orgId)}/shops/${enc(shopId)}/policies`, body),
+    rolePolicies: (orgId, roleId) => get(`${org(orgId)}/roles/${enc(roleId)}/policies`),
+    setRolePolicies: (orgId, roleId, body) => patch(`${org(orgId)}/roles/${enc(roleId)}/policies`, body),
+    memberPolicies: (orgId, membershipId) => get(`${org(orgId)}/members/${enc(membershipId)}/policies`),
+    setMemberPolicies: (orgId, membershipId, body) => patch(`${org(orgId)}/members/${enc(membershipId)}/policies`, body),
+    myPolicies: (orgId) => get(`${org(orgId)}/me/policies`),
+    setMyPolicies: (orgId, body) => patch(`${org(orgId)}/me/policies`, body),
+    platformPolicies: () => get('/v1/platform/policies'),
+    setPlatformPolicies: (body) => patch('/v1/platform/policies', body),
+    businessPolicies: (orgId) => get(`/v1/platform/businesses/${enc(orgId)}/policies`),
+    setBusinessPolicies: (orgId, body) => patch(`/v1/platform/businesses/${enc(orgId)}/policies`, body),
     platformInvitePreview: (token) => get(`/v1/platform-invites/${enc(token)}`),
     registerPlatformInvite: (input) => post('/v1/platform-invites/register', input),
     acceptPlatformInvite: (token) => post('/v1/platform-invites/accept', { token }),

@@ -1,6 +1,7 @@
 {
   "permissions": [
     { "key": "org.settings.manage", "level": "org", "group": "org" },
+    { "key": "settings.push", "level": "org", "group": "comms" },
     { "key": "org.billing.manage", "level": "org", "group": "org" },
     { "key": "org.audit.view", "level": "org", "group": "org" },
     { "key": "org.support_access.manage", "level": "org", "group": "org" },

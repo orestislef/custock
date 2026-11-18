@@ -5,7 +5,7 @@
 import type { OpenApiDoc, ServerInfo } from './server-info';
 import type { ClientErrorInput, Issue, IssueDetail, IssuePage, IssueQuery, IssueStatus } from './errors';
 import type {
-  AudiencePreview, Audience, Category, Customer, CustomerDetail, DashboardCards, FeedItem,
+  AudiencePreview, Audience, Category, CategoryInput, Customer, CustomerDetail, DashboardCards, FeedItem,
   GrantableRole, InviteInput, JoinInput, JoinLink, JoinPage, Locale, MeContext, Member,
   Movement, MovementBatchResult, MovementInput, OrgSettings, Post, PostInput, Product,
   ProductInput, PublicProduct, Role, ScanResult, SeriesPoint, Shop, ShopGroup, StockLevel,
@@ -14,6 +14,7 @@ import type {
   StockCountLine, SyncResult, Transfer, TransferInput, UncountedPolicy, UnsubscribePage, PresignInput, PresignResult,
   PushSubscriptionInput, InviteCreated, InvitePreview, InviteRegisterInput, ShopInput,
 } from './contract';
+import type { BusinessPolicyControl, BusinessPolicyControlsPatch, PlatformPolicyEntry, PolicyEntry, PolicyPatch, PolicyValue } from './policies';
 
 import type {
   BusinessCreated, NewBusinessInput, OrgControls, OrgControlsPatch, PlatformAuditEntry, PlatformBusiness, PlatformBusinessDetail,
@@ -68,6 +69,9 @@ export interface CustockApi {
 
   // catalog and stock
   categories(orgId: string): Promise<Category[]>;
+  createCategory(orgId: string, input: CategoryInput): Promise<Category>;
+  updateCategory(orgId: string, categoryId: string, patch: Partial<CategoryInput>): Promise<Category>;
+  deleteCategory(orgId: string, categoryId: string): Promise<void>;
   products(orgId: string, query?: ProductQuery): Promise<Page<Product & { levels: StockLevel[] }>>;
   product(orgId: string, productId: string): Promise<Product & { levels: StockLevel[] }>;
   createProduct(orgId: string, input: ProductInput): Promise<Product>;
@@ -127,7 +131,9 @@ export interface CustockApi {
   unfollow(scopeType: ScopeType, scopeId: string): Promise<void>;
   setChannel(orgId: string, channel: 'email' | 'push', on: boolean): Promise<void>;
   exportMyData(): Promise<unknown>;
-  deleteMyAccount(): Promise<void>;
+  // how this account confirms deleting itself: its password, or a code sent by email now
+  startAccountDelete(): Promise<{ method: 'password' } | { method: 'code'; sent: true; devCode?: string }>;
+  deleteMyAccount(confirm?: { password?: string; code?: string }): Promise<void>;
 
   // public, no login
   joinPage(code: string): Promise<JoinPage>;
@@ -199,7 +205,10 @@ export interface CustockApi {
   // ---------------------------------------------------------------- security review additions
 
   // account email change: a code goes to the new address, the old one gets a notice once it is done
-  requestEmailChange(newEmail: string): Promise<{ sent: true; devCode?: string }>;
+  // accounts with a password give it here, a session alone is not enough to move the account
+  requestEmailChange(newEmail: string, password?: string): Promise<{ sent: true; devCode?: string }>;
+  // public, from the notice to the old address: puts the old email back and signs everyone out
+  revertEmailChange(token: string): Promise<{ email: string }>;
   confirmEmailChange(newEmail: string, code: string): Promise<void>;
   detachBarcode(orgId: string, variantId: string, barcodeId: string): Promise<void>;
   // movements accepted offline that pushed stock below zero in strict mode
@@ -260,6 +269,22 @@ export interface CustockApi {
 
   // any member of the business can read what the super admin decided for it
   orgControls(orgId: string): Promise<OrgControls>;
+
+  // the policy engine (policies.ts): limits and options per level, with what the caller may change
+  orgPolicies(orgId: string, shopId?: string | null): Promise<{ entries: PolicyEntry[]; mine: Record<string, PolicyValue> }>;
+  setOrgPolicies(orgId: string, patch: PolicyPatch): Promise<{ entries: PolicyEntry[] }>;
+  shopPolicies(orgId: string, shopId: string): Promise<{ entries: PolicyEntry[] }>;
+  setShopPolicies(orgId: string, shopId: string, patch: PolicyPatch): Promise<{ entries: PolicyEntry[] }>;
+  rolePolicies(orgId: string, roleId: string): Promise<{ entries: PolicyEntry[] }>;
+  setRolePolicies(orgId: string, roleId: string, patch: PolicyPatch): Promise<{ entries: PolicyEntry[] }>;
+  memberPolicies(orgId: string, membershipId: string): Promise<{ entries: PolicyEntry[] }>;
+  setMemberPolicies(orgId: string, membershipId: string, patch: PolicyPatch): Promise<{ entries: PolicyEntry[] }>;
+  myPolicies(orgId: string): Promise<{ entries: PolicyEntry[] }>;
+  setMyPolicies(orgId: string, patch: PolicyPatch): Promise<{ entries: PolicyEntry[] }>;
+  platformPolicies(): Promise<{ entries: PlatformPolicyEntry[] }>;
+  setPlatformPolicies(patch: PolicyPatch): Promise<{ entries: PlatformPolicyEntry[] }>;
+  businessPolicies(orgId: string): Promise<{ controls: BusinessPolicyControl[] }>;
+  setBusinessPolicies(orgId: string, patch: BusinessPolicyControlsPatch): Promise<{ controls: BusinessPolicyControl[] }>;
 
   // public: the super admin invite page. 410 invite_expired when used, revoked or old
   platformInvitePreview(token: string): Promise<PlatformInvitePreview>;
