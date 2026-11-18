@@ -4,11 +4,31 @@
 # the web listens on 3000, the api on 8787. the reverse proxy sends <base>/api/* to the api and
 # everything else under <base> to the web.
 
-# the api's dependencies only, so the final image stays small
-FROM node:22-slim AS deps
+FROM node:22-slim AS base
 WORKDIR /app
+# better-sqlite3 uses a prebuilt binary, the toolchain is only a fallback
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@10.34.9 --activate
+
+# the api's production dependencies only. the workspace is cut down to the api and the shared
+# packages first, otherwise the hoisted install brings the whole web and phone toolchains along
+FROM base AS deps
+COPY package.json pnpm-lock.yaml .npmrc tsconfig.base.json ./
+COPY apps/api/package.json apps/api/
+COPY packages/core/package.json packages/core/
+COPY packages/db/package.json packages/db/
+COPY packages/i18n/package.json packages/i18n/
+COPY packages/tokens/package.json packages/tokens/
+RUN printf 'packages:
+  - apps/api
+  - packages/*
+onlyBuiltDependencies:
+  - better-sqlite3
+  - esbuild
+' > pnpm-workspace.yaml  && pnpm install --prod --no-frozen-lockfile
+
+# the web as a next.js standalone server
+FROM base AS web
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
@@ -17,10 +37,6 @@ COPY packages/core/package.json packages/core/
 COPY packages/db/package.json packages/db/
 COPY packages/i18n/package.json packages/i18n/
 COPY packages/tokens/package.json packages/tokens/
-RUN pnpm install --frozen-lockfile --filter "@custock/api..."
-
-# the web as a next.js standalone server
-FROM deps AS web
 RUN pnpm install --frozen-lockfile --filter "@custock/web..."
 COPY packages packages
 COPY apps/web apps/web

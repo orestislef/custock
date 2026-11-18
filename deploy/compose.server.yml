@@ -1,19 +1,17 @@
 # custock as one container on a shared server, behind the reverse proxy that is already there.
-# from this folder: docker compose -f compose.server.yml up -d --build   (needs .env, see env.example)
+# the image is built on the server by deploy/ship.sh, so the server keeps no source code.
+# lives on the server as /opt/custock/compose.yml, next to its .env (see env.example).
+
+name: custock
 
 services:
   custock:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-      args:
-        CUSTOCK_BASE_PATH: ${CUSTOCK_BASE_PATH:-/custock}
-    image: custock
+    image: custock:latest
     container_name: custock
     restart: unless-stopped
     env_file: .env
     volumes:
-      - custock-data:/data
+      - data:/data
     # localhost only, the reverse proxy is the way in
     ports:
       - "127.0.0.1:${CUSTOCK_WEB_PORT:-3090}:3000"
@@ -21,4 +19,4 @@ services:
     mem_limit: 768m
 
 volumes:
-  custock-data:
+  data:
