@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 /screenshots/tmp/
+
+# copied from zxing-wasm by scripts/copy-wasm.mjs
+/public/wasm/
