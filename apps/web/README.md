@@ -1,12 +1,17 @@
 # @custock/web
 
-Next.js 16 app with two halves:
+Next.js 16 app. It is also the phone app: staff and customers add it to the home screen (PWA),
+with camera scanning, offline stock work and web push. Three parts:
 
 - **customer pages**, server rendered and small, opened from a QR code: `/j/[code]` join,
   `/confirm/[token]`, `/p/[code]` shelf product, `/s/[org]` catalog and offers,
   `/unsubscribe/[token]`.
-- **admin** under `/admin`: dashboard, stock, customers, posts with the audience breakdown,
-  team and roles, reports, customer page settings, QR codes with printable posters.
+- **admin** under `/admin`: dashboard, stock, scan, customers, posts with the audience breakdown,
+  team and roles, reports, settings, QR codes with printable posters, shelf labels.
+- **super admin** under `/admin/platform`: every business, feature switches, limits and options,
+  errors, the API docs and server health.
+- **customer app** under `/s/[org]`: catalog, offers, news, saved items, alerts and account, one
+  home screen app per business.
 
 Every string comes from `@custock/i18n` (english, greek, russian). Every screen is gated by the
 permissions in `me()`, the server still decides.

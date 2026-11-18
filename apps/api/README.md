@@ -290,7 +290,7 @@ same JSON works on R2 (bucket settings, CORS policy) and on AWS (Permissions, CO
 ```json
 [
   {
-    "AllowedOrigins": ["https://orestislef.gr"],
+    "AllowedOrigins": ["https://custock.example.com"],
     "AllowedMethods": ["PUT"],
     "AllowedHeaders": ["content-type", "cache-control"],
     "MaxAgeSeconds": 3600

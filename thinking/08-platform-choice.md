@@ -3,112 +3,72 @@
 What we write custock in. I know Flutter, so Flutter was the starting point. This file is the
 honest comparison and the pick.
 
-## update: the website is the phone app
+## the pick
 
-**decided:** no Expo app for now. the Next.js web app is the product on phones too, added to the
-home screen as a web app (PWA). staff and customers use the same site, installed or not.
+**decided: TypeScript everywhere, and the website is the phone app.** Staff and customers use the
+same site, in the browser or added to the home screen as a web app (PWA). No store app.
 
-why:
+- **app:** Next.js. staff screens, the super admin area and the customer app per business, all in
+  one, server rendered where it matters and installable to the home screen.
+- **server:** Node + Hono on SQLite, zod for validation.
+- **one pnpm monorepo** with shared packages: `core` (permissions, schemas, money, quantities,
+  search normalisation, validation rules), `i18n` (all strings in en, el, ru), `tokens` (colors,
+  type, spacing, motion).
 
-- one app to build and run instead of two. the web had to exist anyway (join pages, admin).
+Why:
+
+- one app to build and run. the web had to exist anyway (join pages, the admin), so the phone app
+  is the same code.
 - no app store review, no builds on a mac, updates are live the moment we deploy.
-- a shop can put "add us to your home screen" on a poster. each business gets its own home
-  screen app with its own name and icon (a manifest per business).
+- a shop can put "add us to your home screen" on a poster. each business gets its own home screen
+  app with its own name and icon (a manifest per business).
+- **one source of truth** for permissions, validation and translations, imported directly by the
+  web and the server.
+- a big pool of people who can help with React and TypeScript.
 
-what the browser gives us now, and the limits we accept:
+What the browser gives us, and the limits we accept:
 
 | need | on the web | limit |
 |---|---|---|
-| scanning | camera plus BarcodeDetector, a zxing wasm fallback where the browser has none (iOS Safari) | a bit slower than native, fine for counter and shelf work |
-| push | Web Push with our own VAPID keys, no Firebase needed | on iOS only after the app is added to the home screen (iOS 16.4 and up) |
-| offline stock work | service worker plus IndexedDB outbox, same idempotent movement ids | iOS may clear storage of sites not used for weeks, the outbox syncs on every open |
-| haptics | navigator.vibrate on Android | none on iOS |
-| look and feel | our own tab bar, sheets and transitions, safe areas, standalone mode | not the system tab bar, so liquid glass is drawn by us |
-
-the Expo app is parked on its own branch with everything it had (scanning, offline outbox,
-transfers). if the web ever hits a wall (background sync on iOS, very fast scanning), it comes
-back as a thin shell around the same api.
+| scanning | camera plus BarcodeDetector, a self hosted zxing wasm reader where the browser has none (iPhone) | a bit slower than a native scanner, fine for counter and shelf work |
+| push | Web Push with our own VAPID keys | on iPhone only after the app is added to the home screen (iOS 16.4 and up), no big pictures there |
+| offline stock work | service worker plus an IndexedDB outbox, same idempotent movement ids | iPhone may clear storage of sites not used for weeks, the outbox syncs on every open |
+| haptics | navigator.vibrate on Android | none on iPhone |
+| look and feel | our own tab bar, sheets, transitions, safe areas, standalone mode | not the system tab bar, so the glass look is drawn by us |
 
 ## what the product actually needs
 
-Before picking tools, the list of things that are hard here:
-
-1. **a phone app that feels native and polished.** smooth transitions, real platform tab bars and
-   sheets, haptics, the new iOS look (liquid glass) without faking it.
+1. **a phone app that feels native and polished.** smooth transitions, tab bars and sheets that
+   behave like the platform's, safe areas, no jumps when the keyboard opens.
 2. **continuous barcode scanning** that is fast and does not drain the battery.
-3. **offline** stock work with a local database and an outbox.
-4. **push notifications** that deep link everywhere.
+3. **offline** stock work with a local store and an outbox.
+4. **push notifications** that deep link to the exact page.
 5. **web pages that open in a second from a QR code**: join page, shelf product page, public
-   catalog, manage subscription. no app install. these must be real web pages, small, server
-   rendered, indexable.
-6. **an admin dashboard on the web**: bulk product editing, reports with charts, team and roles.
-   wide screens, keyboard, tables.
-7. **three languages everywhere**: app, web pages, emails, push texts, all from one source.
+   catalog, manage subscription. no install needed.
+6. **an admin on wide screens**: product editing, reports with charts, team and roles, tables.
+7. **three languages everywhere**: screens, emails, push texts, dates and numbers, from one source.
 8. **one set of rules everywhere**: permissions, validation, money and quantity math, search
-   normalisation. the app, the web and the server must agree, or we get holes.
-9. **a small team** (me plus a few people) that can grow, and no ci/cd.
+   normalisation. the web and the server must agree, or we get holes.
+9. **a small team** that can grow, and no ci/cd.
 
-## the options
+## the options we compared
 
-| | Flutter everywhere | Flutter app + React web | TypeScript everywhere (Expo + Next.js) | native Swift + Kotlin + web |
-|---|---|---|---|---|
-| native look on iOS | drawn by flutter, imitates cupertino. liquid glass only via packages | same | **real native tab bars, sheets, menus**. liquid glass comes from the system | best |
-| animations | excellent (impeller) | excellent on phone | excellent (reanimated 4, skia) | excellent |
-| scanning | mobile_scanner, good | same | expo-camera barcode scanning, good, no extra native setup | best |
-| offline db | drift, very good | same | expo-sqlite + drizzle, good | good |
-| public web pages | flutter web is heavy (canvas, slow first load, no SEO). needs a second stack anyway | React | **Next.js, same language** | needs a web stack |
-| admin dashboard | flutter web works but does not feel like the web | React | **React, same language** | web stack |
-| shared code with server | only if the server is dart | via codegen | **direct imports**: permissions, zod schemas, i18n, money math | via codegen |
-| translations | ARB in app, something else on web and server | two formats | **one JSON source for app, web, server** | three formats |
-| my current skill | high | high for app, learning React | learning React Native and React | low |
-| hiring / team help | smaller pool | mixed | **largest pool** | two specialists |
-| codebases | 1 (+ web pages anyway) | 2 languages | 1 language, 3 apps sharing packages | 3 |
-
-## the pick
-
-**decided (pending review): TypeScript everywhere.**
-
-- **phone app:** Expo (React Native, new architecture). expo-router with native tabs, Reanimated 4,
-  gesture handler, expo-camera for scanning, expo-haptics, expo-sqlite + Drizzle for
-  offline, FCM for push, expo-secure-store, i18next.
-- **web:** Next.js. customer pages (join, product, catalog, offers, unsubscribe) server rendered and
-  tiny, plus the admin dashboard in the same app.
-- **server:** Node + Hono, Drizzle ORM on SQLite, zod. runs on my server next to the login, FCM and
-  mail services.
-- **one pnpm monorepo** with shared packages: `core` (permissions, schemas, money, quantities,
-  search normalisation), `i18n` (all strings in en, el, ru), `tokens` (colors, type, spacing for web
-  and phone).
-
-Why, in one line each:
-
-- the web part is not optional. the QR join page and the admin dashboard are half the product,
-  and they need real web tech. once React is in the project for the web, using React Native for
-  the phone means **one language, one way of thinking, shared code**.
-- **native components** make the "feels like Apple made it" goal reachable without faking iOS. the
-  tab bar, sheets, context menus and the iOS 26 glass come from the system, and android gets its own
-  material look for free.
-- **one source of truth** for permissions and translations, imported directly by app, web and
-  server. no codegen between languages, no drift.
-- a bigger pool of people who can help.
-
-What it costs:
-
-- learning React Native and the React way. my Flutter experience helps with the concepts (widgets
-  vs components, state, navigation), not the syntax.
-- React Native upgrades need care. Expo smooths most of it.
-- native modules (camera) need a development build, not Expo Go. fine.
-- iOS builds need a mac in any stack.
+| | Flutter everywhere | native Swift + Kotlin + web | TypeScript, the web app is the phone app |
+|---|---|---|---|
+| phone look | drawn by flutter, imitates the platform | best | drawn by us with the platform's patterns |
+| public web pages | flutter web is heavy (canvas, slow first load), needs a second stack anyway | needs a web stack | **the same app** |
+| admin on wide screens | works but does not feel like the web | needs a web stack | **the same app** |
+| shared rules with the server | only with a dart server | via codegen | **direct imports** |
+| translations | ARB in the app, something else on web and server | three formats | **one JSON source** |
+| store review and builds | yes, a mac for iOS | yes, a mac for iOS | **none** |
+| codebases | 1 plus web pages anyway | 3 | **1** |
 
 ## when I would pick Flutter instead
 
 - if the team that builds this is Flutter only and nobody wants to touch React.
-- if the web part shrinks to just the join page (then a small server rendered page is enough and
-  the admin lives in the app).
+- if the web part shrinks to just the join page and the admin lives in the app.
 
-In that case: Flutter app (riverpod, go_router, drift, mobile_scanner, firebase_messaging,
-gen-l10n with ARB) + a tiny server rendered join/product site + the admin in Flutter web or React.
-The thinking in every other file still holds. Only [13-stack](13-stack.md) and the package names
-change.
+The thinking in every other file still holds then; only [13-stack](13-stack.md) changes.
 
 ## no ci/cd
 

@@ -102,8 +102,7 @@ TypeScript everywhere. The website is also the phone app: staff and customers ad
 screen, with camera scanning, offline stock work and web push. Next.js for the app, Node with Hono
 and SQLite for the api, Cloudflare R2 for photos. One monorepo with shared permissions,
 translations and design tokens. Why a web app and not a native one is in
-[thinking/08](thinking/08-platform-choice.md). An earlier Expo version lives on the `expo-app`
-branch.
+[thinking/08](thinking/08-platform-choice.md).
 
 No CI/CD. Builds and deploys are done by hand.
 

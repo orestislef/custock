@@ -7,7 +7,7 @@ Things I still need to decide. Next to each, what we assume until I answer.
 | 1 | what runs on my server today (language, framework), and how does the login service issue tokens? JWT with a public key we can verify, or something else? | it issues JWTs we can verify with a public key, the custock api runs next to it as its own service |
 | 2 | does the login server already keep devices and FCM tokens, or does custock keep them? | custock keeps its own `devices` table and calls FCM itself |
 | 3 | is custock a product many businesses sign up for (and pay), or something I set up for specific shops? | built multi tenant from day one, signup open later, no billing in v1 |
-| 4 | TypeScript everywhere (Expo + Next.js) or Flutter? see [08](08-platform-choice.md) | TypeScript everywhere |
+| 4 | TypeScript everywhere or Flutter? see [08](08-platform-choice.md) | TypeScript everywhere, and the web app is the phone app (PWA) |
 | 5 | do pilot shops have a POS? should custock record sales (quick sale) or sync from the POS later? | quick sale in v1, POS sync later |
 | 6 | one app for staff and customers, or two apps in the stores? | one app |
 | 7 | countries at the start: Greece only? Cyprus? | Greece first, Cyprus ready (VAT rates, +357, EUR) |

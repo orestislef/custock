@@ -5,35 +5,33 @@ What we build it with, piece by piece, and why. The reasoning for TypeScript ove
 
 ## the short version
 
-**decided (pending review of 08):** TypeScript everywhere, one repo.
+**decided:** TypeScript everywhere, one repo. the website is also the phone app.
 
 | part | what | why |
 |------|------|-----|
-| phone app | Expo (React Native, new architecture) | real native components, so ios and android look like themselves. one codebase for staff and customers |
+| phone app | the web app itself, added to the home screen (PWA), see [08](08-platform-choice.md) | one app to build and run, no store review, updates are live on deploy. one codebase for staff and customers |
 | web | Next.js | customer pages must open fast from a QR with no install. admin needs real tables and charts on a big screen |
 | server | Node + Hono | small, fast, typed, runs anywhere. same language as the app and web |
-| database | SQLite through Drizzle ORM | light, one file, no extra service. Drizzle also runs on the phone, same schema style on both ends |
+| database | SQLite | light, one file, no extra service |
 | validation | zod | one schema checks input on the server and forms in the app and web |
 | storage | Cloudflare R2 (S3 compatible) | free allowance covers us for a long time, no egress fees |
-| push | FCM HTTP v1 | already on my server, covers android and ios |
+| push | Web Push with our own VAPID keys | works in every modern browser, on iPhone once the app is on the home screen. FCM stays as an optional channel on the server |
 | mail | my own server, optional relay for bulk | already there for logins |
 | repo | pnpm monorepo | shared code is a folder, not a published package |
 
 ## phone app
 
-| piece | what for | why this one |
-|-------|----------|--------------|
-| `expo` (new architecture) | the app itself | handles native setup, upgrades and config plugins. we still own the native folders through prebuild |
-| `expo-router` with native tabs | navigation | file based routes, deep links for free. native tabs means the real platform tab bar, so on ios 26 we get liquid glass without faking it |
-| `react-native-reanimated` 4 | animation | runs on the UI thread, springs that feel native, layout animations for lists, the rolling stock numbers |
-| `react-native-gesture-handler` | gestures | swipe actions on list rows, drag to dismiss sheets |
-| `expo-camera` barcode scanning | barcode and QR scanning | **changed when building:** covers every code type we need (EAN, UPC, ITF, Code 128, QR, DataMatrix) with no extra native setup. `react-native-vision-camera` stays the option if continuous scanning ever needs more speed |
-| `expo-haptics` | the tick on each scan | short haptics that match the system meanings, see [10](10-design.md) |
-| `expo-sqlite` + `drizzle-orm` | offline cache and outbox | local copy of catalog and stock, queued movements. same ORM as the server |
-| `@react-native-firebase/messaging` | FCM | data messages for silent refresh, notification messages for customers |
-| `expo-secure-store` | tokens | keychain on ios, keystore on android |
-| `i18next` + `react-i18next` | translations | messages come from `packages/i18n`, shared with web and server, see [11](11-languages.md) |
-| `@tanstack/react-query` | server state | caching, retries, refetch on focus. pairs with the `perms_version` refresh |
+The phone app is the web app. What the browser gives us:
+
+| piece | what for | how |
+|-------|----------|-----|
+| web app manifest | home screen icon, full screen | one manifest for staff, one per business for its customers, with the business's icon |
+| service worker | offline pages, push, notification clicks | cache first for built files, network first for pages, never caches the api |
+| camera + BarcodeDetector | barcode and QR scanning | native detector where the browser has one, a self hosted zxing wasm reader elsewhere (iPhone) |
+| IndexedDB | offline outbox for stock movements | same idempotent movement ids as the server, syncs when the signal is back |
+| Web Push (VAPID) | notifications | asked only from a tap, deep links into the right page |
+| navigator.vibrate | the tick on each scan | Android only, iPhone has no web haptics |
+| visualViewport | sheets above the keyboard | keeps buttons and fields visible while typing |
 
 ## web
 
@@ -68,14 +66,13 @@ uses the same FCM credentials and mail setup that are already running there.
 ```
 custock/
   apps/
-    mobile/          expo app, staff and customer modes
-    web/             next.js, customer pages + /admin
+    web/             next.js: staff, super admin and customer app, installs to the home screen
     api/             hono server + job worker
   packages/
     core/            permissions.json and generated constants, zod schemas,
                      money and quantity helpers, search normalisation, barcode normalisation
     i18n/            shared ICU messages: en, el, ru
-    tokens/          design tokens (colors, type scale, spacing, radius, motion) for web and native
+    tokens/          design tokens (colors, type scale, spacing, radius, motion)
     db/              drizzle schema, migrations, seed data
   thinking/          these notes
   demo/              the static clickable demo for github pages
@@ -165,13 +162,13 @@ party summaries, check the official pricing pages before relying on the numbers.
 
 ## push
 
-- **FCM HTTP v1** from the server, with a service account. APNs key uploaded to firebase so ios
-  goes through the same pipe.
-- **data messages** for silent work: `stock_changed`, `perms_changed`, `post_published`,
-  `transfer_sent`. the app refreshes what changed, nothing shows on screen.
-- **notification messages** for people: offers, back in stock, low stock for managers. title and
-  body in the receiver's language, image url when the post has one, a deep link in the data.
-- tokens per device. on `UNREGISTERED` from FCM the token is removed. on logout the app deletes it.
+- **Web Push** from the server with our own VAPID keys. Subscriptions per person and device, scoped
+  to a business for a business's home screen app.
+- notifications for people: offers, back in stock, staff alerts, super admin alerts. title and body
+  in the receiver's language, the business icon, the post or product photo where the platform shows
+  it, action buttons, and a deep link to the exact page.
+- a subscription the push service reports gone (404 or 410) is removed; sign out removes it too.
+- **FCM HTTP v1** stays available on the server as an optional channel.
 
 ## email
 
@@ -191,9 +188,10 @@ people. plus rate limits per IP and per join link on the API.
 
 ## deep links
 
-- android app links (`/.well-known/assetlinks.json`) and ios universal links
-  (`/.well-known/apple-app-site-association`) served from our domain.
-- `/j/<code>`, `/p/<code>`, `/post/<id>` open the app when installed, the web page when not.
+- every notification and email link opens the exact page, signs in first when needed and switches
+  to the right business, see the route map in the web app.
+- `/j/<code>`, `/p/<code>` and `/s/<business>` are plain web pages, so a phone camera opens them
+  straight from a QR code.
 
 ## environments
 
@@ -203,13 +201,12 @@ people. plus rate limits per IP and per join link on the API.
 | staging | same server as prod, other port and other database file | copy of seed data, never real customers |
 | prod | the server | real |
 
-Expo builds get a dev and a prod variant with different API urls and firebase projects.
 
 ## monitoring
 
 - uptime check on the API and the join page (a free uptime service is enough).
 - structured logs with request id, org id and user id. no customer emails or phones in logs.
-- crash reporting on the phone app and the web, with personal data scrubbed.
+- an error log for the super admin, browser and server errors, with personal data scrubbed.
 - a tiny `/health` endpoint that checks the database and the job queue age.
 
 ## builds and deploys
@@ -218,10 +215,9 @@ Expo builds get a dev and a prod variant with different API urls and firebase pr
 
 - local scripts in `scripts/`: type check, lint, tests, i18n missing keys check, schema check.
   run before every release.
-- **phone:** `expo prebuild`, then gradle for android and xcode for ios, on my machine. no EAS
-  cloud builds. ios needs a mac, whatever the framework.
+- **phone:** nothing to build, the web app is the phone app.
 - **server:** deploy over ssh, docker compose or a systemd service. migrations run at startup.
 - **web:** built locally, shipped to the server the same way.
 - **demo:** the static clickable demo in `demo/` is served by github pages straight from the branch.
   no workflow file in the repo.
-- versions: semver for releases, build number goes up on every store build.
+- versions: the git revision of each deploy is shown to the super admin.

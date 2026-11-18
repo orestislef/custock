@@ -14,7 +14,7 @@ reviewed and I say go.
 
 The boring parts that everything sits on.
 
-- monorepo with apps/mobile, apps/web, apps/api and the shared packages
+- monorepo with apps/web (also the phone app, installed to the home screen), apps/api and the shared packages
 - database migrations from `thinking/db/schema.sql`
 - auth against my login server, `/v1/me/context`
 - orgs, shops, groups, members, invites, default roles, the permission engine with tests for the

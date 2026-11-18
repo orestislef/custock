@@ -49,12 +49,6 @@
       "note": "Own subdomain with its own certificate, one container, real email and push, photos in Cloudflare R2. Next: final deploy and a full live test."
     },
     {
-      "name": "Native phone app (Expo)",
-      "percent": 60,
-      "state": "building",
-      "note": "Paused. The web app covers phones. The Expo version is kept on its own branch."
-    },
-    {
       "name": "Super admin and settings",
       "percent": 90,
       "state": "building",
@@ -78,7 +72,7 @@
     },
     {
       "at": "2026-11-17T17:45:00+02:00",
-      "text": "Monorepo set up: Expo SDK 58, Next.js 16, Hono, SQLite. Shared contract, tokens and translations in place."
+      "text": "Monorepo set up: Next.js 16, Hono, SQLite. Shared contract, tokens and translations in place."
     },
     {
       "at": "2026-11-17T18:00:00+02:00",
@@ -134,7 +128,7 @@
     },
     {
       "at": "2026-11-18T09:00:00+02:00",
-      "text": "Decision: the website is the phone app, added to the home screen. The Expo app moves to its own branch."
+      "text": "Decision: the website is the phone app, added to the home screen."
     },
     {
       "at": "2026-11-18T11:30:00+02:00",

@@ -33,7 +33,6 @@ packages/i18n/src/locales/
     common.json   shared words: roles, permissions, stock states, units, error codes
     server.json   push, email and join page texts built on the server
     web.json      the next.js app
-    mobile.json   the phone app
 ```
 
 - one namespace per app, so the web and the phone app never edit the same file.
@@ -75,7 +74,7 @@ Russian 21 is "one", 22 is "few", 25 is "many". Nobody gets that right with `if 
 
 ## formatting
 
-All through `Intl`, never by hand. Hermes (the React Native engine) has `Intl` built in. if a
+All through `Intl`, never by hand. Every browser we support has `Intl` built in. if a
 piece like `PluralRules` is missing on some Android version, the FormatJS polyfills fill the gap.
 
 | thing | en | el | ru |

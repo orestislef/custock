@@ -38,49 +38,48 @@ All in `deploy/.env` (start from `env.example`).
 | `CUSTOCK_DEV` | never on a server | dev features |
 | `LITESTREAM_BUCKET`, `LITESTREAM_ENDPOINT`, `LITESTREAM_ACCESS_KEY_ID`, `LITESTREAM_SECRET_ACCESS_KEY` | yes | the R2 bucket and an API token for it |
 
-## one container on a shared server
+## one container behind an existing proxy
 
-The simplest setup, and the one in use: the api and the web in one image (`Dockerfile`,
-`start.mjs`), one container, behind the reverse proxy the server already has, under a path of an
-existing domain (`/custock`). The server keeps no source code: `ship.sh` sends the committed code
-over ssh, builds the image there, then removes the source and the build cache.
+The setup in use: the api and the web in one image (`Dockerfile`, `start.mjs`), one container,
+behind the reverse proxy the server already has, on **its own subdomain** (for example
+`custock.example.com`). Its own origin matters: on a path of a shared domain every other app on that
+domain could read the app's sign in tokens and share its notification permission. The server keeps
+no source code: `ship.sh` sends the committed code over ssh, builds the image there, then removes
+the source and the build cache.
 
 | file | what |
 |------|------|
-| `Dockerfile` | api and web together, the web built for `CUSTOCK_BASE_PATH` |
+| `Dockerfile` | api and web together, the web built for `CUSTOCK_BASE_PATH` (empty on its own subdomain) |
 | `start.mjs` | starts the api, then the web once the api answers, stops both together |
 | `compose.server.yml` | the container, ports on 127.0.0.1 only. lives on the server as `/opt/custock/compose.yml` |
 | `ship.sh` | build and restart by hand from your machine |
 
-Once on the server: `/opt/custock/.env` from `env.example` (secrets, `CUSTOCK_PUBLIC_WEB_URL` with
-the path, `CUSTOCK_API_URL` as `<web url>/api`, `CUSTOCK_TRUSTED_PROXY=1`), then the proxy. For
-Apache, inside the domain's `:443` virtual host, the api line first:
+Once on the server: `/opt/custock/.env` from `env.example` (secrets, `CUSTOCK_PUBLIC_WEB_URL` as
+`https://custock.example.com`, `CUSTOCK_API_URL` as `https://custock.example.com/api`,
+`CUSTOCK_CORS` as the same origin, `CUSTOCK_TRUSTED_PROXY=1`), a DNS record (A, and AAAA if the
+server has IPv6), a certificate (`certbot certonly --apache -d custock.example.com`), then the
+virtual host. For Apache, the api first:
 
 ```
-<Location /custock>
+<VirtualHost *:443>
+    ServerName custock.example.com
+    SSLCertificateFile /etc/letsencrypt/live/custock.example.com/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/custock.example.com/privkey.pem
+    Include /etc/letsencrypt/options-ssl-apache.conf
+
+    ProxyPreserveHost On
     RequestHeader set X-Forwarded-Proto "https"
-</Location>
-ProxyPass /custock/api/ http://127.0.0.1:8790/
-ProxyPassReverse /custock/api/ http://127.0.0.1:8790/
-ProxyPass /custock http://127.0.0.1:3090/custock
-ProxyPassReverse /custock http://127.0.0.1:3090/custock
+    Header always set Strict-Transport-Security "max-age=31536000"
+
+    ProxyPass        /api/ http://127.0.0.1:8790/
+    ProxyPassReverse /api/ http://127.0.0.1:8790/
+    ProxyPass        /     http://127.0.0.1:3090/
+    ProxyPassReverse /     http://127.0.0.1:3090/
+</VirtualHost>
 ```
 
-HSTS, so browsers only ever use https for the host. It needs `mod_headers` and holds for the whole
-host, not only the path, so add it once in the `:443` virtual host (on its own subdomain,
-custock.example.com, in that host):
-
-```
-Header always set Strict-Transport-Security "max-age=31536000"
-```
-
-The app sends its own Content-Security-Policy (with a nonce per page, see `apps/web/src/proxy.ts`),
-X-Frame-Options, nosniff, Referrer-Policy and Permissions-Policy, so the proxy adds nothing else.
-
-Its own subdomain is the safer home: the sign in tokens live in the browser's storage for the
-origin, which every app on the same host shares. Moving from a path to a subdomain: a DNS record,
-a virtual host with the two ProxyPass lines without the path, `CUSTOCK_BASE_PATH=` (empty) when
-building, and `CUSTOCK_PUBLIC_WEB_URL`, `CUSTOCK_API_URL` and `CUSTOCK_CORS` on the new address.
+plus a `:80` virtual host that redirects to https. The bucket's CORS rule must allow the same
+origin (see [apps/api](../apps/api/README.md)).
 
 Then every update, from the repo on your machine:
 
@@ -88,9 +87,12 @@ Then every update, from the repo on your machine:
 CUSTOCK_SSH=root@your-server CUSTOCK_SSH_KEY=~/.ssh/your-key sh deploy/ship.sh
 ```
 
-Only committed code is shipped. The data lives in the `custock_data` volume and survives
-rebuilds. The first owner is created with the api's command line inside the container (see
-[apps/api](../apps/api/README.md)).
+Only committed code is shipped. The data lives in the `custock_data` volume and survives rebuilds.
+Migrations run when the api starts and only go forward. The first super admin and the first business
+are created with the api's command line inside the container (see [apps/api](../apps/api/README.md)).
+
+Serving under a path of a shared domain still works (`CUSTOCK_BASE_PATH=/custock` for `ship.sh`),
+but only for testing, for the reason above.
 
 The rest of this file is the bigger setup with the api and web as separate services and
 litestream next to them.

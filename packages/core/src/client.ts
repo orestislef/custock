@@ -1,4 +1,4 @@
-// fetch based implementation of CustockApi. runs on node, browsers and react native.
+// fetch based implementation of CustockApi. runs on node and in browsers.
 
 import type { CustockApi, CustomerQuery, ProductQuery } from './api';
 import type { ErrorCode, Locale, Problem } from './contract';

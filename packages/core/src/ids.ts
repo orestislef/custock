@@ -1,5 +1,5 @@
 // uuid v7: 48 bit unix ms timestamp, version, variant, random. sortable by time.
-// uses crypto.getRandomValues (node, browsers, hermes with a polyfill), falls back to Math.random.
+// uses crypto.getRandomValues (node and browsers), falls back to Math.random.
 
 function randomBytes(n: number): Uint8Array {
   const bytes = new Uint8Array(n);

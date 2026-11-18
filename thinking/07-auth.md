@@ -46,7 +46,7 @@ accept this invite with this account?" and links them anyway.
 | token | lifetime | where it lives | notes |
 |-------|----------|----------------|-------|
 | access token (JWT) | 15 minutes | memory only | `sub`, `sid` (session id), issuer, expiry. nothing else |
-| refresh token | 30 days, sliding | phone: secure storage (Keychain on iOS, Keystore on Android, via `expo-secure-store`). web admin: httpOnly, Secure, SameSite=Strict cookie | opaque, random, stored hashed on the server |
+| refresh token | 30 days, sliding | phone: the installed web app keeps it in the browser storage of its own origin. web admin: httpOnly, Secure, SameSite=Strict cookie | opaque, random, stored hashed on the server |
 
 - **rotation:** every refresh gives a new refresh token and kills the old one.
 - **reuse detection:** if an old refresh token is ever used again, someone copied it. the whole
