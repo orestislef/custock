@@ -47,25 +47,3 @@ if (!stopping) {
   start('web', ['apps/web/server.js'], '/app/web', { PORT: '3000', HOSTNAME: '0.0.0.0', CUSTOCK_API_URL: 'http://127.0.0.1:8787' });
 }
 
-// nightly snapshot of the database into the data volume (VACUUM INTO, newest 30 kept). it guards
-// against mistakes and bad updates, not against losing the disk: copy /data/snapshots off the
-// server too, or set up litestream (see deploy/README.md)
-const DAY = 24 * 60 * 60 * 1000;
-const db = process.env.CUSTOCK_DB ?? '/data/custock.db';
-const out = process.env.CUSTOCK_SNAPSHOT_DIR ?? '/data/snapshots';
-let lastSnapshot = 0;
-function snapshot() {
-  if (stopping || Date.now() - lastSnapshot < DAY - 60_000) return;
-  lastSnapshot = Date.now();
-  const s = spawn(process.execPath, ['scripts/db-snapshot.mjs', '--db', db, '--out', out, '--keep', '30'], { cwd: '/app', stdio: 'inherit' });
-  s.on('exit', (code) => {
-    if (code === 0) return;
-    console.log(`snapshot failed (${code}), next try in an hour`);
-    lastSnapshot = 0;
-  });
-}
-if (process.env.CUSTOCK_SNAPSHOTS !== 'off') {
-  // the first one ten minutes after boot, then once a day
-  setTimeout(snapshot, 10 * 60 * 1000).unref();
-  setInterval(snapshot, 60 * 60 * 1000).unref();
-}
