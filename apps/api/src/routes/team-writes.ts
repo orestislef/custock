@@ -19,6 +19,8 @@ import { permsChanged } from '../lib/notify';
 import { ApiProblem, badRequest, forbidden, notFound } from '../lib/problem';
 import { clampLimit, decodeCursor, page, parseJson, platform, Tenant } from '../lib/tenant';
 import { devOutboxTransport } from '../lib/transport';
+import { emailMessage } from '../lib/transport';
+import { inviteEmail } from '../email/messages';
 import { loadRoles } from './team';
 import { loadShops, orgSettings } from './org';
 import { addShop, BootstrapError } from '../services/bootstrap';
@@ -83,7 +85,7 @@ function ownerUserIds(c: Context<AppEnv>, exceptAssignment?: string, exceptMembe
 
 interface OpenInvite {
   id: string; org_id: string; email: string; role_id: string; scope_type: string; scope_id: string;
-  expires_at: number; invited_by: string; locale: string | null;
+  expires_at: number; invited_by: string | null; locale: string | null;
 }
 
 // an invite that can still be used, or 410
@@ -123,6 +125,8 @@ function claimInvite(db: Db, inv: OpenInvite, user: { id: string; name: string }
     bumpPerms(t, [m.id]);
     audit(t, { id: user.id }, 'invite.accepted', { type: 'invite', id: inv.id }, null, null, now);
   })();
+  // the first owner was invited by the server setup, there is nobody to tell
+  if (!inv.invited_by) return;
   const orgName = t.get<{ name: string }>('SELECT name FROM organizations WHERE id = @org')!.name;
   const inviter = platform(db).get<{ locale: string }>('SELECT locale FROM users WHERE id = @id', { id: inv.invited_by });
   const tr = translator(pickLocale(inviter?.locale), 'server');
@@ -144,7 +148,7 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
   app.get('/v1/orgs/:org/invites', (c) => {
     need(c, 'members.invite');
     const { t, assignments, topology } = orgOf(c);
-    const rows = t.all<{ id: string; email: string; role_id: string; role_name: string; scope_type: 'org' | 'group' | 'shop'; scope_id: string; invited_by: string; created_at: number; expires_at: number }>(
+    const rows = t.all<{ id: string; email: string; role_id: string; role_name: string; scope_type: 'org' | 'group' | 'shop'; scope_id: string; invited_by: string | null; created_at: number; expires_at: number }>(
       `SELECT i.id, i.email, i.role_id, r.name AS role_name, i.scope_type, i.scope_id, i.invited_by, i.created_at, i.expires_at
          FROM invites i JOIN roles r ON r.id = i.role_id
         WHERE i.org_id = @org AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > @now ORDER BY i.created_at DESC`,
@@ -174,12 +178,11 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
         { id, email, role: role.id, st: input.scopeType, sid: input.scopeId, hash: sha256(token), locale: input.locale, u: c.get('user').id, now, exp: now + INVITE_TTL },
       );
       const url = `${cfgOf(c).publicWebUrl.replace(/\/$/, '')}/invite/${token}`;
-      const tr = translator(pickLocale(input.locale), 'server');
       const commonRole = translator(pickLocale(input.locale), 'common');
       const scopeName = input.scopeType === 'org' ? org.name : input.scopeType === 'group' ? groupNames[input.scopeId] ?? '' : shopNames[input.scopeId] ?? '';
       const roleLabel = role.template_key ? commonRole(`role.${role.template_key}`) : role.name;
       const params = { inviter: c.get('user').displayName ?? '', org: org.name, role: roleLabel, scope: scopeName, url };
-      devOutboxTransport(cfgOf(c).db).send({ channel: 'email', orgId: org.id, to: email, locale: input.locale, title: tr('email.invite.subject', params), body: tr('email.invite.body', params), payload: { type: 'invite', inviteId: id } });
+      devOutboxTransport(cfgOf(c).db).send(emailMessage(inviteEmail(input.locale, params), { orgId: org.id, to: email, locale: input.locale, payload: { type: 'invite', inviteId: id } }));
       audit(t, { id: c.get('user').id }, 'invite.sent', { type: 'invite', id }, null, { email, roleId: role.id, scopeType: input.scopeType, scopeId: input.scopeId }, now);
       // the link always comes back so it can be shared by hand while mail is not live
       const body: InviteCreated = { id, link: url, emailed: !!cfgOf(c).sending?.email, ...(cfgOf(c).dev ? { devLink: url } : {}) };

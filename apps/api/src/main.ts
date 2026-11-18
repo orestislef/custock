@@ -12,6 +12,7 @@ import { DEFAULT_DB_PATH, hashPassword, migrate, openDb, rebuildSearch, seed } f
 import { createApp } from './app';
 import { createLiveSender, liveChannels, type LiveSender } from './lib/live';
 import { newVapidKeys, vapidProblems } from './lib/webpush';
+import { storageFromEnv } from './lib/storage';
 import type { Config } from './types';
 import { startWorker } from './worker';
 
@@ -83,6 +84,12 @@ const internalKey = env.CUSTOCK_INTERNAL_KEY || undefined;
 if (internalKey && internalKey.length < 32) fail('CUSTOCK_INTERNAL_KEY must be at least 32 characters');
 
 const dbPath = env.CUSTOCK_DB ?? DEFAULT_DB_PATH;
+const uploadDir = env.CUSTOCK_UPLOAD_DIR ?? join(dirname(dbPath), 'uploads');
+
+// where photos go: an S3 compatible bucket (R2 or AWS), local files (dev, or on purpose), or nowhere
+const storage = storageFromEnv(env, dev, uploadDir);
+if (storage.problems.length) fail(`photo storage refused:\n  ${storage.problems.join('\n  ')}`);
+console.log(storage.line);
 const fresh = !existsSync(dbPath);
 const db = openDb(dbPath);
 migrate(db);
@@ -111,12 +118,14 @@ const app = createApp({
   trustedProxy: env.CUSTOCK_TRUSTED_PROXY === '1',
   turnstileSecret: env.CUSTOCK_TURNSTILE_SECRET,
   apiPublicUrl: env.CUSTOCK_API_URL ?? `http://localhost:${port}`,
-  uploadDir: env.CUSTOCK_UPLOAD_DIR ?? join(dirname(dbPath), 'uploads'),
+  uploadDir,
+  storage: storage.setting,
   auth,
   sending,
   turnstileOff,
   vapidPublicKey,
   internalKey,
+  ownDomains: (env.CUSTOCK_OWN_DOMAINS ?? '').split(',').map((x) => x.trim()).filter(Boolean),
 });
 
 const stopWorker =

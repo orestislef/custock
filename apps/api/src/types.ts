@@ -3,6 +3,7 @@ import type { AppLocale } from '@custock/i18n';
 import type { Db } from '@custock/db';
 import type { Tenant } from './lib/tenant';
 import type { ExternalAuth } from './lib/external-auth';
+import type { PhotoStore, StorageSetting } from './lib/storage';
 
 export interface Config {
   db: Db;
@@ -34,6 +35,12 @@ export interface Config {
   vapidPublicKey?: string;
   // shared with the web server in the same container: with it, X-Custock-Client-Ip is trusted
   internalKey?: string;
+  // more hosts our shelf qr codes may point at, besides the host of publicWebUrl (CUSTOCK_OWN_DOMAINS)
+  ownDomains?: string[];
+  // where photos go: local (the default, dev and tests), s3 (R2 or AWS) or off
+  storage?: StorageSetting;
+  // tests hand in their own store, so nothing ever calls a real bucket
+  photoStore?: PhotoStore;
 }
 
 export interface AuthUser {

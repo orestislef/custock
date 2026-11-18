@@ -388,3 +388,25 @@ describe('production from nothing', () => {
     expect((db.prepare('SELECT ip FROM join_confirmations ORDER BY rowid DESC LIMIT 1').get() as Json).ip).not.toBe('198.51.100.9');
   });
 });
+
+// ---------------------------------------------------------------- small contract additions
+
+describe('org slug on join pages, own shelf codes from the web address', () => {
+  it('the join page and the confirmation name the business slug', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seed(db, { passwordHash: hashPassword('custock'), now: clock });
+    const app = createApp({ db, dev: true, jwtSecret: SECRET, publicWebUrl: 'https://orestislef.gr/custock', corsOrigins: [], now: () => clock, rateLimit: false });
+    const call = caller(() => app);
+    expect((await call('GET', '/v1/public/join/kif7q2')).body.orgSlug).toBe('lemoni');
+    const join = await call('POST', '/v1/public/join/kif7q2', undefined, { name: 'Lia', email: 'lia@example.com', locale: 'en', emailNews: true, push: false, over15: true });
+    const token = join.body.devConfirmLink.split('/').pop();
+    expect((await call('POST', '/v1/public/confirm', undefined, { token })).body).toMatchObject({ orgName: 'Lemoni', orgSlug: 'lemoni' });
+    // a shelf qr printed with this server's address scans as the product inside
+    const scan = await call('POST', `/v1/orgs/${(db.prepare("SELECT id FROM organizations WHERE slug = 'lemoni'").get() as Json).id}/scan`,
+      (await call('POST', '/v1/auth/login', undefined, { email: 'maria@example.com', password: 'custock' })).body.accessToken,
+      { code: 'https://orestislef.gr/custock/p/5200044170102' });
+    expect(scan.status).toBe(200);
+    expect(scan.body).toMatchObject({ kind: 'gtin', codeNorm: '05200044170102' });
+  });
+});

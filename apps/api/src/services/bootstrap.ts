@@ -2,9 +2,11 @@
 // on a production server, where there is no seed data and no dev login. also new shops.
 
 import { DEFAULT_ROLES, normalize, transliterate, uuidv7 } from '@custock/core';
-import type { Db } from '@custock/db';
+import { randomToken, sha256, type Db } from '@custock/db';
 import { audit, bumpPerms } from '../lib/audit';
 import { platform, Tenant } from '../lib/tenant';
+import { devOutboxTransport, emailMessage } from '../lib/transport';
+import { ownerInviteEmail } from '../email/messages';
 
 export const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 
@@ -17,8 +19,12 @@ export interface NewBusiness {
   name: string;
   slug: string;
   ownerEmail: string;
-  ownerName: string;
-  passwordHash: string;
+  // with a password the owner account is made now. without one the owner gets an invite link
+  // (emailed when mail is live) and sets name and password themselves
+  ownerName?: string;
+  passwordHash?: string;
+  // where the invite link points, CUSTOCK_PUBLIC_WEB_URL
+  webUrl?: string;
   shopName?: string;
   locale?: 'en' | 'el' | 'ru';
   currency?: string;
@@ -29,19 +35,25 @@ export interface NewBusiness {
 
 export class BootstrapError extends Error {}
 
-export function createBusiness(db: Db, b: NewBusiness): { orgId: string; userId: string; shopId: string | null } {
+export const OWNER_INVITE_TTL = 14 * 86_400_000;
+
+export function createBusiness(db: Db, b: NewBusiness): { orgId: string; userId: string | null; shopId: string | null; inviteUrl: string | null } {
   const now = b.now ?? Date.now();
   const p = platform(db);
   const email = b.ownerEmail.trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new BootstrapError(`not an email: ${b.ownerEmail}`);
   if (!SLUG.test(b.slug)) throw new BootstrapError(`slug must be lowercase letters, digits and dashes: ${b.slug}`);
   if (!b.name.trim()) throw new BootstrapError('the business needs a name');
-  if (!b.ownerName.trim()) throw new BootstrapError('the owner needs a name');
-  if (p.get('SELECT 1 FROM users WHERE email = @e', { e: email })) throw new BootstrapError(`${email} already has an account`);
+  const invite = !b.passwordHash;
+  if (!invite && !b.ownerName?.trim()) throw new BootstrapError('the owner needs a name');
+  if (invite && !b.webUrl) throw new BootstrapError('the invite link needs CUSTOCK_PUBLIC_WEB_URL');
+  // an existing account can still be invited: it signs in and accepts
+  if (!invite && p.get('SELECT 1 FROM users WHERE email = @e', { e: email })) throw new BootstrapError(`${email} already has an account`);
   if (p.get('SELECT 1 FROM organizations WHERE slug = @s', { s: b.slug })) throw new BootstrapError(`the slug ${b.slug} is taken`);
   const orgId = uuidv7(now);
-  const userId = uuidv7(now);
+  const userId = invite ? null : uuidv7(now);
   let shopId: string | null = null;
+  let inviteUrl: string | null = null;
   db.transaction(() => {
     p.run(
       `INSERT INTO organizations (id, name, slug, country, currency, timezone, default_locale, created_at)
@@ -59,23 +71,49 @@ export function createBusiness(db: Db, b: NewBusiness): { orgId: string; userId:
       );
       for (const perm of r.permissions) p.run('INSERT INTO role_permissions (role_id, permission) VALUES (@r, @p)', { r: rid, p: perm });
     }
-    p.run(
-      `INSERT INTO users (id, email, display_name, password_hash, email_verified_at, locale, created_at, updated_at)
-       VALUES (@id, @e, @n, @h, NULL, @l, @now, @now)`,
-      { id: userId, e: email, n: b.ownerName.trim(), h: b.passwordHash, l: b.locale ?? 'el', now },
-    );
     const t = new Tenant(db, orgId);
-    const mid = uuidv7(now);
-    t.run("INSERT INTO memberships (id, org_id, user_id, status, perms_version, joined_at) VALUES (@id, @org, @u, 'active', 1, @now)", { id: mid, u: userId, now });
-    t.run(
-      `INSERT INTO role_assignments (id, org_id, membership_id, role_id, scope_type, scope_id, granted_by, created_at)
-       VALUES (@id, @org, @m, @r, 'org', @org, NULL, @now)`,
-      { id: uuidv7(now), m: mid, r: roleIds.owner!, now },
-    );
+    if (userId) {
+      p.run(
+        `INSERT INTO users (id, email, display_name, password_hash, email_verified_at, locale, created_at, updated_at)
+         VALUES (@id, @e, @n, @h, NULL, @l, @now, @now)`,
+        { id: userId, e: email, n: b.ownerName!.trim(), h: b.passwordHash!, l: b.locale ?? 'el', now },
+      );
+      const mid = uuidv7(now);
+      t.run("INSERT INTO memberships (id, org_id, user_id, status, perms_version, joined_at) VALUES (@id, @org, @u, 'active', 1, @now)", { id: mid, u: userId, now });
+      t.run(
+        `INSERT INTO role_assignments (id, org_id, membership_id, role_id, scope_type, scope_id, granted_by, created_at)
+         VALUES (@id, @org, @m, @r, 'org', @org, NULL, @now)`,
+        { id: uuidv7(now), m: mid, r: roleIds.owner!, now },
+      );
+    }
     audit(t, { id: userId, kind: 'system' }, 'org.created', { type: 'org', id: orgId }, null, { name: b.name, slug: b.slug, owner: email }, now);
     if (b.shopName?.trim()) shopId = addShop(db, orgId, { name: b.shopName }, { id: userId, kind: 'system' }, now).id;
+    if (invite) inviteUrl = inviteOwner(db, orgId, email, b.locale ?? 'el', b.webUrl!, now).url;
   })();
-  return { orgId, userId, shopId };
+  return { orgId, userId, shopId, inviteUrl };
+}
+
+// an owner invite from the server setup: no inviter, so no rank or delegation checks apply. the
+// link is emailed (it waits in the outbox until mail is live) and returned for the console.
+export function inviteOwner(db: Db, orgId: string, email: string, locale: 'en' | 'el' | 'ru', webUrl: string, now = Date.now()): { id: string; url: string } {
+  const t = new Tenant(db, orgId);
+  const org = t.get<{ name: string }>('SELECT name FROM organizations WHERE id = @org');
+  const role = t.get<{ id: string }>("SELECT id FROM roles WHERE org_id = @org AND template_key = 'owner'");
+  if (!org || !role) throw new BootstrapError('no such business');
+  const address = email.trim().toLowerCase();
+  // an older owner invite for the same address stops working
+  t.run('UPDATE invites SET revoked_at = @now WHERE org_id = @org AND email = @e AND role_id = @r AND accepted_at IS NULL AND revoked_at IS NULL', { now, e: address, r: role.id });
+  const token = randomToken();
+  const id = uuidv7(now);
+  t.run(
+    `INSERT INTO invites (id, org_id, email, role_id, scope_type, scope_id, token_hash, locale, invited_by, created_at, expires_at)
+     VALUES (@id, @org, @e, @r, 'org', @org, @h, @l, NULL, @now, @exp)`,
+    { id, e: address, r: role.id, h: sha256(token), l: locale, now, exp: now + OWNER_INVITE_TTL },
+  );
+  const url = `${webUrl.replace(/\/$/, '')}/invite/${token}`;
+  devOutboxTransport(db, () => {}).send(emailMessage(ownerInviteEmail(locale, { org: org.name, url }), { orgId, to: address, locale, payload: { type: 'invite', inviteId: id } }));
+  audit(t, { id: null, kind: 'system' }, 'invite.sent', { type: 'invite', id }, null, { email: address, role: 'owner' }, now);
+  return { id, url };
 }
 
 export interface NewShop {

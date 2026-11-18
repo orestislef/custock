@@ -21,6 +21,9 @@ Environment:
 | `CUSTOCK_UNSUB_SECRET` | derived from the jwt secret | key for unsubscribe links |
 | `CUSTOCK_TURNSTILE_SECRET` | none | bot check secret for join pages. outside dev, public signups are refused without it |
 | `CUSTOCK_TURNSTILE` | `on` | `off` takes public signups without the bot check, on purpose and logged loudly at startup. rate limits still apply |
+| `CUSTOCK_STORAGE` | `local` in dev, off on a server | `s3` (R2 or AWS, needs the `CUSTOCK_S3_*` settings below), or `local` for files under `CUSTOCK_UPLOAD_DIR`. see photos and uploads |
+| `CUSTOCK_S3_BUCKET`, `CUSTOCK_S3_REGION`, `CUSTOCK_S3_ENDPOINT`, `CUSTOCK_S3_ACCESS_KEY_ID`, `CUSTOCK_S3_SECRET_ACCESS_KEY`, `CUSTOCK_S3_PUBLIC_URL` | | the photo bucket. any of them set means s3, and then all but the endpoint are needed |
+| `CUSTOCK_OWN_DOMAINS` | | more hosts our shelf QR codes may point at, comma separated. the host of `CUSTOCK_PUBLIC_WEB_URL` always counts |
 | `CUSTOCK_INTERNAL_KEY` | none | 32+ random characters shared with the web server in the same container. with it, the web passes the visitor's address in `X-Custock-Client-Ip` for rate limits and consent records |
 | `CUSTOCK_TRUSTED_PROXY` | off | `1` when the api sits behind our own reverse proxy: the rightmost `X-Forwarded-For` hop is the client. otherwise the socket address is used |
 | `CUSTOCK_SEED` | off | `1` seeds the made up Lemoni business into a new database. dev always does. outside dev it needs `CUSTOCK_SEED_PASSWORD` |
@@ -48,13 +51,22 @@ line, in the container:
 
 ```
 docker exec -it custock node --import tsx apps/api/src/cli.ts create-business \
-  --name "Lemoni" --slug lemoni --owner-email eleni@example.com --owner-name "Eleni" --shop "Kifisia"
+  --name "Lemoni" --slug lemoni --owner-email eleni@example.com --shop "Kifisia"
+docker exec -it custock node --import tsx apps/api/src/cli.ts invite-owner --org lemoni --email eleni@example.com
 docker exec -it custock node --import tsx apps/api/src/cli.ts add-shop --org lemoni --name "Marousi"
 docker exec -it custock node --import tsx apps/api/src/cli.ts set-password --email eleni@example.com
 ```
 
-The password comes from `CUSTOCK_NEW_PASSWORD`, or from stdin with `--password-stdin`, otherwise a
-random one is printed once. `create-business` refuses an email that already has an account.
+`create-business` makes the owner one of two ways:
+
+- `--invite`, the default when mail is live: no password is made or mailed. The owner gets a "Your
+  Custock is ready" email with a link (the link is printed too), opens it, sets a name and password
+  and is the owner. The link works for 14 days and once, `invite-owner` makes a fresh one and the old
+  one stops working. An email that already has an account signs in and accepts instead.
+- `--set-password`, the default otherwise: the account is made now with `--owner-name`. The password
+  comes from `CUSTOCK_NEW_PASSWORD`, or from stdin with `--password-stdin`, otherwise a random one is
+  printed once. It refuses an email that already has an account.
+
 `set-password` signs the person out everywhere. Locally: `pnpm --filter @custock/api cli <command> ...`.
 
 The owner then invites the team from the admin. While mail is not live the invite comes back with
@@ -63,6 +75,26 @@ its link to share by hand. A new person opens it, sets a name and password and i
 Customers need mail: joining from a QR code ends with a confirmation email (double opt in), and the
 customer sign in is a code by email. Until `CUSTOCK_SMTP_URL` is live those emails wait in the
 outbox. The join page also needs `CUSTOCK_TURNSTILE_SECRET`, or `CUSTOCK_TURNSTILE=off`.
+
+## emails
+
+Every email has an html part that looks like the app and a plain text part with the same words:
+the sign in code, the join confirmation (double opt in), staff invites, the first owner's "Your
+Custock is ready", the email change code and notice, posts and offers (title, text, cover, linked
+products with price, and for offers the lowest price of the last 30 days), and back in stock.
+Staff alerts (low stock, approvals, counts, transfers) are push only.
+
+The layout is in `src/email/layout.ts`, one builder per message in `src/email/messages.ts`, texts
+under `email.*` in the server translations, sent in the reader's language. It is email safe on
+purpose: tables and inline styles, 600 px at most, a dark version for Apple Mail and Outlook.com,
+a preheader, no scripts and no tracking pixels. The Custock mark and the Commissioner font are
+served by the api at `/email/mark.png` and `/email/commissioner-*.woff2` under `CUSTOCK_API_URL`,
+so that address must be public. Posts carry `List-Unsubscribe` and `List-Unsubscribe-Post`
+(RFC 8058) and the unsubscribe link in the footer.
+
+In dev, `GET /v1/dev/emails` lists every template, and `/v1/dev/emails/<kind>?locale=el&scheme=dark`
+shows one (`format=text` for the text part), with made up content. `pnpm --filter @custock/api
+email-shots` saves phone width screenshots of all of them to `screenshots/email/`.
 
 ## dev logins
 
@@ -189,10 +221,51 @@ What a message carries:
 ## photos and uploads
 
 `POST /orgs/{org}/uploads/presign` with `{ purpose, mime, bytes }` returns a signed upload slot:
-jpeg, png or webp, up to 5 MB, valid 10 minutes, needs the permission of the thing it is for. In
-dev the api stores the file under `CUSTOCK_UPLOAD_DIR` after checking the size, the type and the
-first bytes, and serves it at `/files/uploads/<org>/<file>`. Use that url in `imageUrls`. Outside
-dev the endpoint answers 501 until object storage (R2) is wired; the response shape stays the same.
+jpeg, png or webp, up to 5 MB, valid 10 minutes, needs the permission of the thing it is for. The
+browser PUTs the file to `uploadUrl` with exactly the `headers` it got, then uses `publicUrl` in
+`imageUrls` or `coverUrl`. Where the file goes depends on `CUSTOCK_STORAGE`, one line at startup says
+which:
+
+- `s3`: an S3 compatible bucket, Cloudflare R2 or AWS S3. `uploadUrl` is a SigV4 presigned PUT
+  straight to the bucket (signed here with node crypto, no sdk), with the content type, the exact
+  length and a long cache header signed in, so the bucket refuses anything else. Keys look like
+  `orgs/<org>/products/<uuid>.webp`, `publicUrl` is `CUSTOCK_S3_PUBLIC_URL` plus the key. A photo
+  taken off a product that nothing else uses is deleted from the bucket, best effort.
+- `local`: the api checks the size, the type and the first bytes, keeps the file under
+  `CUSTOCK_UPLOAD_DIR` and serves it at `/files/uploads/<org>/<file>` with a one year cache. The
+  default in dev and tests. A server only uses it with `CUSTOCK_STORAGE=local` set on purpose.
+- off: a server with no bucket settings and no `CUSTOCK_STORAGE` answers 501 to presign, so photos
+  never end up on its disk by accident.
+
+A bucket setting with some values missing stops the server at startup.
+
+Setting up the bucket:
+
+| | Cloudflare R2 | AWS S3 |
+|---|---|---|
+| `CUSTOCK_S3_BUCKET` | the bucket name | the bucket name |
+| `CUSTOCK_S3_REGION` | `auto` | the bucket region, for example `eu-central-1` |
+| `CUSTOCK_S3_ENDPOINT` | `https://<account id>.r2.cloudflarestorage.com` | empty |
+| `CUSTOCK_S3_ACCESS_KEY_ID`, `CUSTOCK_S3_SECRET_ACCESS_KEY` | an R2 API token with Object Read and Write on this bucket | an IAM user allowed `s3:PutObject` and `s3:DeleteObject` on `arn:aws:s3:::<bucket>/orgs/*` |
+| `CUSTOCK_S3_PUBLIC_URL` | the bucket's public address: the `https://pub-<id>.r2.dev` url, or better a custom domain like `https://img.example.com` | `https://<bucket>.s3.<region>.amazonaws.com`, or a CloudFront address |
+| public reads | bucket settings, Public access: turn on the r2.dev subdomain or connect a custom domain | turn off "Block public access" for bucket policies, then a bucket policy allowing `s3:GetObject` to everyone on `arn:aws:s3:::<bucket>/orgs/*` |
+
+The browser uploads straight to the bucket, so the bucket needs a CORS rule for the web's origin. The
+same JSON works on R2 (bucket settings, CORS policy) and on AWS (Permissions, CORS):
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://orestislef.gr"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["content-type", "cache-control"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Reads need no CORS, they are plain image loads. Keep exports and anything private out of this
+bucket, it is public by design.
 
 Products take the full list of `variants` (sku, options, price, cost, barcodes) and `imageUrls`
 on create and update. Variants left out are archived when they have history and deleted when they

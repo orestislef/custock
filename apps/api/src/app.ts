@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { bodyLimit } from 'hono/body-limit';
 import { ZodError } from 'zod';
-import { uuidv7 } from '@custock/core';
+import { ownDomainsFor, setOwnDomains, uuidv7 } from '@custock/core';
 import type { AppEnv, Config } from './types';
 import { localeMiddleware, orgContext, requireAuth } from './lib/context';
 import { ApiProblem } from './lib/problem';
@@ -23,9 +23,11 @@ import { devRoutes } from './routes/dev';
 import { stockExtraRoutes } from './routes/stock-extra';
 import { MAX_UPLOAD_BYTES, uploadRoutes } from './routes/uploads';
 import { buildOpenApi } from './openapi';
-import { setFileBase } from './services/catalog';
+import { setBucketBase, setFileBase } from './services/catalog';
 import { setWebBase } from './lib/webpush';
 import { pushRoutes } from './routes/push';
+import { emailRoutes } from './routes/email';
+import { setEmailAssetBase } from './email/layout';
 
 export function createApp(cfg: Config) {
   const app = new Hono<AppEnv>();
@@ -52,7 +54,11 @@ export function createApp(cfg: Config) {
   const uploadLimit = bodyLimit({ maxSize: MAX_UPLOAD_BYTES, onError: tooLarge });
   app.use('*', (c, next) => (c.req.path.startsWith('/v1/uploads/') ? uploadLimit(c, next) : jsonLimit(c, next)));
   setFileBase(cfg.apiPublicUrl);
+  setEmailAssetBase(cfg.apiPublicUrl);
+  setBucketBase(cfg.storage?.kind === 's3' ? cfg.storage.s3.publicUrl : null);
   setWebBase(cfg.publicWebUrl);
+  // shelf qr codes printed with our own web address scan as the product inside them
+  setOwnDomains(ownDomainsFor(cfg.publicWebUrl, ...(cfg.ownDomains ?? [])));
   app.use('*', localeMiddleware);
 
   app.get('/health', (c) => c.json({ ok: true, name: 'custock-api' }));
@@ -75,6 +81,7 @@ export function createApp(cfg: Config) {
   teamWriteRoutes(app);
   peopleWriteRoutes(app);
   devRoutes(app);
+  emailRoutes(app);
   stockExtraRoutes(app);
   uploadRoutes(app);
   pushRoutes(app);

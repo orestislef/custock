@@ -1,18 +1,25 @@
 // server side setup for a production database, where there is no seed data and no dev login.
 //
 //   node --import tsx apps/api/src/cli.ts create-business --name "Lemoni" --slug lemoni \
-//        --owner-email eleni@example.com --owner-name "Eleni P" [--shop "Kifisia"] [--locale el]
+//        --owner-email eleni@example.com [--owner-name "Eleni P"] [--shop "Kifisia"] [--locale el] [--invite | --set-password]
+//   node --import tsx apps/api/src/cli.ts invite-owner --org lemoni --email eleni@example.com [--locale el]
 //   node --import tsx apps/api/src/cli.ts add-shop --org lemoni --name "Marousi" [--city ...]
 //   node --import tsx apps/api/src/cli.ts set-password --email eleni@example.com
 //
-// the password comes from CUSTOCK_NEW_PASSWORD, or from stdin with --password-stdin, otherwise a
-// random one is made and printed once. in docker: docker exec -it custock node --import tsx apps/api/src/cli.ts ...
+// create-business makes the owner one of two ways. --invite (the default when mail is live): an
+// owner invite, emailed and printed, and the owner sets name and password from the link.
+// --set-password (the default otherwise): the account is made now, the password comes from
+// CUSTOCK_NEW_PASSWORD, or from stdin with --password-stdin, otherwise a random one is printed once.
+// in docker: docker exec -it custock node --import tsx apps/api/src/cli.ts ...
 // the database is CUSTOCK_DB (the same file the api uses).
 
 import { randomBytes } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { DEFAULT_DB_PATH, hashPassword, migrate, openDb, type Db } from '@custock/db';
+import { setEmailAssetBase } from './email/layout';
+import { liveChannels } from './lib/live';
 import { platform } from './lib/tenant';
-import { addShop, BootstrapError, createBusiness } from './services/bootstrap';
+import { addShop, BootstrapError, createBusiness, inviteOwner } from './services/bootstrap';
 
 export const MIN_PASSWORD = 10;
 
@@ -63,24 +70,65 @@ function str(flags: Record<string, string | true>, key: string, required = true)
   return undefined;
 }
 
+// mail really leaves this server: live transport, the yes, and a complete smtp setting
+export function mailIsLive(env: Record<string, string | undefined>): boolean {
+  if (env.CUSTOCK_TRANSPORT !== 'live') return false;
+  const r = liveChannels(env as NodeJS.ProcessEnv, existsSync);
+  return !r.problems.length && !!r.channels.smtp;
+}
+
+function localeFlag(flags: Record<string, string | true>): 'en' | 'el' | 'ru' {
+  const locale = str(flags, 'locale', false) ?? 'el';
+  if (!['en', 'el', 'ru'].includes(locale)) throw new BootstrapError('--locale is en, el or ru');
+  return locale as 'en' | 'el' | 'ru';
+}
+
+function printInvite(io: CliIo, email: string, url: string) {
+  const live = mailIsLive(io.env);
+  io.out(`owner invite for ${email}: ${url}`);
+  io.out(live ? 'emailed now. the link works for 14 days and once.' : 'mail is not live, so share the link by hand. it works for 14 days and once.');
+}
+
 export async function runCli(db: Db, argv: string[], io: CliIo): Promise<number> {
   const { command, flags } = parseArgs(argv);
+  setEmailAssetBase(io.env.CUSTOCK_API_URL);
   switch (command) {
     case 'create-business': {
-      const locale = str(flags, 'locale', false) ?? 'el';
-      if (!['en', 'el', 'ru'].includes(locale)) throw new BootstrapError('--locale is en, el or ru');
+      const locale = localeFlag(flags);
       const name = str(flags, 'name')!;
       const slug = str(flags, 'slug')!;
       const ownerEmail = str(flags, 'owner-email')!;
+      if (flags.invite && flags['set-password']) throw new BootstrapError('--invite or --set-password, not both');
+      const invite = flags.invite ? true : flags['set-password'] ? false : mailIsLive(io.env);
+      const common = {
+        name, slug, ownerEmail, shopName: str(flags, 'shop', false), locale,
+        currency: str(flags, 'currency', false), timezone: str(flags, 'timezone', false), country: str(flags, 'country', false),
+      };
+      if (invite) {
+        const webUrl = io.env.CUSTOCK_PUBLIC_WEB_URL;
+        if (!webUrl) throw new BootstrapError('the invite link needs CUSTOCK_PUBLIC_WEB_URL');
+        const r = createBusiness(db, { ...common, webUrl });
+        io.out(`created ${name} (${slug}), org ${r.orgId}${r.shopId ? `, first shop ${r.shopId}` : ''}`);
+        printInvite(io, ownerEmail.toLowerCase(), r.inviteUrl!);
+        return 0;
+      }
       const ownerName = str(flags, 'owner-name')!;
       const { password, generated } = await passwordFrom(flags, io);
-      const r = createBusiness(db, {
-        name, slug, ownerEmail, ownerName, passwordHash: hashPassword(password), shopName: str(flags, 'shop', false),
-        locale: locale as 'en' | 'el' | 'ru', currency: str(flags, 'currency', false), timezone: str(flags, 'timezone', false), country: str(flags, 'country', false),
-      });
+      const r = createBusiness(db, { ...common, ownerName, passwordHash: hashPassword(password) });
       io.out(`created ${name} (${slug}), org ${r.orgId}${r.shopId ? `, first shop ${r.shopId}` : ''}`);
       io.out(`owner ${ownerEmail.toLowerCase()} can sign in at /admin`);
       if (generated) io.out(`password (shown once, change it after signing in): ${password}`);
+      return 0;
+    }
+    case 'invite-owner': {
+      const slug = str(flags, 'org')!;
+      const org = platform(db).get<{ id: string }>('SELECT id FROM organizations WHERE slug = @s', { s: slug });
+      if (!org) throw new BootstrapError(`no business with the slug ${slug}`);
+      const webUrl = io.env.CUSTOCK_PUBLIC_WEB_URL;
+      if (!webUrl) throw new BootstrapError('the invite link needs CUSTOCK_PUBLIC_WEB_URL');
+      const email = str(flags, 'email')!.toLowerCase();
+      const r = inviteOwner(db, org.id, email, localeFlag(flags), webUrl);
+      printInvite(io, email, r.url);
       return 0;
     }
     case 'add-shop': {
@@ -110,7 +158,7 @@ export async function runCli(db: Db, argv: string[], io: CliIo): Promise<number>
       return 0;
     }
     default:
-      io.out('commands: create-business, add-shop, set-password (see the top of apps/api/src/cli.ts)');
+      io.out('commands: create-business, invite-owner, add-shop, set-password (see the top of apps/api/src/cli.ts)');
       return command ? 2 : 0;
   }
 }
