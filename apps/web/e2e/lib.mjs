@@ -77,10 +77,13 @@ export async function ok(path, opts) {
 }
 
 const tokenCache = new Map();
+// a sign in is reused for 8 minutes, then made again: access tokens live 15 and a full run takes
+// longer, and pages that all refresh the same old token would end each other's sessions
 export async function login(email, password = cfg.password, { fresh = false } = {}) {
-  if (!fresh && tokenCache.has(email)) return tokenCache.get(email);
+  const hit = tokenCache.get(email);
+  if (!fresh && hit && Date.now() - hit.at < 8 * 60_000) return hit.t;
   const t = await ok('/v1/auth/login', { method: 'POST', body: { email, password } });
-  tokenCache.set(email, t);
+  tokenCache.set(email, { t, at: Date.now() });
   return t;
 }
 export const forget = (email) => tokenCache.delete(email);
@@ -182,7 +185,7 @@ export const pageProblems = [];
 const EXPECTED_FAIL = [/\/v1\/client-errors/, /favicon/, /\/v1\/push\/key/, /status=40[134]/];
 
 // a context like a desktop or a phone. ios gives an iphone safari user agent.
-export async function open(t, { device = 'desktop', ios = false, engine = 'chromium', locale = 'en', scheme = 'light', tokens = null, permissions = [], storage = {}, viewport = null } = {}) {
+export async function open(t, { device = 'desktop', ios = false, engine = 'chromium', locale = 'en', scheme = 'light', tokens = null, permissions = [], storage = {}, viewport = null, serviceWorkers = 'allow' } = {}) {
   const phone = device === 'phone';
   const b = engine === 'webkit' ? await webkitBrowser() : browser;
   const ctx = await b.newContext({
@@ -194,7 +197,8 @@ export async function open(t, { device = 'desktop', ios = false, engine = 'chrom
     colorScheme: scheme,
     locale,
     permissions,
-    serviceWorkers: 'allow',
+    // 'block' when a test reroutes the page's own requests (a service worker would answer them first)
+    serviceWorkers,
   });
   await ctx.addCookies([{ name: 'locale', value: locale, url: `http://localhost:${cfg.webPort}` }]);
   await ctx.addInitScript(({ tk, st }) => {

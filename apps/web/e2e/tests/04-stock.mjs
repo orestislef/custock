@@ -73,7 +73,7 @@ test('stock', 'receive into a chosen shop from the product page', async (t) => {
   eq(await onHand(st.variants[0], l.kifisia), 12, 'on hand in Kifisia after receiving 12');
 });
 
-test('stock', 'stock per shop lists every shop with the numbers from the ledger', async (t) => {
+test('stock', 'stock per shop lists every shop with the numbers from the movement history', async (t) => {
   const l = await lemoni();
   const page = await open(t, { tokens: await login(seed.owner) });
   await go(page, `/admin/stock/${st.productId}`);

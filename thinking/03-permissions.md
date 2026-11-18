@@ -19,7 +19,7 @@ Every permission key, at what level it works, and what the default roles get.
 | `org.settings.manage` | name, logo, colors, currency, timezone, default language, policies (negative stock, post approval) |
 | `org.billing.manage` | plan and invoices (later, if custock is sold) |
 | `org.audit.view` | the audit log of the whole org |
-| `org.support_access.manage` | let the platform admin in for support, for a limited time |
+| `org.support_access.manage` | kept for later. today the super admin reaches every business from the super admin area, so nothing uses it |
 | `shops.create` | add a shop |
 | `shops.archive` | close a shop. its history stays |
 | `groups.manage` | create groups, put shops in them |
@@ -118,6 +118,7 @@ edit its own admin, manager, staff and viewer roles. The owner role is locked.
 | permission | owner | admin | manager | staff | viewer |
 |------------|:-----:|:-----:|:-------:|:-----:|:------:|
 | org.settings.manage | x | x | | | |
+| settings.push | x | x | | | |
 | org.billing.manage | x | | | | |
 | org.audit.view | x | x | | | |
 | org.support_access.manage | x | | | | |
@@ -198,15 +199,17 @@ Notes on the defaults:
 |-----------|-------------------|
 | no permission for a whole area (no `reports.view`) | tab or menu item does not exist |
 | can see but not change (`products.view` without `products.edit`) | screen shows, edit buttons do not |
-| can change some fields but not others (edit product, no `products.price.edit`) | price shown as read only with a small lock and "set by admin" |
+| can change some fields but not others (edit product, no `products.price.edit`) | the price field is not in the form, nothing explains why |
 | sensitive data (no `products.cost.view`, no `customers.contact.view`) | not shown at all, or masked: `ma***@gmail.com`, `+30 69** *** 123` |
-| action exists but blocked right now (count waiting for approval) | button shown disabled with the reason |
+| action exists but blocked right now (count waiting for approval) | the state is shown ("waiting for approval"), the button is not |
 
-Rule of thumb: never show a button that will fail because of permissions.
+Rule of thumb: never show a button that will fail because of permissions, and never explain why
+something is missing. a business user never reads "you do not have permission", "read only" or
+"this feature is off". only the super admin sees the reasons.
 
 ## the roles editor
 
 - a list of permission groups with switches, in the user's language.
-- switches for permissions you do not have are shown but locked, with "you do not have this".
+- permissions you do not have yourself are not listed, so you cannot hand them out.
 - the rank slider stops below your own rank.
-- before saving an edit to a role in use: "this changes access for 7 people" with the list.
+- the save bar of a role in use says "this changes access for 7 people" and names them.

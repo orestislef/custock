@@ -8,20 +8,20 @@ the plan.
 | case | plan |
 |------|------|
 | a query forgets the `org_id` filter and leaks another business's data | repository layer builds the filter from the org context, raw sql outside it is not allowed, tests try cross org reads on every endpoint |
-| manager tries to give a permission they do not have | ceiling rule, server refuses. the app shows it locked with the reason |
+| manager tries to give a permission they do not have | ceiling rule, server refuses. the app does not offer what they cannot give |
 | two managers of one shop try to remove each other | rank rule, both refused. only someone above them can |
 | someone edits their own roles | refused, no self service |
 | the last owner tries to leave or delete their account | refused until ownership is transferred or the org is deleted |
-| a role loses a permission while 7 people are using the app | next request is refused, silent push makes the apps refresh, the editor warned "changes access for 7 people" before saving |
-| a member is removed while their app is open, with offline data on the phone | next sync gets 403, the app wipes that org's local data and shows "you no longer have access to Lemoni" |
+| a role loses a permission while 7 people are using the app | next request is refused, the stale permissions header makes the apps refresh, the editor's save bar says "changes access for 7 people" and names them |
+| a member is removed while their app is open, with offline data on the phone | next sync is refused and the business drops out of their list. stock work still waiting for it stops being tried and stays as not sent, other businesses still sync, a paused business keeps its work for later |
 | a shop moves out of a group | group managers lose that shop immediately. listed in the audit log |
-| a shop is archived | its stock history, assignments and join links stay but are inactive. its join links show "this shop is closed" with links to other shops of the org |
+| a shop is archived | not built yet, shops cannot be archived. when it comes: its stock history, assignments and join links stay but are inactive, its join links show "this shop is closed" with links to other shops of the org |
 | invite sent to an email that already has an account | the invite just adds the membership on accept |
 | invite sent to the wrong email | revoke it, the link stops working. single use, 7 days |
 | invited person signs up with a different email than the invite | refused, the invite is bound to that email. ask for a new invite |
 | person is staff at org A and customer at org A | two separate things. their staff role gives them no special view of their own customer record |
 | person works for two businesses | org switcher, each org fully separate, local data separate |
-| platform admin needs to look at an org's data for support | only with support access turned on by the org for a limited time, every action audit logged, banner in the org |
+| platform admin needs to look at an org's data for support | decided differently: the super admin has full access from the super admin area, there is no support access switch in the business |
 | custom role created by someone who later loses permissions | the role keeps its permissions, the creator can no longer edit it |
 
 ## catalog and barcodes
@@ -58,7 +58,7 @@ the plan.
 | transfer received at the wrong shop | the receiving shop must be the target. if goods ended up elsewhere, cancel and redo with a correction note |
 | stock flaps 0, 1, 0, 1 | back in stock alerts fire once per alert. low stock alerts once per dip |
 | a count correction takes stock from 0 to 3 | no back in stock push (only receive, transfer in and return trigger it) |
-| cached `stock_levels` drift from the ledger after a bug | nightly check rebuilds from the ledger and reports differences |
+| cached `stock_levels` drift from the ledger after a bug | nightly check rebuilds from the ledger and reports the count to the super admin error log |
 
 ## customers and consent
 
@@ -71,7 +71,7 @@ the plan.
 | someone signs up a friend's email | nothing is sent except the confirmation email. no confirmation, no marketing |
 | a customer changes their email | new email must be confirmed, consent moves with it, the old one gets a notice |
 | a customer asks to be deleted | erase: personal fields wiped, counts kept, notify me and favorites removed, logged |
-| a customer imported from an old excel list | stays pending until they confirm a "do you want to join?" email |
+| a customer imported from an old excel list | not built yet, there is no customer import. when it comes: stays pending until they confirm a "do you want to join?" email |
 | a minor signs up | the 15 or older box. if a shop sells to kids, the shop's own policy applies |
 | unsubscribe link clicked by an email security scanner | the GET only shows a page with a button, the one click header uses POST as the RFC says |
 | customer turned push off in the OS but on in the app | we cannot send, delivery skipped as `no_device`, the composer counts them under "no push" |
@@ -83,17 +83,17 @@ the plan.
 | case | plan |
 |------|------|
 | scheduled post across a DST change | stored in UTC, scheduled in the shop's timezone, shown in local time |
-| post goes to 5000 people and the server restarts mid send | deliveries are rows, the worker resumes from what is still queued |
+| post goes to 5000 people and the server restarts mid send | deliveries are rows, each message and its row are written in one step, and the worker sweeps what is still queued once a minute (also after a send bigger than one batch, or a lifted pause) |
 | manager cancels a post while it is sending | queued rows stop, sent ones are sent. the composer warned before publishing |
 | post edited after sending | feed and web page update, nothing is resent |
 | linked product goes out of stock during an offer | the card shows "out of stock" (if the merchant shows stock) and "notify me" |
-| linked product is archived | the card hides it. if no products left, the post still shows its text |
+| linked product is archived | customers' cards and emails leave it out, staff still see it on the post. if no products left, the post still shows its text |
 | a fake "was" price | not possible, the was price is computed from 30 days of price history |
-| offer price lower than cost | warning to the author if they can see cost, otherwise to the approver |
+| offer price lower than cost | the composer warns whoever can see cost. nobody else sees cost, so nobody else is warned |
 | a business sends 6 pushes in a day | cap 2 per customer per day, the rest go to the feed only |
 | push at 23:30 | held until 09:00 shop time |
 | posts in 3 languages, customer reads russian, post only in greek | they get greek (the org default). the composer showed "RU: 46 people" so the manager knew |
-| email bounces | hard bounce suppressed platform wide, soft bounces retried |
+| email bounces | a permanent refusal of the address (550 to 554 at the recipient) is suppressed platform wide and not tried again, temporary errors retried |
 | a customer marks the newsletter as spam | complaint suppressed platform wide, the org sees it in stats |
 | emails "from" the shop's own domain | not unless they set up DNS, otherwise DMARC fails. we send as "Lemoni Kifisia via Custock" |
 
@@ -116,7 +116,7 @@ the plan.
 | russian plurals (1 товар, 2 товара, 5 товаров) | ICU plurals with one, few, many, other |
 | strings 30 percent longer in russian or greek | layouts wrap, no fixed width buttons, test with the longest |
 | sqlite `lower()` does not fold greek or cyrillic | search key computed in our code |
-| CSV opened in greek excel | UTF-8 with BOM and semicolon delimiter for el and ru |
+| CSV opened in greek excel | not built yet, there is no CSV export. when it comes: UTF-8 with BOM and semicolon delimiter for el and ru |
 | PDF labels with greek or russian product names | fonts embedded in the PDF |
 
 ## offline and sync
@@ -125,7 +125,7 @@ the plan.
 |------|------|
 | scanning in a basement with no signal | outbox on the phone, "not synced yet" badge with the count |
 | permissions changed while offline | rejected movements listed with the reason, user hands them to a manager |
-| phone lost with offline data | sessions list, "log out everywhere", the server refuses its token, local data is encrypted at rest by the OS |
+| phone lost with offline data | the account sheet says how many other devices are signed in and signs them all out, the server refuses their tokens, local data is encrypted at rest by the OS |
 | two phones offline count the same shelf | both counts land in the same count session, lines add up, the reviewer sees both counters |
 
 ## platform
