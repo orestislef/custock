@@ -7,7 +7,7 @@ import * as schema from './schema';
 export { openDb, migrate, MIGRATIONS_DIR, hasFts5, hasSearchIndex, rebuildSearch, type Db } from './open';
 export { seed, type SeedResult } from './seed';
 export { seedBig, type SynthOptions, type SynthResult } from './synth';
-export { hashPassword, verifyPassword, burnPasswordCheck, sha256, randomToken } from './password';
+export { hashPassword, verifyPassword, burnPasswordCheck, hashPasswordAsync, verifyPasswordAsync, burnPasswordCheckAsync, sha256, randomToken } from './password';
 export { schema };
 
 export function orm(db: Db) {
