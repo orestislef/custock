@@ -1,6 +1,10 @@
 // runs the api and the web in one container. the web starts once the api answers, and when
 // either one exits the other is stopped too, so docker restarts the pair.
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+
+// the web passes the visitor's address to the api with this key. one per boot is enough
+process.env.CUSTOCK_INTERNAL_KEY ||= randomBytes(32).toString('hex');
 
 const children = [];
 let stopping = false;
