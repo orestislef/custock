@@ -1,34 +1,116 @@
 {
-  "app": { "name": "Custock", "tagline": "A clean blend of Customer and Stock" },
-  "action": {
-    "save": "Save", "cancel": "Cancel", "done": "Done", "undo": "Undo", "edit": "Edit", "delete": "Delete",
-    "close": "Close", "back": "Back", "search": "Search", "retry": "Try again", "more": "More", "next": "Next",
-    "add": "Add", "remove": "Remove", "confirm": "Confirm", "share": "Share", "print": "Print", "export": "Export",
-    "signIn": "Sign in", "signOut": "Sign out", "seeAll": "See all"
+  "app": {
+    "name": "Custock",
+    "tagline": "A clean blend of Customer and Stock"
   },
-  "time": { "now": "now", "today": "Today", "yesterday": "Yesterday" },
-  "role": { "owner": "Owner", "admin": "Admin", "manager": "Manager", "staff": "Staff", "viewer": "Viewer", "customer": "Customer" },
-  "scope": { "org": "Whole business", "group": "Group", "shop": "Shop", "allShops": "All shops" },
+  "action": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "done": "Done",
+    "undo": "Undo",
+    "edit": "Edit",
+    "delete": "Delete",
+    "close": "Close",
+    "back": "Back",
+    "search": "Search",
+    "retry": "Try again",
+    "more": "More",
+    "next": "Next",
+    "add": "Add",
+    "remove": "Remove",
+    "confirm": "Confirm",
+    "share": "Share",
+    "print": "Print",
+    "export": "Export",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "seeAll": "See all"
+  },
+  "time": {
+    "now": "now",
+    "today": "Today",
+    "yesterday": "Yesterday"
+  },
+  "role": {
+    "owner": "Owner",
+    "admin": "Admin",
+    "manager": "Manager",
+    "staff": "Staff",
+    "viewer": "Viewer",
+    "customer": "Customer",
+    "superadmin": "Super admin"
+  },
+  "scope": {
+    "org": "Whole business",
+    "group": "Group",
+    "shop": "Shop",
+    "allShops": "All shops"
+  },
   "stock": {
-    "in": "In stock", "few": "Only a few left", "out": "Out of stock", "negative": "Needs fixing", "onTheWay": "On the way",
+    "in": "In stock",
+    "few": "Only a few left",
+    "out": "Out of stock",
+    "negative": "Needs fixing",
+    "onTheWay": "On the way",
     "qtyInStock": "{{count}} in stock",
-    "waiting_one": "{{count}} person waiting", "waiting_other": "{{count}} people waiting",
-    "told_one": "{{count}} person told", "told_other": "{{count}} people told",
+    "waiting_one": "{{count}} person waiting",
+    "waiting_other": "{{count}} people waiting",
+    "told_one": "{{count}} person told",
+    "told_other": "{{count}} people told",
     "changesDuringDay": "Stock changes during the day"
   },
-  "uom": { "piece": "pcs", "kg": "kg", "l": "l", "m": "m" },
+  "uom": {
+    "piece": "pcs",
+    "kg": "kg",
+    "l": "l",
+    "m": "m"
+  },
   "movement": {
-    "initial": "Opening stock", "receive": "Received", "sale": "Sold", "return": "Returned", "adjust": "Adjusted",
-    "damage": "Damaged", "count": "Count difference", "transfer_out": "Sent to another shop", "transfer_in": "Arrived from another shop",
+    "initial": "Opening stock",
+    "receive": "Received",
+    "sale": "Sold",
+    "return": "Returned",
+    "adjust": "Adjusted",
+    "damage": "Damaged",
+    "count": "Count difference",
+    "transfer_out": "Sent to another shop",
+    "transfer_in": "Arrived from another shop",
     "reversal": "Undone"
   },
-  "reason": { "found": "Found", "lost": "Lost", "damaged": "Damaged", "expired": "Expired", "theft": "Theft", "own_use": "Own use", "correction": "Correction" },
-  "postKind": { "news": "News", "offer": "Offer", "new_arrival": "New arrival", "back_in_stock": "Back in stock", "event": "Event" },
-  "postStatus": { "draft": "Draft", "pending_approval": "Waiting for approval", "scheduled": "Scheduled", "sending": "Sending", "sent": "Sent", "cancelled": "Cancelled", "failed": "Failed" },
-  "channel": { "feed": "Feed", "push": "Push", "email": "Email", "sms": "SMS" },
+  "reason": {
+    "found": "Found",
+    "lost": "Lost",
+    "damaged": "Damaged",
+    "expired": "Expired",
+    "theft": "Theft",
+    "own_use": "Own use",
+    "correction": "Correction"
+  },
+  "postKind": {
+    "news": "News",
+    "offer": "Offer",
+    "new_arrival": "New arrival",
+    "back_in_stock": "Back in stock",
+    "event": "Event"
+  },
+  "postStatus": {
+    "draft": "Draft",
+    "pending_approval": "Waiting for approval",
+    "scheduled": "Scheduled",
+    "sending": "Sending",
+    "sent": "Sent",
+    "cancelled": "Cancelled",
+    "failed": "Failed"
+  },
+  "channel": {
+    "feed": "Feed",
+    "push": "Push",
+    "email": "Email",
+    "sms": "SMS"
+  },
   "error": {
     "unauthorized": "Please sign in again.",
-    "forbidden": "Your role does not allow this.",
+    "forbidden": "This is not available.",
     "not_found": "We could not find that.",
     "validation": "Some fields need a look.",
     "conflict": "Someone changed this a moment ago. Reload to see the latest.",
@@ -47,9 +129,25 @@
     "already_subscribed": "You already follow this shop.",
     "account_exists": "This email already has an account. Sign in to accept.",
     "internal": "Something went wrong on our side. Try again.",
-    "offline": "No signal. Your scans are saved and will sync when you are back online."
+    "offline": "No signal. Your scans are saved and will sync when you are back online.",
+    "feature_off": "This is switched off for your business.",
+    "org_suspended": "This business is paused right now.",
+    "limit_reached": "This business has reached a limit.",
+    "platform_paused": "This is paused for now. Try again later.",
+    "last_superadmin": "The last super admin cannot be removed.",
+    "storage_full": "Photos cannot be added right now. Everything already uploaded stays.",
+    "reset_expired": "This link no longer works. Ask for a new one."
   },
-  "permGroup": { "org": "Business", "team": "Team", "catalog": "Catalog", "prices": "Prices", "stock": "Stock", "customers": "Customers", "comms": "Posts and messages", "reports": "Reports" },
+  "permGroup": {
+    "org": "Business",
+    "team": "Team",
+    "catalog": "Catalog",
+    "prices": "Prices",
+    "stock": "Stock",
+    "customers": "Customers",
+    "comms": "Posts and messages",
+    "reports": "Reports"
+  },
   "perm": {
     "org.settings.manage": "Change business settings",
     "org.billing.manage": "Manage billing",
@@ -104,11 +202,7 @@
     "reports.staff.view": "See staff activity"
   },
   "why": {
-    "notYourShop": "Not one of your shops",
-    "setByAdmin": "Set by your admin",
-    "hiddenForRole": "Hidden for your role",
     "rankBelow": "You can give roles below {{role}}",
-    "youDoNotHave": "You do not have this",
     "askName": "Ask {{name}}"
   }
 }

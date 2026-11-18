@@ -36,3 +36,60 @@ export async function uploadPhoto(api: CustockApi, orgId: string, file: File, pu
   if (!res.ok) throw Object.assign(new Error('upload'), { code: 'internal' });
   return slot.publicUrl;
 }
+
+// ---------------------------------------------------------------- squares: profile photos and logos
+
+const SQUARE = 512;
+
+// a profile photo fills the square (center crop). a logo fits inside it on a transparent
+// background, so a wide wordmark is never cut. photos go as webp, logos as png (the home screen
+// icon is drawn from it, and png keeps the transparency everywhere).
+async function square(file: File, mode: 'cover' | 'contain'): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement('canvas');
+  canvas.width = SQUARE;
+  canvas.height = SQUARE;
+  const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingQuality = 'high';
+  const { width: w, height: h } = bitmap;
+  if (mode === 'cover') {
+    const side = Math.min(w, h);
+    ctx.drawImage(bitmap, (w - side) / 2, (h - side) / 2, side, side, 0, 0, SQUARE, SQUARE);
+  } else {
+    const scale = Math.min(SQUARE / w, SQUARE / h);
+    const dw = Math.round(w * scale);
+    const dh = Math.round(h * scale);
+    ctx.drawImage(bitmap, 0, 0, w, h, (SQUARE - dw) / 2, (SQUARE - dh) / 2, dw, dh);
+  }
+  bitmap.close?.();
+  if (mode === 'contain') {
+    return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode'))), 'image/png'));
+  }
+  const webp = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/webp', 0.86));
+  if (webp && webp.type === 'image/webp') return webp;
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode'))), 'image/jpeg', 0.86));
+}
+
+async function put(slot: { uploadUrl: string; method: string; headers: Record<string, string> }, blob: Blob) {
+  const res = await fetch(sameOrigin(slot.uploadUrl), { method: slot.method, headers: slot.headers, body: blob });
+  if (!res.ok) throw Object.assign(new Error('upload'), { code: 'internal' });
+}
+
+// the person's own profile photo. returns the file id for updateMe({ avatarFileId })
+export async function uploadAvatar(api: CustockApi, file: File): Promise<{ fileId: string; url: string }> {
+  const blob = await square(file, 'cover');
+  if (apiMode === 'fixtures') return { fileId: 'local-avatar', url: URL.createObjectURL(blob) };
+  const mime = blob.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+  const slot = await api.presignAvatar({ mime, bytes: blob.size });
+  await put(slot, blob);
+  return { fileId: slot.fileId, url: slot.publicUrl };
+}
+
+// the business logo. returns the file id for updateOrgSettings({ logoFileId })
+export async function uploadLogo(api: CustockApi, orgId: string, file: File): Promise<{ fileId: string; url: string }> {
+  const blob = await square(file, 'contain');
+  if (apiMode === 'fixtures') return { fileId: 'local-logo', url: URL.createObjectURL(blob) };
+  const slot = await api.presignUpload(orgId, { purpose: 'logo', mime: 'image/png', bytes: blob.size });
+  await put(slot, blob);
+  return { fileId: slot.fileId, url: slot.publicUrl };
+}

@@ -2,13 +2,13 @@
 
 // interactive pieces: sheets, toasts, tips, pickers, the language switch, images with a fallback.
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type InputHTMLAttributes, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { LOCALES, LOCALE_NAMES, type AppLocale } from '@custock/i18n';
 import { setLocaleCookie, useLocale, useT } from '@/lib/i18n-client';
-import { IconChevronDown, IconClose, IconGlobe, IconInfo } from './icons';
+import { IconChevronDown, IconClose, IconEye, IconEyeOff, IconGlobe, IconInfo } from './icons';
 
 // ---------------------------------------------------------------- sheet
 
@@ -194,6 +194,67 @@ export function Picker<T extends string>({ value, options, onChange, label, icon
       <select aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value as T)}>
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------- sideways rows
+
+// a row that scrolls sideways and fades at the edge where there is more to see, so it reads as
+// scrollable. the fade follows the scroll position and the width.
+export function FadeRow({ children, className, label }: { children: ReactNode; className?: string; label: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ start: false, end: false });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const start = el.scrollLeft > 2;
+      const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+      setEdges((cur) => (cur.start === start && cur.end === end ? cur : { start, end }));
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => { el.removeEventListener('scroll', update); ro.disconnect(); };
+  }, []);
+  return (
+    <div ref={ref} className={`fade-x ${className ?? ''}`} data-start={edges.start ? '' : undefined} data-end={edges.end ? '' : undefined} role="group" aria-label={label}>
+      {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- password field
+
+// a password input with a trailing show or hide button. the button never takes the focus from
+// the field, and the caret stays where it was when the text is revealed or hidden again.
+export function PasswordField({ className = 'field', ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  const t = useT();
+  const [shown, setShown] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const toggle = () => {
+    const el = ref.current;
+    const focused = !!el && document.activeElement === el;
+    const start = el?.selectionStart ?? null;
+    const end = el?.selectionEnd ?? null;
+    setShown((v) => !v);
+    if (focused && start !== null) requestAnimationFrame(() => el!.setSelectionRange(start, end ?? start));
+  };
+  return (
+    <span className="password-field">
+      <input ref={ref} {...props} className={className} type={shown ? 'text' : 'password'} autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+      <button
+        type="button"
+        className="password-toggle"
+        aria-label={t('password.show')}
+        aria-pressed={shown}
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={toggle}
+      >
+        {shown ? <IconEyeOff size={20} /> : <IconEye size={20} />}
+      </button>
     </span>
   );
 }

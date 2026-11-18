@@ -8,8 +8,9 @@ import { useEffect, useState } from 'react';
 import type { PublicProduct, StockAlertItem } from '@custock/core';
 import { AppIcon, InstallRow, InstallSteps } from '@/components/pwa/install-coach';
 import { PushRow } from '@/components/pwa/push-row';
+import { ProfilePhoto } from '@/components/ui/profile-photo';
 import { LocaleSwitch, Photo, Sheet, useToast } from '@/components/ui/client-kit';
-import { Avatar, Empty, Switch } from '@/components/ui/kit';
+import { Empty, Switch } from '@/components/ui/kit';
 import { IconBell, IconChevronRight, IconDownload, IconHeart, IconLogout, IconMail, IconPeople, IconPhoneApp, IconTrash } from '@/components/ui/icons';
 import { useT } from '@/lib/i18n-client';
 import { orgIconSrc } from './org-coach';
@@ -19,7 +20,7 @@ import { useShopper } from './shopper-context';
 export function AccountView() {
   const t = useT();
   const toast = useToast();
-  const { api, status, me, follow, slug, orgName, joinCode, signOut } = useShopper();
+  const { api, status, me, follow, slug, orgName, joinCode, signOut, reload } = useShopper();
   const [alerts, setAlerts] = useState<StockAlertItem[] | null>(null);
   const [saved, setSaved] = useState<PublicProduct[] | null>(null);
   const [emailOn, setEmailOn] = useState(true);
@@ -81,12 +82,11 @@ export function AccountView() {
     <>
       <section className="inset-group">
         <div className="list">
-          <div className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties}>
-            <Avatar name={me.user.displayName} size={44} />
-            <span className="row-main">
-              <span className="row-title block">{me.user.displayName}</span>
-              <span className="row-sub block">{me.user.email}</span>
-            </span>
+          <div className="row" style={{ paddingTop: 12, paddingBottom: 12 }}>
+            <ProfilePhoto api={api} name={me.user.displayName} avatarUrl={me.user.avatarUrl} size={52} onChanged={reload} className="w-full">
+              <span className="row-title block truncate">{me.user.displayName}</span>
+              <span className="row-sub block truncate">{me.user.email}</span>
+            </ProfilePhoto>
           </div>
         </div>
       </section>

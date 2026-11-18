@@ -6,13 +6,14 @@ import type { AudiencePreview, Channel, Locale, PostKind, PostInput, Product, Sc
 import { LOCALES, LOCALE_NAMES } from '@custock/i18n';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
-import { Chips, Group, Row, Segmented, Switch, Why } from '@/components/ui/kit';
+import { Chips, Group, Row, Segmented, Switch } from '@/components/ui/kit';
 import { Photo, useToast } from '@/components/ui/client-kit';
 import { ProductPicker } from '@/components/admin/product-picker';
 import { IconBell, IconMail, IconPlus, IconClose, IconInfo } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { productName } from '@/lib/names';
 import { money, number } from '@/lib/format';
+import { RedirectHome } from '@/components/admin/redirect-home';
 
 const KINDS: PostKind[] = ['news', 'offer', 'new_arrival', 'back_in_stock', 'event'];
 
@@ -89,9 +90,7 @@ export default function ComposerPage() {
     }
   }
 
-  if (!can('posts.create', null)) {
-    return <Page title={t('composer.title')}><Why>{t('common:error.forbidden')}</Why></Page>;
-  }
+  if (!can('posts.create', null)) return <RedirectHome />;
 
   const cur = texts[tab] ?? { title: '', body: '' };
 
@@ -137,7 +136,7 @@ export default function ComposerPage() {
                         <input className="t-body tnum text-right bg-transparent border-0 outline-none w-24 rounded-[8px] px-2 py-1" style={{ background: 'var(--c-fill)' }} inputMode="decimal"
                           placeholder={t('composer.offerPrice')} aria-label={t('composer.offerPrice')} value={l.offer}
                           onChange={(e) => setLines((x) => x.map((y, j) => (j === i ? { ...y, offer: e.target.value } : y)))} />
-                      ) : <Why>{t('common:why.youDoNotHave')}</Why>
+                      ) : null
                     ) : null}
                     <button type="button" className="icon-btn" aria-label={t('common:action.remove')} onClick={() => setLines((x) => x.filter((_, j) => j !== i))}><IconClose size={18} /></button>
                   </div>
@@ -163,24 +162,20 @@ export default function ComposerPage() {
         </div>
 
         <div>
-          <Group title={t('composer.audience')} footer={t('composer.audienceFoot')}>
+          <Group title={t('composer.audience')}>
             {orgScope ? <ScopeRow label={org.name} sub={t('common:scope.org')} on={has('org', org.orgId)} toggle={() => toggleScope('org', org.orgId)} /> : null}
             {(groups.data ?? []).filter((g) => orgScope || g.shopIds.every((s) => can('posts.create', s))).map((g) => (
               <ScopeRow key={g.id} label={g.name} sub={t('common:scope.group')} on={has('group', g.id)} toggle={() => toggleScope('group', g.id)} />
             ))}
-            {shops.map((s) => (
-              can('posts.create', s.id)
-                ? <ScopeRow key={s.id} label={s.name} sub={t('common:scope.shop')} on={has('shop', s.id)} toggle={() => toggleScope('shop', s.id)} />
-                : <Row key={s.id} title={<span className="t-2">{s.name}</span>} subtitle={<Why>{t('common:why.notYourShop')}</Why>} />
+            {shops.filter((s) => can('posts.create', s.id)).map((s) => (
+              <ScopeRow key={s.id} label={s.name} sub={t('common:scope.shop')} on={has('shop', s.id)} toggle={() => toggleScope('shop', s.id)} />
             ))}
           </Group>
 
           <Group title={t('composer.channels')}>
             <Row title={t('common:channel.feed')} subtitle={t('composer.feedSub')} trailing={<Switch checked disabled label={t('common:channel.feed')} />} />
-            <Row title={t('common:channel.push')} subtitle={can('posts.channel.push', null) ? undefined : <Why>{t('common:why.hiddenForRole')}</Why>}
-              trailing={<Switch checked={push} onChange={setPush} disabled={!can('posts.channel.push', null)} label={t('common:channel.push')} />} />
-            <Row title={t('common:channel.email')} subtitle={can('posts.channel.email', null) ? undefined : <Why>{t('common:why.hiddenForRole')}</Why>}
-              trailing={<Switch checked={email} onChange={setEmail} disabled={!can('posts.channel.email', null)} label={t('common:channel.email')} />} />
+            {can('posts.channel.push', null) ? <Row title={t('common:channel.push')} trailing={<Switch checked={push} onChange={setPush} label={t('common:channel.push')} />} /> : null}
+            {can('posts.channel.email', null) ? <Row title={t('common:channel.email')} trailing={<Switch checked={email} onChange={setEmail} label={t('common:channel.email')} />} /> : null}
           </Group>
 
           <section className="inset-group">

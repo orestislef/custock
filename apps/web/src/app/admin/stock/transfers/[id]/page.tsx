@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import type { Transfer } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
-import { Group, Row, StockBadge, Why } from '@/components/ui/kit';
+import { Group, Row, StockBadge } from '@/components/ui/kit';
 import { useToast } from '@/components/ui/client-kit';
 import { IconChevronLeft } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
@@ -71,7 +71,7 @@ export default function TransferPage({ params }: { params: Promise<{ id: string 
             {t('transfers.receive')}
           </button>
         </div>
-      ) : x.status === 'sent' ? <p><Why>{t('transfers.onlyReceiving')}</Why></p> : null}
+      ) : null}
     </div>
   );
 }

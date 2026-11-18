@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { isUnavailable, Unavailable } from '@/components/platform/unavailable';
 import { serverApi } from '@/lib/api-server';
 import { getT } from '@/lib/i18n-server';
 import { PublicShell } from '@/components/public/public-shell';
@@ -17,7 +18,7 @@ export async function generateMetadata({ params }: PageProps<'/j/[code]'>): Prom
     const slug = (page as { orgSlug?: string }).orgSlug;
     return { ...(slug ? orgAppMetadata(slug, page.orgName) : {}), title: t('join.metaTitle', { scope: page.scopeName }), robots: { index: false } };
   } catch {
-    return { title: 'Custock' };
+    return { title: { absolute: 'Custock' } };
   }
 }
 
@@ -26,7 +27,9 @@ export default async function JoinPageRoute({ params, searchParams }: PageProps<
   const sp = await searchParams;
   const { t, locale } = await getT();
   const { api } = await serverApi(locale);
-  const page = await api.joinPage(code).catch(() => null);
+  const result = await api.joinPage(code).catch((e: unknown) => (isUnavailable(e) ? 'unavailable' as const : null));
+  if (result === 'unavailable') return <Unavailable />;
+  const page = result;
   if (!page) notFound();
 
   const notifyName = typeof sp.notify === 'string' ? sp.notify : null;

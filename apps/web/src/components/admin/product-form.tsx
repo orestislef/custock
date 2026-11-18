@@ -6,10 +6,10 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ProductInput as ProductInputSchema, type Product, type ProductInput, type StockLevel, type Uom } from '@custock/core';
+import { featureOn, ProductInput as ProductInputSchema, type Product, type ProductInput, type StockLevel, type Uom } from '@custock/core';
 import { useAdmin } from './admin-context';
 import { ScanButton } from './scan-button';
-import { Chips, Segmented, Switch, Why } from '@/components/ui/kit';
+import { Chips, Segmented, Switch } from '@/components/ui/kit';
 import { Photo, Picker, useToast } from '@/components/ui/client-kit';
 import { IconClose, IconPlus } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
@@ -128,8 +128,9 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
         const url = await uploadPhoto(api, org.orgId, f);
         setImages((x) => [...x, url]);
       }
-    } catch {
-      setError(t('productForm.uploadFailed'));
+    } catch (e) {
+      // a paused bucket gets its own plain line, anything else the usual retry text
+      setError((e as { code?: string }).code === 'storage_full' ? t('common:error.storage_full') : t('productForm.uploadFailed'));
     } finally {
       setUploading(false);
     }
@@ -228,13 +229,15 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
                   <button type="button" className="icon-btn" aria-label={t('common:action.remove')} onClick={() => setImages((x) => x.filter((_, j) => j !== i))}><IconClose size={18} /></button>
                 </li>
               ))}
-              <li>
-                <label className="row" style={{ color: 'var(--c-accent)', cursor: 'pointer' }}>
-                  <IconPlus size={20} />
-                  <span className="row-main row-title">{uploading ? t('productForm.uploading') : t('productForm.upload')}</span>
-                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={uploading} onChange={(e) => { void addFiles(e.target.files); e.target.value = ''; }} />
-                </label>
-              </li>
+              {featureOn(org, 'uploads') ? (
+                <li>
+                  <label className="row" style={{ color: 'var(--c-accent)', cursor: 'pointer' }}>
+                    <IconPlus size={20} />
+                    <span className="row-main row-title">{uploading ? t('productForm.uploading') : t('productForm.upload')}</span>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={uploading} onChange={(e) => { void addFiles(e.target.files); e.target.value = ''; }} />
+                  </label>
+                </li>
+              ) : null}
               <li>
                 <form className="flex items-center pr-1 row-sep relative" onSubmit={(e) => { e.preventDefault(); if (/^https:\/\//.test(imageUrl)) { setImages((x) => [...x, imageUrl]); setImageUrl(''); } }}>
                   <label className="block flex-1"><span className="sr-only">{t('productForm.photoPh')}</span>
@@ -249,20 +252,24 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
       </div>
 
       <div className="lg:sticky lg:top-[72px]">
+        {canPrice || canCost ? (
         <section className="inset-group">
           <h2 className="inset-group-head">{t('product.prices')}</h2>
           <ul className="list" role="list">
-            <Field label={t('stock.form.price')}>
-              <input className="field pt-1 tnum" inputMode="decimal" placeholder={t('productForm.pricePh', { zero })} disabled={!canPrice} value={price} onChange={(e) => setPrice(e.target.value)} />
-            </Field>
+            {canPrice ? (
+              <Field label={t('stock.form.price')}>
+                <input className="field pt-1 tnum" inputMode="decimal" placeholder={t('productForm.pricePh', { zero })} value={price} onChange={(e) => setPrice(e.target.value)} />
+              </Field>
+            ) : null}
             {canCost ? (
-              <Field label={t('product.cost')} sep>
+              <Field label={t('product.cost')} sep={canPrice}>
                 <input className="field pt-1 tnum" inputMode="decimal" placeholder={t('productForm.costPh', { zero })} value={cost} onChange={(e) => setCost(e.target.value)} />
               </Field>
             ) : null}
           </ul>
-          <p className="inset-group-foot">{canPrice ? t('productForm.priceFoot') : <Why>{t('common:why.setByAdmin')}</Why>}</p>
+          {canPrice ? <p className="inset-group-foot">{t('productForm.priceFoot')}</p> : null}
         </section>
+        ) : null}
         <section className="inset-group">
           <h2 className="inset-group-head">{t('productForm.vatFor', { country: countryName })}</h2>
           <div className="px-1"><Segmented label={t('product.vat')} value={vat} onChange={setVat} options={rates.map((r) => ({ value: String(r), label: `${r / 100}%` }))} /></div>

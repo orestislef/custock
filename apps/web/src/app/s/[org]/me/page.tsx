@@ -14,7 +14,7 @@ export default async function MePage({ params }: PageProps<'/s/[org]/me'>) {
   const { t, locale } = await getT();
   const info = await orgInfo(org, locale);
   return (
-    <PublicShell orgName={info.name} t={t}>
+    <PublicShell orgName={info.name} logoUrl={info.logoUrl} t={t}>
       <h1 className="t-large t-display m-0 mb-4">{t('shopper.me.title')}</h1>
       <AccountView />
     </PublicShell>

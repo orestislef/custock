@@ -5,11 +5,12 @@ import { useState } from 'react';
 import type { AuditEntry } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
-import { Avatar, Empty, Why } from '@/components/ui/kit';
+import { Avatar, Empty } from '@/components/ui/kit';
 import { IconHistory } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { useNames } from '@/lib/use-names';
 import { dateTime, money } from '@/lib/format';
+import { RedirectHome } from '@/components/admin/redirect-home';
 
 // who changed what, as sentences people can read. the raw record stays in the api.
 const SETTING_LABEL: Record<string, string> = {
@@ -39,7 +40,7 @@ export default function AuditPage() {
   const [cursor, setCursor] = useState<string | null | undefined>(undefined);
   const next = cursor === undefined ? first.data?.nextCursor ?? null : cursor;
 
-  if (!allowed) return <Page title={t('audit.title')}><Why>{t('common:error.forbidden')}</Why></Page>;
+  if (!allowed) return <RedirectHome />;
   const items = [...(first.data?.items ?? []), ...more];
 
   async function loadMore() {
@@ -106,7 +107,7 @@ export default function AuditPage() {
             const link = href(e);
             const inner = (
               <>
-                <Avatar name={e.actorName ?? t('audit.system')} size={32} />
+                <Avatar name={e.actorName ?? t('audit.system')} size={32} src={e.actorAvatarUrl} />
                 <span className="row-main">
                   <span className="row-title block">{sentence(e)}</span>
                   <span className="row-sub block">{dateTime(e.createdAt, locale)}</span>

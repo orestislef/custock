@@ -6,7 +6,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import type { InvitePreview, Locale } from '@custock/core';
-import { LocaleSwitch } from '@/components/ui/client-kit';
+import { LocaleSwitch, PasswordField } from '@/components/ui/client-kit';
 import { IconShield, IconWarning } from '@/components/ui/icons';
 import { createBrowserApi, loadTokens, saveTokens } from '@/lib/api-client';
 import { useLocale, useT } from '@/lib/i18n-client';
@@ -69,9 +69,10 @@ export function InviteAccept({ token }: { token: string }) {
   };
 
   return (
-    <main className="min-h-dvh grid place-items-center px-4 py-10" style={{ paddingTop: 'calc(40px + env(safe-area-inset-top))' }}>
+    <main className="min-h-dvh flex flex-col px-4" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="w-full max-w-[420px] mx-auto flex justify-end pt-3"><LocaleSwitch /></div>
+      <div className="flex-1 grid place-items-center py-8">
       <div className="w-full max-w-[420px] page-in">
-        <div className="flex justify-end mb-6"><LocaleSwitch /></div>
         {failed ? (
           <div className="text-center">
             <span className="inline-grid place-items-center w-16 h-16 rounded-full mb-4" style={{ background: 'var(--c-out-tint)', color: 'var(--c-out-text)' }}><IconWarning size={30} /></span>
@@ -99,7 +100,7 @@ export function InviteAccept({ token }: { token: string }) {
                   </label>
                   <label className="block row-sep relative">
                     <span className="field-label">{t('invite.password')}</span>
-                    <input className="field pt-1" type="password" autoComplete="new-password" required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <PasswordField className="field pt-1" autoComplete="new-password" required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} />
                   </label>
                 </div>
                 <p className="t-foot t-2 m-0 mb-4 px-4">{t('invite.passwordHint')}</p>
@@ -117,7 +118,7 @@ export function InviteAccept({ token }: { token: string }) {
                   {!loadTokens() ? (
                     <label className="block row-sep relative">
                       <span className="sr-only">{t('login.password')}</span>
-                      <input className="field" type="password" autoComplete="current-password" placeholder={t('login.password')} value={password} onChange={(e) => setPassword(e.target.value)} required />
+                      <PasswordField autoComplete="current-password" placeholder={t('login.password')} value={password} onChange={(e) => setPassword(e.target.value)} required />
                     </label>
                   ) : null}
                 </div>
@@ -127,6 +128,7 @@ export function InviteAccept({ token }: { token: string }) {
             )}
           </>
         )}
+      </div>
       </div>
     </main>
   );

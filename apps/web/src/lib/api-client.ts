@@ -4,6 +4,7 @@
 // with CUSTOCK_API_URL, fixtures in memory otherwise.
 
 import { createApiClient, type CustockApi } from '@custock/core';
+import { reportError } from './report-error';
 
 // a production build always talks to the real api, sample data exists only while developing
 export const apiMode: 'real' | 'fixtures' = process.env.NODE_ENV === 'production' || process.env.NEXT_PUBLIC_API_MODE === 'real' ? 'real' : 'fixtures';
@@ -80,6 +81,8 @@ export function createBrowserApi(opts: {
       getPermsVersion: opts.getPermsVersion,
       onUnauthorized: opts.onUnauthorized,
       onPermsStale: opts.onPermsStale,
+      // a 5xx is ours to fix: the super admin sees it on the Errors screen
+      onServerError: (e) => reportError({ source: 'api', method: e.method, apiPath: e.path, status: e.status }),
     });
   }
   if (process.env.NODE_ENV === 'production') throw new Error('no sample data in a production build');

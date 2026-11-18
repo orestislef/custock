@@ -6,15 +6,21 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { featureOn, type Feature } from '@custock/core';
 import { useAdmin } from './admin-context';
+import { GoHome, featureForRoute } from '@/components/platform/feature-off';
+import { OrgSwitcher } from '@/components/platform/org-switcher';
+import { PlatformBanners } from '@/components/platform/bits';
+import { SuperAdminPill } from '@/components/platform/platform-shell';
 import { OutboxBadge } from './outbox-badge';
 import { Avatar } from '@/components/ui/kit';
 import { LocaleSwitch, Picker, Sheet, useToast } from '@/components/ui/client-kit';
 import {
-  IconBox, IconChart, IconChevronLeft, IconChevronRight, IconGear, IconHome, IconLink, IconLogout, IconMegaphone, IconMore, IconPeople, IconShield, IconShop, IconHistory, IconMail, IconScan, IconWifiOff, IconPhoneApp,
+  IconBox, IconChart, IconChevronDown, IconChevronLeft, IconChevronRight, IconGear, IconHome, IconLink, IconLogout, IconMegaphone, IconMore, IconPeople, IconShield, IconShop, IconHistory, IconMail, IconScan, IconWifiOff, IconPhoneApp,
 } from '@/components/ui/icons';
 import { AppIcon, InstallRow, InstallSteps } from '@/components/pwa/install-coach';
 import { PushRow } from '@/components/pwa/push-row';
+import { ProfilePhoto } from '@/components/ui/profile-photo';
 import { basePath } from '@/lib/api-client';
 import { devBuild } from '@/lib/env';
 import { startOfflineSync, useOnline, useOutbox } from '@/lib/outbox';
@@ -28,20 +34,22 @@ type NavItem = { href: string; key: string; icon: (p: { filled?: boolean; size?:
 
 export function useNav(): NavItem[] {
   const { can, org } = useAdmin();
+  // a feature the super admin switched off for this business takes its screens away
   const anyShop = (perm: string) => org.orgPerms.includes(perm) || org.shops.some((s) => s.perms.includes(perm)) || org.anyPerms.includes(perm);
+  const on = (f: Feature) => featureOn(org, f);
   const items: NavItem[] = [
     { href: '/admin', key: 'home', icon: IconHome, show: true, section: 'main' },
     {
       href: '/admin/stock', key: 'stock', icon: IconBox, show: anyShop('stock.view') || anyShop('products.view'), section: 'main',
       children: [
-        { href: '/admin/stock/counts', key: 'counts', show: anyShop('stock.count') || anyShop('stock.count.approve') },
-        { href: '/admin/stock/transfers', key: 'transfers', show: anyShop('stock.transfer.send') || anyShop('stock.transfer.receive') },
+        { href: '/admin/stock/counts', key: 'counts', show: on('counts') && (anyShop('stock.count') || anyShop('stock.count.approve')) },
+        { href: '/admin/stock/transfers', key: 'transfers', show: on('transfers') && (anyShop('stock.transfer.send') || anyShop('stock.transfer.receive')) },
       ],
     },
     { href: '/admin/scan', key: 'scan', icon: IconScan, show: ['stock.sell', 'stock.receive', 'stock.count', 'stock.transfer.send'].some(anyShop), section: 'main' },
     { href: '/admin/customers', key: 'customers', icon: IconPeople, show: anyShop('customers.view'), section: 'main' },
-    { href: '/admin/posts', key: 'posts', icon: IconMegaphone, show: anyShop('posts.view'), section: 'main' },
-    { href: '/admin/reports', key: 'reports', icon: IconChart, show: anyShop('reports.view'), section: 'main' },
+    { href: '/admin/posts', key: 'posts', icon: IconMegaphone, show: on('posts') && anyShop('posts.view'), section: 'main' },
+    { href: '/admin/reports', key: 'reports', icon: IconChart, show: on('reports') && anyShop('reports.view'), section: 'main' },
     { href: '/admin/team', key: 'team', icon: IconShield, show: anyShop('members.view'), section: 'business' },
     { href: '/admin/join-links', key: 'joinLinks', icon: IconLink, show: anyShop('joinlinks.manage'), section: 'business' },
     { href: '/admin/settings', key: 'settings', icon: IconGear, show: can('org.settings.manage') || anyShop('shop.settings.manage'), section: 'business' },
@@ -57,8 +65,10 @@ function isActive(pathname: string, href: string, exact = false) {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { t, api, org, me, shops, shopId, setShopId, logout, locale } = useAdmin();
+  const { t, api, org, me, shops, shopId, setShopId, logout, locale, refresh, superadmin } = useAdmin();
+  const [orgsOpen, setOrgsOpen] = useState(false);
   const pathname = usePathname();
+  const routeOff = featureForRoute(pathname);
   const nav = useNav();
   const toast = useToast();
   const online = useOnline();
@@ -115,7 +125,19 @@ export function Shell({ children }: { children: ReactNode }) {
       <aside className="hidden md:flex flex-col sticky top-0 h-dvh px-3 pt-5 pb-4 overflow-y-auto" style={{ background: 'var(--c-shelf)', borderRight: '0.5px solid var(--c-line)' }}>
         <div className="px-3 mb-5">
           <p className="t-cap t-2 m-0">{t('admin.business')}</p>
-          <p className="t-title3 t-display m-0">{org.name}</p>
+          {superadmin ? (
+            <Link href="/admin/platform" className="nav-link flex items-center gap-2 -mx-3 px-3 min-h-[36px] rounded-[10px] t-sub mb-3" style={{ color: 'var(--c-accent)' }}>
+              <IconChevronLeft size={18} />{t('platform.allBusinesses')}
+            </Link>
+          ) : null}
+          {me.orgs.length > 1 ? (
+            <button type="button" className="flex items-center gap-1 border-0 bg-transparent p-0 cursor-pointer text-left max-w-full" onClick={() => setOrgsOpen(true)} aria-label={t('platform.switchBusiness')}>
+              <span className="t-title3 t-display truncate">{org.name}</span><IconChevronDown size={16} className="flex-none t-2" />
+            </button>
+          ) : (
+            <p className="t-title3 t-display m-0">{org.name}</p>
+          )}
+          {org.platformAccess ? <div className="mt-1"><SuperAdminPill label={t('platform.access')} /></div> : null}
         </div>
         <nav aria-label={t('admin.nav')}>
           <ul className="list-none p-0 m-0 flex flex-col gap-0.5">{main.map(link)}</ul>
@@ -134,7 +156,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </nav>
         <div className="flex-1" />
         <button type="button" className="nav-link flex items-center gap-3 px-3 min-h-[52px] rounded-[10px] text-left border-0 bg-transparent cursor-pointer" onClick={() => setUserOpen(true)}>
-          <Avatar name={me.user.displayName} size={32} />
+          <Avatar name={me.user.displayName} size={32} src={me.user.avatarUrl} />
           <span className="flex-1 min-w-0">
             <span className="t-sub block truncate">{me.user.displayName}</span>
             <span className="t-foot t-2 block truncate">{org.roleNames.map((r) => t(`common:role.${r}`, { defaultValue: r })).join(', ')}</span>
@@ -146,19 +168,26 @@ export function Shell({ children }: { children: ReactNode }) {
         {/* toolbar */}
         <header className="bar" data-toolbar>
           <div className="flex items-center gap-2 h-[52px] px-4 md:px-8" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-            <span className="md:hidden t-headline">{org.name}</span>
+            {me.orgs.length > 1 ? (
+              <button type="button" className="md:hidden t-headline inline-flex items-center gap-1 border-0 bg-transparent p-0 max-w-[45%]" onClick={() => setOrgsOpen(true)} aria-label={t('platform.switchBusiness')}>
+                <span className="truncate">{org.name}</span><IconChevronDown size={14} className="flex-none t-2" />
+              </button>
+            ) : <span className="md:hidden t-headline">{org.name}</span>}
             <span id="bar-title" className="t-headline flex-1 text-center md:text-left truncate opacity-0 transition-opacity" aria-hidden="true" />
             <span id="bar-action" className="md:hidden" />
             <OutboxBadge />
             <ShopSwitcher shops={shops} shopId={shopId} onChange={setShopId} canAll={org.shops.length > 1} />
             <button type="button" className="md:hidden icon-btn" aria-label={t('admin.account')} onClick={() => setUserOpen(true)}>
-              <Avatar name={me.user.displayName} size={30} />
+              <Avatar name={me.user.displayName} size={30} src={me.user.avatarUrl} />
             </button>
           </div>
           {!online ? <p className="offline-line m-0" role="status"><IconWifiOff size={16} className="flex-none" />{t('offline.line')}</p> : null}
         </header>
 
-        <main id="main" tabIndex={-1} className="outline-none flex-1 px-4 md:px-8 pb-[calc(110px+env(safe-area-inset-bottom))] md:pb-12 w-full max-w-[1200px]">{children}</main>
+        <main id="main" tabIndex={-1} className="outline-none flex-1 px-4 md:px-8 pb-[calc(110px+env(safe-area-inset-bottom))] md:pb-12 w-full max-w-[1200px]">
+          <PlatformBanners me={me} t={t} />
+          {routeOff && !featureOn(org, routeOff) ? <GoHome /> : children}
+        </main>
       </div>
 
       {/* phone tab bar, floating glass */}
@@ -184,7 +213,20 @@ export function Shell({ children }: { children: ReactNode }) {
         ) : null}
       </nav>
 
+      <OrgSwitcher open={orgsOpen} onClose={() => setOrgsOpen(false)} />
+
       <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title={t('nav.more')}>
+        {superadmin ? (
+          <ul className="list mb-4" role="list">
+            <li>
+              <Link href="/admin/platform" className="row has-icon" onClick={() => setMoreOpen(false)}>
+                <span className="icon-tile"><IconShield size={18} /></span>
+                <span className="row-main row-title">{t('platform.allBusinesses')}</span>
+                <IconChevronRight size={16} className="chev" />
+              </Link>
+            </li>
+          </ul>
+        ) : null}
         <ul className="list mb-4" role="list">
           {rest.map((item) => {
             const Icon = item.icon;
@@ -213,22 +255,22 @@ export function Shell({ children }: { children: ReactNode }) {
       </Sheet>
 
       <Sheet open={userOpen} onClose={() => { setUserOpen(false); setConfirmOut(false); }} title={t('admin.account')}>
-        <div className="flex items-center gap-3 mb-4">
-          <Avatar name={me.user.displayName} size={48} />
-          <div className="min-w-0">
-            <p className="t-headline m-0 truncate">{me.user.displayName}</p>
-            <p className="t-sub t-2 m-0 truncate">{me.user.email}</p>
-          </div>
-        </div>
+        <ProfilePhoto api={api} name={me.user.displayName} avatarUrl={me.user.avatarUrl} onChanged={() => void refresh()} className="mb-4">
+          <p className="t-headline m-0 truncate">{me.user.displayName}</p>
+          <p className="t-sub t-2 m-0 truncate">{me.user.email}</p>
+        </ProfilePhoto>
+        {/* where they work and as what, nothing about permissions */}
         <ul className="list mb-4" role="list">
-          {org.shops.map((s) => (
-            <li key={s.shopId} className="row">
-              <span className="row-main">
-                <span className="row-title block">{s.name}</span>
-                <span className="row-sub block">{t('admin.permsCount', { count: s.perms.length })}</span>
-              </span>
+          <li className="row">
+            <span className="row-main row-title">{t('admin.role')}</span>
+            <span className="t-body t-2 text-right">{org.roleNames.map((r) => t(`common:role.${r}`, { defaultValue: r })).join(', ')}</span>
+          </li>
+          {org.shops.length ? (
+            <li className="row">
+              <span className="row-main row-title">{t('admin.shops')}</span>
+              <span className="t-body t-2 text-right min-w-0 truncate">{org.shops.map((s) => s.name).join(', ')}</span>
             </li>
-          ))}
+          ) : null}
         </ul>
         <section className="inset-group" style={{ marginBottom: 16 }}>
           <div className="list">

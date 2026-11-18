@@ -7,6 +7,7 @@ import { Shell } from './shell';
 // the sign in page and print posters go without the frame
 export function AdminFrame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const bare = pathname === '/admin/login' || pathname.startsWith('/admin/print');
+  // the super admin screens bring their own frame (components/platform/platform-shell.tsx)
+  const bare = pathname === '/admin/login' || pathname === '/admin/forgot' || pathname.startsWith('/admin/reset/') || pathname.startsWith('/admin/print') || pathname.startsWith('/admin/platform');
   return <AdminProvider>{bare ? children : <Shell>{children}</Shell>}</AdminProvider>;
 }

@@ -19,7 +19,7 @@ export default async function CatalogProductPage({ params }: PageProps<'/s/[org]
   const joinHref = info.joinCode ? `/j/${info.joinCode}` : null;
   const p = await publicProductById(org, id, locale);
   return (
-    <PublicShell orgName={info.name} t={t} back={{ href: `/s/${org}`, label: t('catalog.title') }}>
+    <PublicShell orgName={info.name} logoUrl={info.logoUrl} t={t} back={{ href: `/s/${org}`, label: t('catalog.title') }}>
       {p ? <ProductView p={p} t={t} locale={locale} actions={<ProductActions p={p} joinHref={joinHref} />} /> : <FollowerProduct id={id} joinHref={joinHref} />}
     </PublicShell>
   );

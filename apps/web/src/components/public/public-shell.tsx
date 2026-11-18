@@ -6,7 +6,7 @@ import { IconChevronLeft } from '@/components/ui/icons';
 
 // the frame of every customer facing page: the business name, the language switch,
 // the content, and a quiet footer. the business is the brand here, not us.
-export function PublicShell({ orgName, t, children, back }: { orgName: string; t: TFunction; children: ReactNode; back?: { href: string; label: string } }) {
+export function PublicShell({ orgName, t, children, back, logoUrl }: { orgName: string; t: TFunction; children: ReactNode; back?: { href: string; label: string }; logoUrl?: string | null }) {
   return (
     <div className="min-h-dvh flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <header className="bar">
@@ -17,7 +17,11 @@ export function PublicShell({ orgName, t, children, back }: { orgName: string; t
               {back.label}
             </Link>
           ) : (
-            <span className="t-headline">{orgName}</span>
+            <span className="inline-flex items-center gap-2 min-w-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {logoUrl ? <img src={logoUrl} alt="" width={28} height={28} className="flex-none rounded-[7px] object-contain" style={{ background: '#FFFFFF' }} /> : null}
+              <span className="t-headline truncate">{orgName}</span>
+            </span>
           )}
           <span className="flex-1" />
           <LocaleSwitch />

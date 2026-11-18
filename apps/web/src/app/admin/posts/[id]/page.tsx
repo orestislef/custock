@@ -5,7 +5,7 @@ import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Locale } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
-import { Group, Row, Segmented, Why } from '@/components/ui/kit';
+import { Group, Row, Segmented } from '@/components/ui/kit';
 import { Photo, useToast } from '@/components/ui/client-kit';
 import { IconChevronLeft } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
@@ -51,7 +51,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         {p.status === 'pending_approval' && can('posts.publish', null) ? (
           <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void act(() => api.approvePost(org.orgId, p.id), t('post.approved'))}>{t('post.approve')}</button>
         ) : null}
-        {p.status === 'pending_approval' && !can('posts.publish', null) ? <Why>{t('post.waitingApproval')}</Why> : null}
+        {p.status === 'pending_approval' && !can('posts.publish', null) ? <p className="t-sub t-2 m-0">{t('post.waitingApproval')}</p> : null}
         {p.status === 'draft' && can('posts.create', null) ? (
           <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void act(() => api.publishPost(org.orgId, p.id), t('post.sentOff'))}>{can('posts.publish', null) ? t('composer.publish') : t('composer.submit')}</button>
         ) : null}

@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation';
 import type { Role } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
-import { Switch, Why } from '@/components/ui/kit';
+import { Switch } from '@/components/ui/kit';
 import { Picker, useToast } from '@/components/ui/client-kit';
-import { IconLock } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { PERM_GROUPS, rankAt } from '@/lib/perms';
 import { roleLabel } from '@/lib/names';
+import { RedirectHome } from '@/components/admin/redirect-home';
 
 // a role on its own page: permission groups in two columns, a sticky save with what changes
 export default function RoleEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -18,7 +18,7 @@ export default function RoleEditorPage({ params }: { params: Promise<{ id: strin
   const { api, org, t, can } = useAdmin();
   const roles = useAsync(() => (can('roles.manage', null) ? api.roles(org.orgId) : Promise.resolve([] as Role[])), []);
   const role = id === 'new' ? null : roles.data?.find((r) => r.id === id) ?? null;
-  if (!can('roles.manage', null)) return <Page title={t('roles.title')} back={{ href: '/admin/team', label: t('team.title') }}><Why>{t('common:error.forbidden')}</Why></Page>;
+  if (!can('roles.manage', null)) return <RedirectHome />;
   if (!roles.data) return <Page title={t('roles.edit')}><div className="h-40 skel" /></Page>;
   return <Editor key={role?.id ?? 'new'} role={role} all={roles.data} />;
 }
@@ -79,22 +79,17 @@ function Editor({ role, all }: { role: Role | null; all: Role[] }) {
           </p>
         </section>
         <div />
-        {PERM_GROUPS.map((g) => (
+        {/* only what this person may hand out. anything else on the role stays as it is */}
+        {PERM_GROUPS.map((g) => ({ ...g, perms: g.perms.filter((p) => mine.has(p)) })).filter((g) => g.perms.length).map((g) => (
           <section key={g.group} className="inset-group">
             <h2 className="inset-group-head">{t(`common:permGroup.${g.group}`)}</h2>
             <ul className="list" role="list">
-              {g.perms.map((p) => {
-                const have = mine.has(p);
-                return (
-                  <li key={p} className="row">
-                    <span className="row-main">
-                      <span className="row-title block" style={{ color: have ? 'var(--c-ink)' : 'var(--c-ink-3)' }}>{t(`common:perm.${p}`)}</span>
-                      {have ? null : <span className="why"><IconLock size={12} />{t('common:why.youDoNotHave')}</span>}
-                    </span>
-                    <Switch checked={perms.has(p)} disabled={!have} label={t(`common:perm.${p}`)} onChange={(v) => setPerms((x) => { const n = new Set(x); if (v) n.add(p); else n.delete(p); return n; })} />
-                  </li>
-                );
-              })}
+              {g.perms.map((p) => (
+                <li key={p} className="row">
+                  <span className="row-main row-title">{t(`common:perm.${p}`)}</span>
+                  <Switch checked={perms.has(p)} label={t(`common:perm.${p}`)} onChange={(v) => setPerms((x) => { const n = new Set(x); if (v) n.add(p); else n.delete(p); return n; })} />
+                </li>
+              ))}
             </ul>
           </section>
         ))}

@@ -1,9 +1,11 @@
 // small building blocks: inset grouped lists, rows, switches, segmented controls, badges,
-// empty states and the "why not" line. no state here, so they work in server components too.
+// empty states and the "why not" line (only for things a person can act on, never about rights).
+// no state here, so they work in server components too.
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { IconChevronRight, IconHalf, IconLock, IconSlash, IconTruck, IconWarning } from './icons';
+import { IconChevronRight, IconHalf, IconInfo, IconSlash, IconTruck, IconWarning } from './icons';
+import { FadeRow } from './client-kit';
 
 // a group is a real list (ul role=list), each Row inside renders as its li
 export function Group({ title, footer, children, className }: { title?: ReactNode; footer?: ReactNode; children: ReactNode; className?: string }) {
@@ -84,7 +86,7 @@ export function StockBadge({ state, label }: { state: StockState; label: string 
 }
 
 export function Why({ children }: { children: ReactNode }) {
-  return <span className="why"><IconLock size={13} />{children}</span>;
+  return <span className="why"><IconInfo size={13} />{children}</span>;
 }
 
 export function Empty({ icon, title, body, action }: { icon?: ReactNode; title: ReactNode; body?: ReactNode; action?: ReactNode }) {
@@ -137,11 +139,12 @@ export function Segmented<T extends string>({ value, options, onChange, label, d
 // a scrollable row of choices, for options that do not fit a segmented control on a phone
 export function Chips<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
   return (
-    <div className="scroll-x flex gap-2" role="group" aria-label={label}>
+    <FadeRow className="flex gap-2" label={label}>
       {options.map((o) => (
-        <button key={o.value} type="button" className="chip" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>{o.label}</button>
+        <button key={o.value} type="button" className="chip flex-none" aria-pressed={o.value === value}
+          onClick={(e) => { onChange(o.value); e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }}>{o.label}</button>
       ))}
-    </div>
+    </FadeRow>
   );
 }
 
@@ -153,9 +156,17 @@ export function initials(name: string | null | undefined): string {
 // avatar colors carry no meaning, so the brand accent is not one of them. white text passes on each
 const AVATAR = ['#2F5BC8', '#8F5E0F', '#5E7D3A', '#17706F', '#7B4FA0', '#6B7280'];
 
-export function Avatar({ name, size = 36 }: { name: string | null | undefined; size?: number }) {
+// the person's photo when they have one, their initials on a colour otherwise
+export function Avatar({ name, size = 36, src }: { name: string | null | undefined; size?: number; src?: string | null }) {
   const n = name ?? '';
   const color = AVATAR[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR.length];
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt="" aria-hidden="true" width={size} height={size} loading="lazy" decoding="async"
+        className="rounded-full flex-none object-cover" style={{ width: size, height: size, background: 'var(--c-fill)' }} />
+    );
+  }
   return (
     <span
       aria-hidden="true"

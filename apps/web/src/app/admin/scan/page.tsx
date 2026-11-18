@@ -8,13 +8,13 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ean13, uuidv7, type MovementBatchResult, type Product, type ScanResult, type Shop, type StockLevel } from '@custock/core';
+import { ean13, featureOn, uuidv7, type MovementBatchResult, type Product, type ScanResult, type Shop, type StockLevel } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { OutboxBadge } from '@/components/admin/outbox-badge';
 import { Camera } from '@/components/scan/camera';
 import { useToast } from '@/components/ui/client-kit';
-import { Chips, Empty, Why } from '@/components/ui/kit';
-import { IconBarcode, IconCheck, IconKeyboard, IconLock, IconMinus, IconPlus, IconShop, IconTruck } from '@/components/ui/icons';
+import { Chips, Why } from '@/components/ui/kit';
+import { IconBarcode, IconCheck, IconKeyboard, IconMinus, IconPlus, IconShop, IconTruck } from '@/components/ui/icons';
 import { Tally } from '@/components/ui/tally';
 import { apiMode } from '@/lib/api-client';
 import { lookupCached, syncShops } from '@/lib/catalog-cache';
@@ -23,6 +23,7 @@ import { qtyNumber } from '@/lib/format';
 import { productName } from '@/lib/names';
 import { isNetworkError, submitMovements, useOnline } from '@/lib/outbox';
 import { symbology } from '@/lib/scanner';
+import { RedirectHome } from '@/components/admin/redirect-home';
 
 type Mode = 'lookup' | 'sell' | 'receive' | 'count' | 'transfer';
 const MODES: Mode[] = ['lookup', 'sell', 'receive', 'count', 'transfer'];
@@ -46,7 +47,13 @@ function Scan() {
 
   // the shop we scan in: the one selected, else the first where this person may change stock
   const workShop = shopId ?? org.shops.find((s) => s.perms.some((x) => x.startsWith('stock.')))?.shopId ?? org.shops[0]?.shopId ?? null;
-  const modes = MODES.filter((m) => can(MODE_PERM[m], m === 'lookup' ? null : workShop));
+  const canTransfer = can(MODE_PERM.transfer, workShop);
+  const [allShops, setAllShops] = useState<Shop[] | null>(null);
+  // transfer needs another shop to send to. a business with one shop does not get the mode at all
+  const otherShops = (allShops ?? shops).filter((s) => s.id !== workShop).length;
+  // count and transfer leave when a super admin switched them off for this business
+  const modes = MODES.filter((m) => can(MODE_PERM[m], m === 'lookup' ? null : workShop) && (m !== 'transfer' || otherShops > 0)
+    && (m !== 'count' || featureOn(org, 'counts')) && (m !== 'transfer' || featureOn(org, 'transfers')));
   const asked = params.get('mode') as Mode | null;
   const [mode, setMode] = useState<Mode>(asked && modes.includes(asked) ? asked : modes.includes('sell') ? 'sell' : modes[0] ?? 'lookup');
   const [lines, setLines] = useState<Line[]>([]);
@@ -55,7 +62,6 @@ function Scan() {
   const [busy, setBusy] = useState(false);
   const [unknown, setUnknown] = useState<ScanResult | null>(null);
   const [toShop, setToShop] = useState<string | null>(null);
-  const [allShops, setAllShops] = useState<Shop[]>([]);
   const countId = useRef<string | null>(null);
   const inFlight = useRef(false);
 
@@ -65,11 +71,11 @@ function Scan() {
   }, [api, org.orgId, workShop]);
 
   useEffect(() => {
-    if (!modes.includes('transfer')) return;
+    if (!canTransfer) return;
     void api.shops(org.orgId, { all: true }).then(setAllShops).catch(() => setAllShops(shops));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, org.orgId]);
-  const destinations = allShops.filter((s) => s.id !== workShop);
+  const destinations = (allShops ?? []).filter((s) => s.id !== workShop);
 
   const name = useCallback((p: Pick<Product, 'name' | 'translations'>) => productName(p, locale), [locale]);
   const total = lines.reduce((n, l) => n + l.qty, 0);
@@ -228,13 +234,8 @@ function Scan() {
   const samples = useMemo(() => (devBuild ? [ean13('520004417010'), ean13('520004417020'), ean13('520004417030'), '4006381333931'] : []), []);
   const needsSignal = !online && (mode === 'count' || mode === 'transfer');
 
-  if (!modes.length || !workShop) {
-    return (
-      <div className="pt-10">
-        <Empty icon={<IconLock size={40} />} title={t('scanner.noModesTitle')} body={t('scanner.noModesBody')} />
-      </div>
-    );
-  }
+  // nothing to scan for: the tab is not offered, an old link goes home
+  if (!modes.length || !workShop) return <RedirectHome />;
 
   return (
     <div className="page-in pt-3 max-w-[640px]">
@@ -282,7 +283,7 @@ function Scan() {
             <div className="mt-3">
               {can('products.create', null) ? (
                 <Link className="btn btn-tinted" href={`/admin/stock/new?code=${encodeURIComponent(unknown.codeNorm.replace(/^0+(?=\d{8})/, ''))}`}><IconPlus size={18} />{t('scanner.createWithCode')}</Link>
-              ) : <Why>{t('scanner.unknownSaved')}</Why>}
+              ) : <p className="t-sub t-2 m-0">{t('scanner.unknownSaved')}</p>}
             </div>
           </div>
         ) : null}

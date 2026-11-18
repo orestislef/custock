@@ -68,6 +68,46 @@
       "lead": "Good news, {{product}} is back in stock at {{shop}}.",
       "button": "See the product",
       "note": "You get this once, because you asked to hear when it is back."
+    },
+    "superadminInvite": {
+      "subject": "You are invited to run Custock",
+      "preheader": "{{inviter}} invited you as a super admin.",
+      "heading": "Become a super admin",
+      "lead": "{{inviter}} invited you as a super admin of Custock. Super admins see every business, create new ones and invite their owners.",
+      "button": "Accept the invite",
+      "note": "The link works for 7 days and only once. If you did not expect it, you can ignore this email."
+    },
+    "passwordReset": {
+      "subject": "Reset your Custock password",
+      "preheader": "The link works for 30 minutes.",
+      "heading": "Choose a new password",
+      "lead": "Someone asked to reset the password for {{email}} on Custock. Tap the button to choose a new one.",
+      "button": "Choose a new password",
+      "note": "The link works for 30 minutes and only once. If you did not ask for it, ignore this email. Your password stays as it is."
+    },
+    "passwordChanged": {
+      "subject": "Your Custock password was changed",
+      "preheader": "Every other device was signed out.",
+      "heading": "Your password was changed",
+      "lead": "The password for {{email}} was changed just now, and every other device was signed out.",
+      "button": "Reset my password",
+      "note": "If this was not you, reset your password right away and reply to this email."
+    },
+    "errorNotice": {
+      "subject": "New error in Custock: {{kind}}",
+      "heading": "Something new went wrong",
+      "lead": "A new error ({{kind}}) showed up in production. It is on the Errors screen with its details.",
+      "where": "Where: {{route}}",
+      "button": "Open the error",
+      "note": "You get one email per new error, at most 10 a day. Repeats are only counted.",
+      "reason": "You get this email because you are a super admin of Custock.",
+      "kind": {
+        "api": "server",
+        "worker": "background job",
+        "send": "sending",
+        "storage": "photo storage",
+        "client": "browser"
+      }
     }
   },
   "push": {
@@ -99,6 +139,11 @@
     "welcome": {
       "title": "{{shop}}",
       "body": "Welcome. You will hear about new arrivals and offers here."
+    },
+    "test": {
+      "title": "{{app}}",
+      "bodyStaff": "Alerts work on this device. Low stock, deliveries and posts to approve will show up like this.",
+      "bodyCustomer": "Notifications work. Offers and back in stock news will show up like this."
     }
   }
 }

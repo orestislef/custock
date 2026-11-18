@@ -3,10 +3,11 @@
 import { useAdmin, useShopFilter } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { BarList, ChartCard, ColumnChart, DataTable, FunnelBars, Legend } from '@/components/admin/charts';
-import { Group, Row, Why } from '@/components/ui/kit';
+import { Group, Row } from '@/components/ui/kit';
 import { useAsync } from '@/lib/use-async';
 import { date, money, number, qtyNumber } from '@/lib/format';
 import type { Uom } from '@custock/core';
+import { RedirectHome } from '@/components/admin/redirect-home';
 
 export default function ReportsPage() {
   const { api, org, t, locale, can } = useAdmin();
@@ -25,7 +26,7 @@ export default function ReportsPage() {
   const cards = useAsync(() => (allowed && moneyOk ? api.dashboard(org.orgId, shopId) : Promise.resolve(null)), [shopId, allowed]);
   const shrink = useAsync(() => (allowed ? api.shrinkage(org.orgId, shopId, 30) : none([])), [shopId, allowed]);
 
-  if (!allowed) return <Page title={t('reports.title')}><Why>{t('common:error.forbidden')}</Why></Page>;
+  if (!allowed) return <RedirectHome />;
 
   const eur = (n: number) => money(n, org.currency, locale);
   // the same currency style as every other amount, whole units on the axis
@@ -39,7 +40,6 @@ export default function ReportsPage() {
 
   return (
     <Page title={t('reports.title')} subtitle={t('reports.subtitle')}>
-      {!moneyOk ? <p className="mb-4"><Why>{t('reports.moneyHidden')}</Why></p> : null}
       {moneyOk && cards.data ? (
         <Group>
           <Row title={t('dash.stockValue')} value={<span className="t-headline" style={{ color: 'var(--c-ink)' }}>{eur(cards.data.stockValueCostMinor ?? 0)}</span>} />
@@ -50,7 +50,7 @@ export default function ReportsPage() {
         {moneyOk ? (
           <ChartCard title={t('reports.sales')} subtitle={t('reports.salesSub', { total: eur(total) })}
             table={<DataTable head={[t('reports.day'), t('reports.value')]} rows={days.map((d) => [d.long, eur(d.value)])} />}>
-            <ColumnChart data={days} format={eur} formatAxis={eurAxis} label={t('reports.sales')} />
+            <ColumnChart data={days} format={eur} formatAxis={eurAxis} label={t('reports.sales')} empty={t('reports.noSales')} />
           </ChartCard>
         ) : null}
 

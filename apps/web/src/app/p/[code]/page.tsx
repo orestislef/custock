@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { isUnavailable, Unavailable } from '@/components/platform/unavailable';
 import { serverApi } from '@/lib/api-server';
 import { getT } from '@/lib/i18n-server';
 import { PublicShell } from '@/components/public/public-shell';
@@ -12,7 +13,7 @@ export async function generateMetadata({ params }: PageProps<'/p/[code]'>): Prom
   const { locale } = await getT();
   const { api } = await serverApi(locale);
   const p = await api.shelfProduct(code).catch(() => null);
-  return { title: p ? `${p.name} · ${p.orgName}` : 'Custock' };
+  return { title: { absolute: p ? `${p.name} · ${p.orgName}` : 'Custock' } };
 }
 
 export default async function ShelfProductPage({ params, searchParams }: PageProps<'/p/[code]'>) {
@@ -20,7 +21,9 @@ export default async function ShelfProductPage({ params, searchParams }: PagePro
   const sp = await searchParams;
   const { t, locale } = await getT();
   const { api } = await serverApi(locale);
-  const p = await api.shelfProduct(code).catch(() => null);
+  const result = await api.shelfProduct(code).catch((e: unknown) => (isUnavailable(e) ? 'unavailable' as const : null));
+  if (result === 'unavailable') return <Unavailable />;
+  const p = result;
   if (!p) notFound();
 
   // a poster QR can carry the shop's join code, so "notify me" and "join" land on the right shop

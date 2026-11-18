@@ -4,6 +4,7 @@ import { getLocale } from '@/lib/i18n-server';
 import { I18nProvider } from '@/lib/i18n-client';
 import { ToastProvider } from '@/components/ui/client-kit';
 import { PwaRoot } from '@/components/pwa/pwa-root';
+import { ReportErrors } from '@/components/report-errors';
 import { appIcons } from '@/lib/manifests';
 import './globals.css';
 
@@ -42,6 +43,7 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
         <I18nProvider locale={locale}>
           <ToastProvider>{children}</ToastProvider>
           <PwaRoot />
+          <ReportErrors />
         </I18nProvider>
       </body>
     </html>

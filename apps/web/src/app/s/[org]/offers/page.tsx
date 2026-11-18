@@ -8,7 +8,10 @@ import { FollowerCatalog } from '@/components/shopper/follower-catalog';
 import { Empty } from '@/components/ui/kit';
 import { IconTag } from '@/components/ui/icons';
 
-export const metadata: Metadata = { title: 'Offers' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t('offers.title') };
+}
 
 export default async function OffersPage({ params }: PageProps<'/s/[org]/offers'>) {
   const { org } = await params;
@@ -20,7 +23,7 @@ export default async function OffersPage({ params }: PageProps<'/s/[org]/offers'
   items.sort((a, b) => (a.offer?.validUntil ?? Infinity) - (b.offer?.validUntil ?? Infinity));
 
   return (
-    <PublicShell orgName={info.name} t={t}>
+    <PublicShell orgName={info.name} logoUrl={info.logoUrl} t={t}>
       <h1 className="t-large t-display m-0">{t('offers.title')}</h1>
       <p className="t-sub t-2 mt-2 mb-5">{t('offers.lead')}</p>
       {!all ? (

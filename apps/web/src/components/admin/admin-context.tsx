@@ -27,9 +27,37 @@ interface AdminState {
   logout: () => Promise<void>;
   t: TFunction;
   locale: string;
+  // a super admin above every business (lib: components/platform)
+  superadmin: boolean;
+  // switch to another business the person can open (a super admin: any business)
+  openOrg: (orgId: string, to?: string) => void;
 }
 
 const Ctx = createContext<AdminState | null>(null);
+
+// the platform screens (/admin/platform) for a super admin, with or without a business open
+export interface PlatformState {
+  api: CustockApi;
+  me: MeContext;
+  currentOrgId: string | null;
+  openOrg: (orgId: string, to?: string) => void;
+  refresh: () => Promise<void>;
+  logout: () => Promise<void>;
+  t: TFunction;
+  locale: string;
+}
+
+const PlatformCtx = createContext<PlatformState | null>(null);
+
+export function usePlatform(): PlatformState {
+  const v = useContext(PlatformCtx);
+  if (!v) throw new Error('usePlatform outside a super admin session');
+  return v;
+}
+
+export function useAdminOptional(): AdminState | null {
+  return useContext(Ctx);
+}
 
 export function useAdmin(): AdminState {
   const v = useContext(Ctx);
@@ -63,12 +91,21 @@ function getApi(): CustockApi {
   return browserApi;
 }
 
-interface Loaded { me: MeContext; settings: OrgSettings | null; shops: Shop[]; shopId: string | null }
+interface Loaded { me: MeContext; orgId: string | null; settings: OrgSettings | null; shops: Shop[]; shopId: string | null }
+
+const ORG_KEY = 'custock.org';
+
+// the business on screen: the one picked last, else the first of the person's own. a super admin
+// with no business of their own starts on the platform screens instead
+function pickOrg(me: MeContext) {
+  const saved = localStorage.getItem(ORG_KEY);
+  return me.orgs.find((o) => o.orgId === saved) ?? (me.platformRole === 'superadmin' ? me.orgs.find((o) => !o.platformAccess) : me.orgs[0]);
+}
 
 async function loadSession(api: CustockApi): Promise<Loaded> {
   const me = await api.me();
-  const org = me.orgs[0];
-  if (!org) return { me, settings: null, shops: [], shopId: null };
+  const org = pickOrg(me);
+  if (!org) return { me, orgId: null, settings: null, shops: [], shopId: null };
   session.versions.set(org.orgId, org.permsVersion);
   const [settings, shops] = await Promise.all([api.orgSettings(org.orgId).catch(() => null), api.shops(org.orgId)]);
   const mine = new Set(org.shops.map((x) => x.shopId));
@@ -76,7 +113,7 @@ async function loadSession(api: CustockApi): Promise<Loaded> {
   const shopId = saved === 'all' && org.shops.length > 1 ? null
     : saved && mine.has(saved) ? saved
     : org.shops.length === 1 ? org.shops[0]!.shopId : null;
-  return { me, settings, shops: shops.filter((x) => mine.has(x.id)), shopId };
+  return { me, orgId: org.orgId, settings, shops: shops.filter((x) => mine.has(x.id)), shopId };
 }
 
 export function AdminProvider({ children }: { children: ReactNode }) {
@@ -87,7 +124,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<Loaded | null>(null);
   const [version, setVersion] = useState(0);
   const [failed, setFailed] = useState(false);
-  const isLogin = pathname === '/admin/login';
+  // pages that work signed out: sign in, forgot password and the reset link
+  const isLogin = pathname === '/admin/login' || pathname === '/admin/forgot' || pathname.startsWith('/admin/reset/');
   useEffect(() => { session.locale = locale; }, [locale]);
 
   const refresh = useCallback(async () => { setVersion((v) => v + 1); }, []);
@@ -119,11 +157,20 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('custock.shop', id ?? 'all');
   }, []);
 
+  const openOrg = useCallback((orgId: string, to = '/admin') => {
+    localStorage.setItem(ORG_KEY, orgId);
+    localStorage.removeItem('custock.shop');
+    setState(null);
+    setVersion((v) => v + 1);
+    router.push(to);
+  }, [router]);
+
   const logout = useCallback(async () => {
     // nothing of this person stays on the device: no push to it, no saved stock work, no catalog copy
     await disablePush(getApi()).catch(() => {});
     await getApi().logout().catch(() => {});
     saveTokens(null);
+    localStorage.removeItem(ORG_KEY);
     resetCatalogSync();
     await wipeLocal();
     setState(null);
@@ -135,15 +182,58 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   }
   if (!state && failed) return <Retry t={t} onRetry={() => setVersion((v) => v + 1)} />;
   if (!state) return <Splash />;
-  const org = state.me.orgs[0];
-  if (!org) return <NoOrg t={t} onLogout={logout} />;
+  const superadmin = state.me.platformRole === 'superadmin';
+  const onPlatform = pathname.startsWith('/admin/platform');
+  const org = state.me.orgs.find((o) => o.orgId === state.orgId);
+  const platformValue: PlatformState | null = superadmin
+    ? { api: getApi(), me: state.me, currentOrgId: org?.orgId ?? null, openOrg, refresh, logout, t, locale }
+    : null;
+  if (!org) {
+    if (superadmin) {
+      if (!onPlatform) return <Redirect to="/admin/platform" />;
+      return <PlatformCtx.Provider value={platformValue}>{children}</PlatformCtx.Provider>;
+    }
+    return <NoOrg t={t} onLogout={logout} />;
+  }
+  if (onPlatform && !superadmin) return <Redirect to="/admin" />;
+  // a paused business: its people see a calm screen. a super admin still gets in
+  if (org.suspended && !superadmin) {
+    return <Paused t={t} name={org.name} others={state.me.orgs.filter((o) => o.orgId !== org.orgId && !o.suspended)} onOpen={openOrg} onLogout={logout} />;
+  }
 
   const value: AdminState = {
     api: getApi(), me: state.me, org, settings: state.settings, shops: state.shops, shopId: state.shopId, setShopId,
     can: (perm, s) => canFn(org, perm, s === undefined ? state.shopId : s),
-    refresh, logout, t, locale,
+    refresh, logout, t, locale, superadmin, openOrg,
   };
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <PlatformCtx.Provider value={platformValue}>
+      <Ctx.Provider value={value}>{children}</Ctx.Provider>
+    </PlatformCtx.Provider>
+  );
+}
+
+function Redirect({ to }: { to: string }) {
+  const router = useRouter();
+  useEffect(() => { router.replace(to); }, [router, to]);
+  return <Splash />;
+}
+
+function Paused({ t, name, others, onOpen, onLogout }: { t: TFunction; name: string; others: OrgAccess[]; onOpen: (id: string) => void; onLogout: () => void }) {
+  return (
+    <div className="min-h-dvh grid place-items-center px-6 text-center">
+      <div className="max-w-[420px] page-in">
+        <p className="t-title2 m-0">{t('platform.paused.title')}</p>
+        <p className="t-body t-2 mt-2 mb-0">{name}</p>
+        <div className="flex flex-col items-center gap-2 mt-5">
+          {others.map((o) => (
+            <button key={o.orgId} className="btn btn-tinted" type="button" onClick={() => onOpen(o.orgId)}>{t('platform.paused.open', { name: o.name })}</button>
+          ))}
+          <button className="btn btn-gray" type="button" onClick={onLogout}>{t('common:action.signOut')}</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export const LoginApi = createContext<{ api: CustockApi; onSignedIn: () => void } | null>(null);

@@ -34,12 +34,15 @@ export function ChartCard({ title, subtitle, children, table, legend }: { title:
   const [view, setView] = useState<'chart' | 'table'>('chart');
   return (
     <section className="card p-4 md:p-5 mb-4">
-      <div className="flex items-start gap-3 mb-3">
-        <div className="flex-1 min-w-0">
+      {/* on a narrow card the switch drops under the title instead of squeezing it */}
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2 mb-3">
+        <div className="flex-1 min-w-[min(100%,13rem)]">
           <h2 className="t-headline m-0">{title}</h2>
           {subtitle ? <p className="t-foot t-2 m-0 mt-0.5">{subtitle}</p> : null}
         </div>
-        <Segmented label={t('reports.view')} value={view} onChange={setView} options={[{ value: 'chart', label: t('reports.chart') }, { value: 'table', label: t('reports.table') }]} />
+        <div className="flex-none">
+          <Segmented label={t('reports.view')} value={view} onChange={setView} options={[{ value: 'chart', label: t('reports.chart') }, { value: 'table', label: t('reports.table') }]} />
+        </div>
       </div>
       {legend && view === 'chart' ? <div className="mb-2">{legend}</div> : null}
       {view === 'chart' ? children : <div className="overflow-x-auto">{table}</div>}
@@ -73,18 +76,22 @@ function useWidth<T extends HTMLElement>() {
   return [ref, w] as const;
 }
 
-export function ColumnChart({ data, format, formatAxis, label }: { data: { key: string; label: string; long: string; value: number }[]; format: (n: number) => string; formatAxis: (n: number) => string; label: string }) {
+export function ColumnChart({ data, format, formatAxis, label, empty }: { data: { key: string; label: string; long: string; value: number }[]; format: (n: number) => string; formatAxis: (n: number) => string; label: string; empty?: string }) {
   const [hover, setHover] = useState<number | null>(null);
   const [box, W] = useWidth<HTMLDivElement>();
+  // nothing to draw: say so instead of a flat line with zeros on every axis
+  const blank = !data.some((d) => d.value > 0);
   const Hh = 220, left = 52, right = 8, top = 16, bottom = 28;
   const max = niceMax(Math.max(...data.map((d) => d.value), 0));
   const plotW = W - left - right, plotH = Hh - top - bottom;
   const slot = plotW / Math.max(1, data.length);
   const bw = Math.min(24, slot - GAP * 2 - 6);
-  const ticks = [0, max / 2, max];
+  // each axis label once: small amounts can round to the same text
+  const ticks = [...new Map([0, max / 2, max].map((v) => [formatAxis(v), v] as const)).values()];
   const maxIdx = data.reduce((m, d, i) => (d.value > (data[m]?.value ?? -1) ? i : m), 0);
   const y = (v: number) => top + plotH - (v / max) * plotH;
 
+  if (blank) return <div ref={box}><p className="t-sub t-2 m-0 py-6 text-center">{empty}</p></div>;
   return (
     <div ref={box} className="relative" onPointerLeave={() => setHover(null)}>
       <svg viewBox={`0 0 ${W} ${Hh}`} width={W} height={Hh} role="img" aria-label={label} style={{ display: 'block', overflow: 'visible' }}>
@@ -97,7 +104,7 @@ export function ColumnChart({ data, format, formatAxis, label }: { data: { key: 
         {data.map((d, i) => {
           const x = left + i * slot + (slot - bw) / 2;
           const h = (d.value / max) * plotH;
-          const showLabel = i === maxIdx || i === data.length - 1;
+          const showLabel = d.value > 0 && (i === maxIdx || i === data.length - 1);
           return (
             <g key={d.key}>
               <rect x={left + i * slot} y={top} width={slot} height={plotH} fill="transparent"

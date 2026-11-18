@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdmin } from '@/components/admin/admin-context';
-import { Avatar, Group, Row, Why } from '@/components/ui/kit';
+import { Avatar, Group, Row } from '@/components/ui/kit';
 import { useToast } from '@/components/ui/client-kit';
 import { IconBell, IconChevronLeft, IconHeart, IconMail, IconPhone, IconPlus } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
@@ -55,7 +55,7 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
     <div className="page-in pt-2">
       <Link href="/admin/customers" className="inline-flex items-center min-h-[44px] -ml-2 t-body"><IconChevronLeft size={24} />{t('customers.title')}</Link>
       <div className="flex items-center gap-4 mt-3 mb-8">
-        <Avatar name={d.name} size={64} />
+        <Avatar name={d.name} size={64} src={d.avatarUrl} />
         <div className="min-w-0">
           <h1 className="t-title1 m-0">{d.name}</h1>
           <p className="t-sub t-2 m-0 mt-1">{t('customer.since', { date: date(d.createdAt, locale, { day: 'numeric', month: 'long', year: 'numeric' }) })} · {t(`customer.source.${d.source}`)}</p>
@@ -64,9 +64,10 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
 
       <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-2 gap-x-6">
         <div>
-          <Group title={t('customer.contact')} footer={d.contactMasked ? <Why>{t('customers.maskedWhy')}</Why> : undefined}>
-            <Row leading={<span className="icon-tile"><IconMail size={18} /></span>} title={d.email ?? '-'} subtitle={t('common:channel.email')} />
-            <Row leading={<span className="icon-tile"><IconPhone size={18} /></span>} title={<span className="tnum">{d.phone ?? '-'}</span>} subtitle={t('customer.phone')} />
+          {/* contact details only for those who may see them, the language for everyone */}
+          <Group title={t('customer.contact')}>
+            {!d.contactMasked ? <Row leading={<span className="icon-tile"><IconMail size={18} /></span>} title={d.email ?? '-'} subtitle={t('common:channel.email')} /> : null}
+            {!d.contactMasked ? <Row leading={<span className="icon-tile"><IconPhone size={18} /></span>} title={<span className="tnum">{d.phone ?? '-'}</span>} subtitle={t('customer.phone')} /> : null}
             <Row title={t('customer.language')} value={LOCALE_NAMES[d.locale]} />
           </Group>
 
@@ -83,7 +84,7 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
             ))}
           </Group>
 
-          <Group title={t('customer.tags')} footer={editable ? undefined : <Why>{t('common:why.hiddenForRole')}</Why>}>
+          {editable || d.tags.length ? <Group title={t('customer.tags')}>
             <div className="row flex-wrap gap-2">
               {d.tags.length ? d.tags.map((x) => (
                 <span key={x} className="badge badge-gray" style={{ fontSize: 15, padding: '4px 10px' }}>
@@ -98,7 +99,7 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
                 <button type="submit" className="icon-btn mr-1" aria-label={t('common:action.add')} disabled={!tag.trim()}><IconPlus size={20} /></button>
               </form>
             ) : null}
-          </Group>
+          </Group> : null}
         </div>
 
         <div>
@@ -113,15 +114,17 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
             </Group>
           ) : null}
 
-          <Group title={t('customer.notes')}>
-            {d.notes.map((n) => <Row key={n.id} title={n.body} subtitle={`${n.authorName ?? ''} · ${relative(n.createdAt, locale)}`} />)}
-            {editable ? (
-              <form className={`${d.notes.length ? 'row-sep' : ''} relative`} onSubmit={(e) => { e.preventDefault(); void addNote(); }}>
-                <textarea className="field" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('customer.addNote')} aria-label={t('customer.addNote')} rows={2} />
-                <div className="flex justify-end px-3 pb-3"><button className="btn btn-tinted" type="submit" disabled={!note.trim()}>{t('common:action.save')}</button></div>
-              </form>
-            ) : !d.notes.length ? <Row title={<span className="t-2">{t('customer.noNotes')}</span>} /> : null}
-          </Group>
+          {editable || d.notes.length ? (
+            <Group title={t('customer.notes')}>
+              {d.notes.map((n) => <Row key={n.id} title={n.body} subtitle={`${n.authorName ?? ''} · ${relative(n.createdAt, locale)}`} />)}
+              {editable ? (
+                <form className={`${d.notes.length ? 'row-sep' : ''} relative`} onSubmit={(e) => { e.preventDefault(); void addNote(); }}>
+                  <textarea className="field" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('customer.addNote')} aria-label={t('customer.addNote')} rows={2} />
+                  <div className="flex justify-end px-3 pb-3"><button className="btn btn-tinted" type="submit" disabled={!note.trim()}>{t('common:action.save')}</button></div>
+                </form>
+              ) : null}
+            </Group>
+          ) : null}
 
           <Group title={t('customer.consents')} footer={t('customer.consentsFoot')}>
             {d.consents.length ? d.consents.map((x, i) => (

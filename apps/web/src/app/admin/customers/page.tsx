@@ -8,11 +8,12 @@ import { LOCALES, LOCALE_NAMES } from '@custock/i18n';
 import { Picker, Sheet, isMac, useShortcuts, useToast } from '@/components/ui/client-kit';
 import { useAdmin, useShopFilter } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
-import { Avatar, Empty, Segmented, Switch, Why } from '@/components/ui/kit';
+import { Avatar, Empty, Segmented, Switch } from '@/components/ui/kit';
 import { IconBell, IconBellOff, IconMail, IconMailOff, IconPeople, IconPlus, IconSearch } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { useMedia } from '@/lib/use-media';
 import { date } from '@/lib/format';
+import { RedirectHome } from '@/components/admin/redirect-home';
 
 type Channel = 'all' | 'email' | 'push';
 
@@ -48,13 +49,12 @@ export default function CustomersPage() {
   const list = useAsync(() => api.customers(org.orgId, { q: debounced || undefined, shopId, channel: channel === 'all' ? undefined : channel, limit: 200 }), [debounced, shopId, channel]);
   const groups = useAsync(() => api.groups(org.orgId), []);
   const items = list.data?.items ?? [];
-  const masked = items.some((c) => c.contactMasked);
+  // contact details only for those who may see them. nobody else gets a column of stars
+  const showEmail = items.some((c) => !c.contactMasked);
   const scopeName = (c: Customer) => c.subscriptions.filter((s) => s.status !== 'unsubscribed').map((s) =>
     s.scopeType === 'org' ? t('common:scope.org') : s.scopeType === 'group' ? groups.data?.find((g) => g.id === s.scopeId)?.name ?? '' : shops.find((x) => x.id === s.scopeId)?.name ?? t('transfers.otherShop')).join(', ');
 
-  if (!can('customers.view', null)) {
-    return <Page title={t('customers.title')}><Empty icon={<IconPeople size={40} />} title={t('customers.noAccess')} body={t('common:error.forbidden')} /></Page>;
-  }
+  if (!can('customers.view', null)) return <RedirectHome />;
 
   return (
     <Page title={t('customers.title')} subtitle={list.data ? t('customers.count', { count: items.length }) : undefined}
@@ -76,7 +76,7 @@ export default function CustomersPage() {
           <table className="table mb-2">
             <thead>
               <tr>
-                <th>{t('customers.col.name')}</th><th>{t('join.email')}</th><th>{t('customer.language')}</th><th>{t('customers.col.follows')}</th><th>{t('customer.channels')}</th><th className="num">{t('customers.col.joined')}</th>
+                <th>{t('customers.col.name')}</th>{showEmail ? <th>{t('join.email')}</th> : null}<th>{t('customer.language')}</th><th>{t('customers.col.follows')}</th><th>{t('customer.channels')}</th><th className="num">{t('customers.col.joined')}</th>
               </tr>
             </thead>
             <tbody>
@@ -84,11 +84,11 @@ export default function CustomersPage() {
                 <tr key={c.id} onClick={() => router.push(`/admin/customers/${c.id}`)}>
                   <td>
                     <Link href={`/admin/customers/${c.id}`} className="flex items-center gap-3 hover:no-underline" style={{ color: 'var(--c-ink)' }} onClick={(e) => e.stopPropagation()}>
-                      <Avatar name={c.name} size={30} /><span>{c.name}</span>
+                      <Avatar name={c.name} size={30} src={c.avatarUrl} /><span>{c.name}</span>
                     </Link>
                     {c.tags.length ? <span className="block mt-1 pl-[42px]">{c.tags.map((tag) => <span key={tag} className="badge badge-gray mr-1">{tag}</span>)}</span> : null}
                   </td>
-                  <td className="t-2">{c.email}</td>
+                  {showEmail ? <td className="t-2">{c.contactMasked ? '' : c.email}</td> : null}
                   <td>{LOCALE_NAMES[c.locale]}</td>
                   <td className="t-2">{scopeName(c)}</td>
                   <td><Channels c={c} /></td>
@@ -97,7 +97,6 @@ export default function CustomersPage() {
               ))}
             </tbody>
           </table>
-          {masked ? <p className="t-foot mb-6"><Why>{t('customers.maskedWhy')}</Why></p> : null}
         </>
       ) : (
         <section className="inset-group">
@@ -105,10 +104,10 @@ export default function CustomersPage() {
             {items.map((c) => (
               <li key={c.id}>
                 <Link href={`/admin/customers/${c.id}`} className="row has-icon" style={{ '--sep-inset': '64px' } as React.CSSProperties}>
-                  <Avatar name={c.name} />
+                  <Avatar name={c.name} src={c.avatarUrl} />
                   <span className="row-main">
                     <span className="row-title block">{c.name}</span>
-                    <span className="row-sub block truncate">{c.email} · {LOCALE_NAMES[c.locale]}</span>
+                    <span className="row-sub block truncate">{c.contactMasked || !c.email ? LOCALE_NAMES[c.locale] : `${c.email} · ${LOCALE_NAMES[c.locale]}`}</span>
                     {c.tags.length ? <span className="flex gap-1.5 flex-wrap mt-1">{c.tags.map((tag) => <span key={tag} className="badge badge-gray">{tag}</span>)}</span> : null}
                   </span>
                   <Channels c={c} />
@@ -119,7 +118,6 @@ export default function CustomersPage() {
               <li key={i} className="row"><span className="w-9 h-9 rounded-full skel" /><span className="row-main"><span className="block h-4 w-1/2 skel" /><span className="block h-3 w-2/3 skel mt-2" /></span></li>
             )) : null}
           </ul>
-          {masked ? <p className="inset-group-foot"><Why>{t('customers.maskedWhy')}</Why></p> : null}
         </section>
       )}
       {adding ? <AddCustomer onClose={() => setAdding(false)} onAdded={() => { setAdding(false); void list.reload(); }} /> : null}

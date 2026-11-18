@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import type { DevOutboxItem } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
-import { Empty, Segmented, Switch, Why } from '@/components/ui/kit';
+import { Empty, Segmented, Switch } from '@/components/ui/kit';
 import { showLocalNotification } from '@/lib/push';
 import { useToast } from '@/components/ui/client-kit';
 import { IconBell, IconMail, IconInfo } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { relative } from '@/lib/format';
 import { LOCALE_NAMES, type AppLocale } from '@custock/i18n';
+import { RedirectHome } from '@/components/admin/redirect-home';
 
 // development only: the emails and pushes that would have gone out. nothing leaves this machine.
 export default function DevOutboxPage() {
@@ -21,7 +22,7 @@ export default function DevOutboxPage() {
   const items = useAsync(() => (allowed ? api.devOutbox(200) : Promise.resolve([])), [allowed, tick]);
   const [channel, setChannel] = useState<'all' | 'push' | 'email'>('all');
 
-  if (!allowed) return <Page title={t('outbox.title')}><Why>{t('common:error.forbidden')}</Why></Page>;
+  if (!allowed) return <RedirectHome />;
   const list = (items.data ?? []).filter((i) => channel === 'all' || i.channel === channel || (channel === 'push' && i.channel === 'webpush'));
   const unavailable = Boolean(items.error);
 

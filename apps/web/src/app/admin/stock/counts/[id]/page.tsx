@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import type { StockCount, UncountedPolicy } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
-import { Group, Row, Segmented, Why, signed } from '@/components/ui/kit';
+import { Group, Row, Segmented, signed } from '@/components/ui/kit';
 import { useToast } from '@/components/ui/client-kit';
 import { IconBarcode, IconChevronLeft, IconPlus } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
@@ -80,7 +80,7 @@ export default function CountPage({ params }: { params: Promise<{ id: string }> 
 
       <Group
         title={c.status === 'open' ? t('counts.counted') : t('counts.differences')}
-        footer={c.status === 'open' ? t('counts.blindFoot') : valueShown ? t('counts.valueFoot', { value: money(totalValue, org.currency, locale) }) : <Why>{t('product.costHidden')}</Why>}
+        footer={c.status === 'open' ? t('counts.blindFoot') : valueShown ? t('counts.valueFoot', { value: money(totalValue, org.currency, locale) }) : undefined}
       >
         {c.lines.length ? c.lines.map((l) => (
           <Row
@@ -130,7 +130,7 @@ export default function CountPage({ params }: { params: Promise<{ id: string }> 
             <button type="button" className="btn btn-danger" disabled={busy} onClick={() => void run(() => api.cancelCount(org.orgId, id), t('counts.cancelled'))}>{t('counts.cancel')}</button>
           </div>
         </section>
-      ) : c.status === 'review' ? <p><Why>{t('counts.waitingApproval')}</Why></p> : null}
+      ) : c.status === 'review' ? <p className="t-sub t-2">{t('counts.waitingApproval')}</p> : null}
     </div>
   );
 }

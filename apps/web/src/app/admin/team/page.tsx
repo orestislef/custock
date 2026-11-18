@@ -6,11 +6,12 @@ import type { Member, ScopeType } from '@custock/core';
 import { relative } from '@/lib/format';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
-import { Avatar, Group, Row, Why } from '@/components/ui/kit';
+import { Avatar, Group, Row } from '@/components/ui/kit';
 import { Picker, Sheet, useToast } from '@/components/ui/client-kit';
-import { IconCheck, IconCopy, IconLock, IconPlus, IconShare, IconShield } from '@/components/ui/icons';
+import { IconCheck, IconCopy, IconPlus, IconShare, IconShield } from '@/components/ui/icons';
 import { basePath } from '@/lib/api-client';
 import { useAsync } from '@/lib/use-async';
+import { RedirectHome } from '@/components/admin/redirect-home';
 
 export default function TeamPage() {
   const { api, org, t, can, locale } = useAdmin();
@@ -19,7 +20,8 @@ export default function TeamPage() {
   const [managing, setManaging] = useState<Member | null>(null);
   const toast = useToast();
   const invites = useAsync(() => (org.orgPerms.includes('members.invite') || org.shops.some((s) => s.perms.includes('members.invite')) ? api.invites(org.orgId) : Promise.resolve([])), [inviting]);
-  const canInvite = org.orgPerms.includes('members.invite') || org.shops.some((s) => s.perms.includes('members.invite'));
+  const canInvite = !org.staffFull && (org.orgPerms.includes('members.invite') || org.shops.some((s) => s.perms.includes('members.invite')));
+  if (!org.orgPerms.includes('members.view') && !org.shops.some((s) => s.perms.includes('members.view'))) return <RedirectHome />;
 
   return (
     <Page
@@ -31,16 +33,15 @@ export default function TeamPage() {
         </>
       }
     >
-      <Group title={t('team.members')} footer={t('team.rulesFoot')}>
+      <Group title={t('team.members')}>
         {(members.data ?? []).map((m) => (
           <Row
             key={m.membershipId}
-            leading={<Avatar name={m.name} />}
+            leading={<Avatar name={m.name} src={m.avatarUrl} />}
             title={m.name}
             subtitle={
               <span className="block">
                 {m.assignments.map((a) => `${t(`common:role.${a.roleName}`, { defaultValue: a.roleName })} · ${a.scopeName}`).join(', ')}
-                {!m.canManage && m.manageBlockedBy ? <span className="block mt-0.5"><Why>{t(`team.blocked.${m.manageBlockedBy}`, { defaultValue: t(`common:error.${m.manageBlockedBy}`) })}</Why></span> : null}
               </span>
             }
             value={m.status === 'active' ? undefined : t(`team.status.${m.status}`)}
@@ -81,7 +82,6 @@ function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
   const sc = scopes[Number(scope)];
   const roles = useAsync(() => (open && sc ? api.grantableRoles(org.orgId, sc.type, sc.id) : Promise.resolve([])), [open, scope]);
   const available = (roles.data ?? []).filter((r) => r.ok);
-  const locked = (roles.data ?? []).filter((r) => !r.ok);
   const label = (r: { name: string }) => t(`common:role.${r.name}`, { defaultValue: r.name });
 
   async function send() {
@@ -153,22 +153,6 @@ function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
             </ul>
             <p className="inset-group-foot">{t('team.inviteFoot')}</p>
           </section>
-          {locked.length ? (
-            <section className="inset-group">
-              <h3 className="inset-group-head">{t('team.cantGive')}</h3>
-              <ul className="list" role="list">
-                {locked.map((r) => (
-                  <li key={r.roleId} className="row">
-                    <IconLock size={16} style={{ color: 'var(--c-ink-3)' }} />
-                    <span className="row-main">
-                      <span className="row-title block" style={{ color: 'var(--c-ink-2)' }}>{label(r)}</span>
-                      {r.blockedBy ? <span className="row-sub block">{t(`team.why.${r.blockedBy}`, { defaultValue: t(`common:error.${r.blockedBy}`) })}</span> : null}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
         </>
       )}
     </Sheet>

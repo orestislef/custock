@@ -517,6 +517,17 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     },
     async refresh(rt) { return tokens(rt.replace('devr.', '')); },
     async logout() { currentUser = null; },
+    // forgot password in sample mode: any link of 8+ characters works for the first person
+    async requestPasswordReset() { return { sent: true as const }; },
+    async passwordResetPreview(token) {
+      if (token.length < 8) throw new FixtureError(410, 'reset_expired');
+      return { valid: true as const, expiresAt: Date.now() + 30 * 60_000 };
+    },
+    async resetPassword(token) {
+      if (token.length < 8) throw new FixtureError(410, 'reset_expired');
+      currentUser = people[0]!.userId;
+      return tokens(people[0]!.userId);
+    },
     async me(): Promise<MeContext> {
       const p = me();
       if (!p) throw new FixtureError(401, 'unauthorized');
@@ -1119,6 +1130,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async pushKey() { return null; },
     async savePushSubscription() { /* kept on the real api */ },
     async deletePushSubscription() { /* kept on the real api */ },
+    async testPush() { return { devices: 0 }; },
     // invites from a link: the sample invite belongs to a new person
     async invitePreview(token) {
       if (token.length < 8) throw new FixtureError(410, 'invite_expired');
@@ -1136,6 +1148,37 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       shops.push(shop);
       return shop;
     },
+    // the platform level: nobody in the sample data is a super admin, so it answers like the api
+    // does for owners and staff. what the super admin decided for the sample business: everything on
+    async orgControls() { return { status: 'active' as const, disabledFeatures: [], maxShops: null, maxStaff: null, shops: shops.length, staff: people.length }; },
+    async platformOverview() { throw new FixtureError(403, 'forbidden'); },
+    async platformBusinesses() { throw new FixtureError(403, 'forbidden'); },
+    async platformBusiness() { throw new FixtureError(403, 'forbidden'); },
+    async suggestSlug() { throw new FixtureError(403, 'forbidden'); },
+    async createBusiness() { throw new FixtureError(403, 'forbidden'); },
+    async inviteOwner() { throw new FixtureError(403, 'forbidden'); },
+    async resendOwnerInvite() { throw new FixtureError(403, 'forbidden'); },
+    async revokeOwnerInvite() { throw new FixtureError(403, 'forbidden'); },
+    async setOrgControls() { throw new FixtureError(403, 'forbidden'); },
+    async deleteBusiness() { throw new FixtureError(403, 'forbidden'); },
+    async platformSettings() { throw new FixtureError(403, 'forbidden'); },
+    async setPlatformSettings() { throw new FixtureError(403, 'forbidden'); },
+    async platformAudit() { throw new FixtureError(403, 'forbidden'); },
+    async superAdmins() { throw new FixtureError(403, 'forbidden'); },
+    async inviteSuperAdmin() { throw new FixtureError(403, 'forbidden'); },
+    async resendSuperAdminInvite() { throw new FixtureError(403, 'forbidden'); },
+    async revokeSuperAdminInvite() { throw new FixtureError(403, 'forbidden'); },
+    async removeSuperAdmin() { throw new FixtureError(403, 'forbidden'); },
+    async platformInvitePreview() { throw new FixtureError(410, 'invite_expired'); },
+    async registerPlatformInvite() { throw new FixtureError(410, 'invite_expired'); },
+    async acceptPlatformInvite() { throw new FixtureError(410, 'invite_expired'); },
+    async platformErrors() { throw new FixtureError(403, 'forbidden'); },
+    async platformError() { throw new FixtureError(403, 'forbidden'); },
+    async setPlatformErrorStatus() { throw new FixtureError(403, 'forbidden'); },
+    // sample data mode has no server to tell
+    async reportClientError() {},
+    async openApi() { throw new FixtureError(403, 'forbidden'); },
+    async platformServer() { throw new FixtureError(403, 'forbidden'); },
   };
   // anything the sample data does not cover answers like a missing endpoint
   return new Proxy(api, {

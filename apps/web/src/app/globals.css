@@ -253,6 +253,17 @@
     background: transparent; border: 0; outline: none;
   }
   .field::placeholder { color: var(--c-ink-3); }
+  .password-field { position: relative; display: block; }
+  .password-field .field { padding-right: 52px; }
+  .password-field input::-ms-reveal, .password-field input::-ms-clear { display: none; }
+  .password-toggle {
+    position: absolute; right: 4px; bottom: 0;
+    width: 44px; height: 44px; display: grid; place-items: center;
+    border: 0; border-radius: 10px; background: transparent; color: var(--c-ink-2); cursor: pointer;
+  }
+  .password-toggle:hover { color: var(--c-ink); }
+  .password-toggle[aria-pressed="true"] { color: var(--c-accent); }
+  .password-toggle:focus-visible { outline: 2px solid var(--c-accent); outline-offset: -2px; }
   textarea.field { resize: vertical; min-height: 88px; line-height: 22px; }
   .field-label { display: block; font-size: 13px; color: var(--c-ink-2); padding: 8px 16px 0; }
   .search {
@@ -273,8 +284,45 @@
   .picker.filled { background: var(--c-fill); color: var(--c-ink); font-weight: 500; }
   .picker.plain { padding: 0; min-height: 44px; border-radius: 8px; }
   .picker select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
-  .picker:focus-within { outline: 3px solid color-mix(in srgb, var(--c-accent) 60%, transparent); outline-offset: 2px; }
+  .picker:has(select:focus-visible) { outline: 3px solid color-mix(in srgb, var(--c-accent) 60%, transparent); outline-offset: 2px; }
   .picker[aria-disabled="true"] { cursor: default; opacity: 0.6; }
+
+  /* the open menu. where the browser lets us style it (chromium, appearance: base-select) it sits on
+     the app surface like the app's own menus: 12px radius, soft shadow, 44px rows, an accent check
+     on the chosen one. elsewhere the system picker stays, on an iphone that is the wheel. the select
+     itself stays invisible over the pill, painted transparent instead of opacity 0 so its menu shows */
+  @supports (appearance: base-select) {
+    .picker select, .picker select::picker(select) { appearance: base-select; }
+    .picker select { opacity: 1; color: transparent; background: transparent; border: 0; padding: 0; min-height: 0; }
+    .picker select::picker-icon { display: none; }
+    .picker select::picker(select) {
+      border: 0; border-radius: 12px; padding: 6px; margin-block: 6px;
+      min-width: max(anchor-size(width), 200px); max-width: min(360px, calc(100vw - 24px)); max-height: min(60vh, 440px);
+      background: var(--c-elevated); color: var(--c-ink);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 0 0.5px var(--c-line);
+      font: 400 15px/20px var(--font-ui, inherit); letter-spacing: -0.2px;
+      opacity: 1; transform: none; transform-origin: top center;
+      transition: opacity 160ms ease, transform 200ms cubic-bezier(0.32, 0.72, 0, 1), display 200ms allow-discrete, overlay 200ms allow-discrete;
+    }
+    .picker select:not(:open)::picker(select) { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    @starting-style {
+      .picker select:open::picker(select) { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    }
+    .picker select option {
+      position: relative; display: flex; align-items: center;
+      min-height: 44px; padding: 0 12px 0 36px; border-radius: 8px;
+      color: var(--c-ink); background: transparent; cursor: pointer; white-space: nowrap;
+    }
+    .picker select option:hover { background: var(--c-fill); }
+    .picker select option:focus-visible { background: var(--c-fill); outline: 2px solid var(--c-accent); outline-offset: -2px; }
+    .picker select option:focus:not(:focus-visible) { outline: none; }
+    .picker select option:checked { font-weight: 600; }
+    .picker select option::checkmark { position: absolute; left: 12px; color: var(--c-accent); font-weight: 600; }
+    .picker select option:disabled { color: var(--c-ink-3); cursor: default; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .picker select::picker(select) { transition: none; }
+  }
 
   /* switches like ios, tinted with the app accent */
   .switch { position: relative; flex: none; width: 51px; height: 31px; }
@@ -312,6 +360,12 @@
   /* scrollable rows of options fade at the edge so a clipped label reads as "more" */
   .scroll-x { overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); padding-right: 28px; }
   .scroll-x::-webkit-scrollbar { display: none; }
+  /* sideways rows that fade only where there is more to scroll to (FadeRow) */
+  .fade-x { overflow-x: auto; scrollbar-width: none; scroll-padding-inline: 24px; }
+  .fade-x::-webkit-scrollbar { display: none; }
+  .fade-x[data-end] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+  .fade-x[data-start] { -webkit-mask-image: linear-gradient(to right, transparent, #000 40px); mask-image: linear-gradient(to right, transparent, #000 40px); }
+  .fade-x[data-start][data-end] { -webkit-mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent); }
   .chip {
     display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 999px;
     background: var(--c-fill); color: var(--c-ink); font-size: 15px; font-weight: 500; border: 0; cursor: pointer; white-space: nowrap;
@@ -532,4 +586,26 @@
   body { background: #fff; }
   .no-print { display: none !important; }
   .print-only { display: block !important; }
+}
+
+/* the super admin's api docs: method badges and the schema tree */
+@layer components {
+  .method {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 58px; height: 22px; padding: 0 6px;
+    border-radius: 6px; font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0.02em;
+  }
+  .method-get { background: color-mix(in srgb, var(--c-info) 16%, transparent); color: var(--c-info); }
+  .method-post { background: var(--c-accent-tint); color: var(--c-accent); }
+  .method-put, .method-patch { background: var(--c-few-tint); color: var(--c-few-text); }
+  .method-delete { background: var(--c-neg-tint); color: var(--c-neg-text); }
+  .schema-list { list-style: none; margin: 0; padding: 0; }
+  .schema-item { padding: 6px 0; border-top: 0.5px solid var(--c-line); }
+  .schema-item:first-child { border-top: 0; }
+  .schema-summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 6px; min-height: 28px; }
+  .schema-summary::-webkit-details-marker { display: none; }
+  .schema-summary::before { content: ""; flex: none; width: 6px; height: 6px; margin: 0 2px 2px 0; border-right: 1.5px solid var(--c-ink-2); border-bottom: 1.5px solid var(--c-ink-2); transform: rotate(-45deg); transition: transform 0.2s ease; }
+  details[open] > .schema-summary::before { transform: rotate(45deg); }
+  .schema-summary:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: 6px; }
+  .schema-nest { margin: 4px 0 2px 14px; padding-left: 10px; border-left: 1.5px solid var(--c-line); }
+  .code-path { font: 13px/18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
 }

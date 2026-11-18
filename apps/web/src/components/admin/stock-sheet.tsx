@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { uuidv7, type AdjustReason, type MovementBatchResult, type Product, type StockLevel } from '@custock/core';
 import { useAdmin } from './admin-context';
 import { Picker, Sheet, useToast } from '@/components/ui/client-kit';
-import { Chips, Why } from '@/components/ui/kit';
+import { Chips } from '@/components/ui/kit';
 import { IconMinus, IconPlus } from '@/components/ui/icons';
 import { productName, variantLabel } from '@/lib/names';
 import { qtyNumber } from '@/lib/format';
@@ -107,7 +107,7 @@ export function StockSheet({ open, onClose, product, mode, onDone, variantId }: 
       footer={
         <>
           <button type="button" className="btn btn-primary btn-large" disabled={busy || !shop || qty === 0} onClick={() => void submit()}>{button}</button>
-          {!shop ? <p className="why-line">{t('stockSheet.noShop')}</p> : qty === 0 ? <p className="why-line">{t('stockSheet.needQty')}</p> : null}
+          {shop && qty === 0 ? <p className="why-line">{t('stockSheet.needQty')}</p> : null}
         </>
       }
     >
@@ -155,7 +155,6 @@ export function StockSheet({ open, onClose, product, mode, onDone, variantId }: 
         <input className="field" placeholder={t('stockSheet.note')} aria-label={t('stockSheet.note')} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
       </div>
       {confirming ? <p className="t-sub mt-3 mb-0" role="alert" style={{ color: negative ? 'var(--c-neg-text)' : 'var(--c-ink)' }}>{t(negative ? 'stockSheet.confirmNegative' : 'stockSheet.confirmBig', { count: Math.abs(qty) })}</p> : negative ? <p className="t-foot mt-2 mb-0" style={{ color: 'var(--c-neg-text)' }}>{t('stockSheet.negativeHint')}</p> : null}
-      {allowed.length < shops.length ? <p className="mt-2 mb-0"><Why>{t('stockSheet.onlyYourShops')}</Why></p> : null}
     </Sheet>
   );
 }

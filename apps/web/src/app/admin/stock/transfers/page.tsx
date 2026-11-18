@@ -7,12 +7,13 @@ import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { StockTabs } from '@/components/admin/stock-tabs';
 import { ProductPicker } from '@/components/admin/product-picker';
-import { Empty, Group, Row, Why } from '@/components/ui/kit';
+import { Empty, Group, Row } from '@/components/ui/kit';
 import { Picker, Sheet, isMac, useShortcuts } from '@/components/ui/client-kit';
 import { IconClose, IconPlus, IconTruck } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { productName } from '@/lib/names';
 import { relative } from '@/lib/format';
+import { RedirectHome } from '@/components/admin/redirect-home';
 
 export default function TransfersPage() {
   const { api, org, t, locale, can, shops, shopId } = useAdmin();
@@ -26,7 +27,7 @@ export default function TransfersPage() {
   const allShops = useAsync(() => api.shops(org.orgId, { all: true }), []);
   const name = (id: string) => (allShops.data ?? shops).find((s) => s.id === id)?.name ?? t('transfers.otherShop');
 
-  if (!allowed) return <Page title={t('transfers.title')}><Why>{t('common:error.forbidden')}</Why></Page>;
+  if (!allowed) return <RedirectHome />;
   const items = list.data ?? [];
   const groups: { key: string; items: Transfer[] }[] = [
     { key: 'incoming', items: items.filter((x) => x.status === 'sent' && can('stock.transfer.receive', x.toShopId)) },

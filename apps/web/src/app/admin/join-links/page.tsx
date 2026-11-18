@@ -5,13 +5,14 @@ import { useState } from 'react';
 import type { JoinLink, ScopeType } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
-import { Empty, Switch, Why } from '@/components/ui/kit';
+import { Empty, Switch } from '@/components/ui/kit';
 import { Picker, Sheet, Tip, useToast } from '@/components/ui/client-kit';
 import { Qr } from '@/components/ui/qr';
 import { IconCopy, IconLink, IconPlus, IconPrint } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { basePath } from '@/lib/api-client';
 import { number, percent } from '@/lib/format';
+import { RedirectHome } from '@/components/admin/redirect-home';
 
 export default function JoinLinksPage() {
   const { api, org, t, locale, can, shops } = useAdmin();
@@ -22,13 +23,15 @@ export default function JoinLinksPage() {
   const origin = typeof window === 'undefined' ? '' : window.location.origin + basePath;
   const scopeName = (l: JoinLink) => l.scopeType === 'org' ? org.name : l.scopeType === 'group' ? groups.data?.find((g) => g.id === l.scopeId)?.name ?? '' : shops.find((s) => s.id === l.scopeId)?.name ?? '';
 
-  if (!can('joinlinks.manage', null)) return <Page title={t('links.title')}><Why>{t('common:error.forbidden')}</Why></Page>;
+  if (!can('joinlinks.manage', null)) return <RedirectHome />;
 
   return (
-    <Page title={t('links.title')} actions={<button type="button" className="btn btn-primary" onClick={() => setCreating(true)}><IconPlus size={18} />{t('links.new')}</button>}>
+    <Page title={t('links.title')} actions={<button type="button" className="btn btn-primary" onClick={() => setCreating(true)}><IconPlus size={18} />{t('links.new')}</button>}
+      phoneAction={<button type="button" className="icon-btn" style={{ background: 'var(--c-accent-tint)' }} aria-label={t('links.new')} onClick={() => setCreating(true)}><IconPlus size={22} /></button>}>
       <Tip id="links-label">{t('links.tip')}</Tip>
       {links.data && !links.data.length ? (
-        <Empty icon={<IconLink size={40} />} title={t('links.emptyTitle')} body={t('links.emptyBody')} />
+        <Empty icon={<IconLink size={40} />} title={t('links.emptyTitle')} body={t('links.emptyBody')}
+          action={<button type="button" className="btn btn-primary" onClick={() => setCreating(true)}><IconPlus size={18} />{t('links.new')}</button>} />
       ) : (
         <ul className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 list-none p-0 m-0">
           {(links.data ?? []).map((l) => (

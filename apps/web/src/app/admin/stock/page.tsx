@@ -90,7 +90,8 @@ function StockList() {
       phoneAction={canCreate ? <Link href="/admin/stock/new" className="icon-btn" aria-label={t('stock.newProduct')} style={{ background: 'var(--c-accent-tint)' }}><IconPlus size={22} /></Link> : undefined}
     >
       <StockTabs />
-      <Tip id="stock-scan">{t('stock.tipScan')}</Tip>
+      {/* on a phone this screen is already the phone app, the tip is for wide screens */}
+      <div className="hidden md:block"><Tip id="stock-scan">{t('stock.tipScan')}</Tip></div>
       <div className="sticky top-[52px] z-10 -mx-4 px-4 md:mx-0 md:px-0 pt-1 pb-3 flex flex-col gap-3" style={{ background: 'var(--c-shelf)' }}>
         <div className="search" style={{ height: 40 }}>
           <IconSearch size={18} />

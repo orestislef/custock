@@ -7,7 +7,7 @@ import { useAdmin } from '@/components/admin/admin-context';
 import { StockSheet, type StockMode } from '@/components/admin/stock-sheet';
 import { ShopSettingsSheet } from '@/components/admin/shop-settings-sheet';
 import { useRouter } from 'next/navigation';
-import { Group, Row, StockBadge, Why, signed, stockState } from '@/components/ui/kit';
+import { Group, Row, StockBadge, signed, stockState } from '@/components/ui/kit';
 import { Photo, useToast } from '@/components/ui/client-kit';
 import { Tally } from '@/components/ui/tally';
 import { IconBell, IconChevronLeft, IconPlus, IconEdit, IconTruck, IconGear } from '@/components/ui/icons';
@@ -72,7 +72,6 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
             {canAdjust ? <button type="button" className="btn btn-gray" onClick={() => setSheet('adjust')}>{t('product.adjust')}</button> : null}
             {can('products.edit', null) ? <Link href={`/admin/stock/${p.id}/edit`} className="btn btn-gray"><IconEdit size={18} />{t('common:action.edit')}</Link> : null}
           </div>
-          {!canReceive && !canAdjust ? <p className="mt-3 mb-0"><Why>{t('product.readOnly')}</Why></p> : null}
         </div>
       </div>
 
@@ -117,23 +116,17 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
           ))}
 
           <Group title={t('product.prices')}>
-            <Row
-              title={t('product.basePrice')}
-              subtitle={!can('products.price.edit', null) ? <Why>{t('common:why.setByAdmin')}</Why> : undefined}
-              value={money(v0?.priceMinor, org.currency, locale)}
-            />
-            {shopId ? (
+            <Row title={t('product.basePrice')} value={money(v0?.priceMinor, org.currency, locale)} />
+            {shopId && can('prices.shop.edit', shopId) ? (
               <Row
                 title={t('product.shopPrice', { shop: shops.find((s) => s.id === shopId)?.name ?? '' })}
-                subtitle={can('prices.shop.edit', shopId) ? t('product.shopPriceSub') : <Why>{t('common:why.hiddenForRole')}</Why>}
+                subtitle={t('product.shopPriceSub')}
                 value={t('product.samePrice')}
               />
             ) : null}
             {v0 && v0.costMinor !== undefined ? (
               <Row title={t('product.cost')} subtitle={v0.priceMinor && v0.costMinor ? t('product.margin', { pct: Math.round(((v0.priceMinor - v0.costMinor) / v0.priceMinor) * 100) }) : undefined} value={money(v0.costMinor, org.currency, locale)} />
-            ) : (
-              <Row title={t('product.cost')} subtitle={<Why>{t('product.costHidden')}</Why>} />
-            )}
+            ) : null}
             <Row title={t('product.vat')} value={`${p.taxRateBp / 100}%`} />
           </Group>
 
@@ -145,7 +138,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         </div>
 
         <div>
-          {history.data ? (
+          {!can('stock.history.view', null) ? null : history.data ? (
             <Group title={t('product.history')} footer={moves.length ? t('product.historyFoot') : undefined}>
               {moves.length ? moves.slice(0, 15).map((m) => (
                 <Row
@@ -157,7 +150,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
               )) : <Row title={t('product.noHistory')} />}
             </Group>
           ) : (
-            <Group title={t('product.history')}><Row title={<Why>{t('common:why.hiddenForRole')}</Why>} /></Group>
+            <Group title={t('product.history')}><Row title={<span className="inline-block h-4 w-40 skel" />} /></Group>
           )}
           {p.levels.some((l) => l.inTransitIn > 0) ? (
             <div className="tip"><IconTruck size={20} /><span className="t-sub">{t('product.transferTip')}</span></div>

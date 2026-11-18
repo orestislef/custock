@@ -17,6 +17,7 @@ import {
 import { useAsync } from '@/lib/use-async';
 import { useNames } from '@/lib/use-names';
 import { AppIcon, InstallCoach } from '@/components/pwa/install-coach';
+import { PushCard } from '@/components/pwa/push-card';
 import { basePath } from '@/lib/api-client';
 import { date, qtyNumber, relative } from '@/lib/format';
 
@@ -52,9 +53,11 @@ function ManagerHome() {
         can('stock.count.approve', null) && d.countsInReview > 0 && { key: 'counts', n: d.countsInReview, href: '/admin/stock/counts', icon: <IconClipboard size={18} /> },
         (can('products.create', null) || can('products.edit', null)) && d.unknownCodes > 0 && { key: 'unknown', n: d.unknownCodes, href: '/admin/stock?filter=unknown', icon: <IconBarcode size={18} /> },
         can('stock.adjust', null) && d.negativeStock > 0 && { key: 'negative', n: d.negativeStock, href: '/admin/stock?filter=negative', icon: <IconWarning size={18} />, tone: 'neg' as const },
-        d.transfersOnTheWay > 0 && { key: 'transfers', n: d.transfersOnTheWay, href: '/admin/stock/transfers', icon: <IconTruck size={18} /> },
+        can('stock.transfer.receive', null) && d.transfersOnTheWay > 0 && { key: 'transfers', n: d.transfersOnTheWay, href: '/admin/stock/transfers', icon: <IconTruck size={18} /> },
       ].filter(Boolean) as { key: string; n: number; href: string; icon: React.ReactNode; tone?: 'neg' }[]
     : [];
+  // someone who never has anything to act on gets no "needs you" section at all
+  const actsOnThings = ['posts.publish', 'stock.count.approve', 'products.create', 'products.edit', 'stock.adjust', 'stock.transfer.receive'].some((p) => can(p, null));
 
   const stats: { key: string; value: number | null; href: string; icon: React.ReactNode }[] = [
     { key: 'waiting', value: d?.peopleWaiting ?? null, href: '/admin/stock?filter=waiting', icon: <IconBell size={18} /> },
@@ -70,11 +73,13 @@ function ManagerHome() {
       <StaffCoach />
       <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-2 gap-x-6 items-start">
         <div>
-          <Group title={t('dash.needsYou')} footer={d && !needs.length ? t('dash.allClear') : undefined}>
-            {!d ? <Row title={<span className="inline-block h-4 w-40 skel" />} /> : needs.length ? needs.map((n) => (
-              <Row key={n.key} href={n.href} leading={<IconTile tone={n.tone}>{n.icon}</IconTile>} title={t(`dash.need.${n.key}`, { count: n.n })} />
-            )) : <Row leading={<IconTile tone="ok"><IconCheck size={18} /></IconTile>} title={t('dash.nothing')} />}
-          </Group>
+          {actsOnThings ? (
+            <Group title={t('dash.needsYou')} footer={d && !needs.length ? t('dash.allClear') : undefined}>
+              {!d ? <Row title={<span className="inline-block h-4 w-40 skel" />} /> : needs.length ? needs.map((n) => (
+                <Row key={n.key} href={n.href} leading={<IconTile tone={n.tone}>{n.icon}</IconTile>} title={t(`dash.need.${n.key}`, { count: n.n })} />
+              )) : <Row leading={<IconTile tone="ok"><IconCheck size={18} /></IconTile>} title={t('dash.nothing')} />}
+            </Group>
+          ) : null}
 
           <Group title={t('dash.atAGlance')}>
             {stats.map((s) => (
@@ -86,6 +91,7 @@ function ManagerHome() {
 
         {recent.data ? (
           <Group title={t('dash.recent')} footer={<Link href="/admin/stock">{t('common:action.seeAll')}</Link>}>
+            {!recent.data.items.length ? <Row title={<span className="t-2">{t('dash.recentEmpty')}</span>} /> : null}
             {recent.data.items.map((m) => (
               <Row
                 key={m.id}
@@ -184,11 +190,17 @@ function StaffToday() {
 
 // "add custock to your home screen", on phones only, closable for good
 function StaffCoach() {
-  const { t } = useAdmin();
+  const { t, api } = useAdmin();
   return (
-    <div className="md:hidden">
-      <InstallCoach place="staff-home" appName="Custock" className="mb-6"
-        icon={<AppIcon src={`${basePath}/icons/icon-192.png`} size={48} label="Custock" />} body={t('pwa.staffCoachBody')} />
-    </div>
+    <>
+      <div className="md:hidden">
+        <InstallCoach place="staff-home" appName="Custock" className="mb-6"
+          icon={<AppIcon src={`${basePath}/icons/icon-192.png`} size={48} label="Custock" />} body={t('pwa.staffCoachBody')} />
+      </div>
+      <PushCard api={api} orgId={null} place="staff-home" className="mb-6 max-w-[640px]" installCoachShown
+        title={t('push.card.staffTitle')} body={t('push.card.staffBody')} later={t('push.card.staffLater')}
+        onTitle={t('push.card.staffOnTitle')} onBody={t('push.card.staffOnBody')}
+        appName="Custock" appIcon={<AppIcon src={`${basePath}/icons/icon-192.png`} size={44} label="Custock" />} />
+    </>
   );
 }

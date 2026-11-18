@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_API_MODE: apiUrl || process.env.NODE_ENV === 'production' ? 'real' : 'fixtures',
     NEXT_PUBLIC_BASE_PATH: basePath ?? '',
+    // the build revision browsers put on their error reports (deploy/ship.sh passes it)
+    NEXT_PUBLIC_BUILD_REV: process.env.CUSTOCK_REV ?? process.env.CUSTOCK_BUILD_REV ?? '',
     NEXT_PUBLIC_SHOW_DEV: process.env.CUSTOCK_SHOW_DEV === '1' ? '1' : '',
   },
   images: {
@@ -42,6 +44,10 @@ const nextConfig: NextConfig = {
     return [
       { source: '/api/v1/:path*', destination: `${apiUrl}/v1/:path*` },
       { source: '/files/:path*', destination: `${apiUrl}/files/:path*` },
+      // the api's public address is <web>/api on a server; without the reverse proxy in front
+      // (local runs) photos and email assets under it still reach the api
+      { source: '/api/files/:path*', destination: `${apiUrl}/files/:path*` },
+      { source: '/api/email/:path*', destination: `${apiUrl}/email/:path*` },
     ];
   },
 };

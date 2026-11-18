@@ -71,7 +71,6 @@
     "priceInShop": "Price in the shop",
     "receive": "Receive",
     "adjust": "Adjust",
-    "readOnly": "You can see this product, your role cannot change its stock.",
     "stockPerShop": "Stock per shop",
     "stockFoot": "Numbers are the sum of every movement, nothing is ever overwritten.",
     "prices": "Prices",
@@ -80,7 +79,6 @@
     "shopPriceSub": "Same as the base price unless you change it",
     "samePrice": "Same",
     "cost": "Cost",
-    "costHidden": "Costs are hidden for your role",
     "margin": "Margin {{pct}}%",
     "vat": "VAT",
     "barcodes": "Barcodes",
@@ -110,7 +108,8 @@
     "closedBody": "{{org}} does not share its catalog. Join to get their offers.",
     "followersTitle": "{{org}} shows its products to followers",
     "followersBody": "Join to browse them. It takes a few seconds and you choose what you hear about.",
-    "joinToBrowse": "Join {{org}}"
+    "joinToBrowse": "Join {{org}}",
+    "followersBodyNoLink": "Ask {{org}} for its QR code to join. It takes a few seconds and you choose what you hear about."
   },
   "offers": {
     "title": "Offers",
@@ -136,21 +135,22 @@
     "password": "Password",
     "wrong": "Email or password is not right.",
     "devTitle": "Sample team",
-    "devFoot": "Development only. Each person has a different role, so you can see what each one can and cannot do."
+    "devFoot": "Development only. Each person has a different role, so you can see what each one can and cannot do.",
+    "forgot": "Forgot password?"
   },
   "admin": {
     "business": "Business",
     "nav": "Sections",
     "account": "Account",
     "shop": "Shop",
-    "permsCount_one": "{{count}} permission here",
-    "permsCount_other": "{{count}} permissions here",
     "noOrgTitle": "No business yet",
     "noOrgBody": "You are not a member of any business. Ask for an invite.",
     "skip": "Skip to content",
     "offlineTitle": "Cannot reach the server",
     "offlineBody": "Your session is fine. Check the connection and try again.",
-    "businessSection": "Business"
+    "businessSection": "Business",
+    "role": "Role",
+    "shops": "Shops"
   },
   "nav": {
     "home": "Home",
@@ -194,7 +194,8 @@
     },
     "recent": "Latest stock changes",
     "tipQr": "Print the window QR from QR codes. People join in 30 seconds, no app needed.",
-    "atAGlance": "At a glance"
+    "atAGlance": "At a glance",
+    "recentEmpty": "No stock changes yet"
   },
   "stock": {
     "title": "Stock",
@@ -216,7 +217,7 @@
     "noResultsBody": "Nothing found for \"{{q}}\".",
     "emptyTitle": "Nothing here",
     "empty": {
-      "all": "Add your first product, or scan one with the phone app.",
+      "all": "Add your first product, or scan its barcode with Scan.",
       "low": "Nothing is running low.",
       "out": "Nothing is out of stock.",
       "negative": "No negative stock. Good.",
@@ -227,7 +228,7 @@
     "unknownFoot": "Staff scanned these and they matched nothing. Add them to a product or create a new one.",
     "unknownSub_one": "Scanned {{count}} time, {{when}}",
     "unknownSub_other": "Scanned {{count}} times, {{when}}",
-    "tipScan": "The phone app is faster for stock: scan to receive, sell or count. This screen is for checking and fixing.",
+    "tipScan": "On a phone, Scan is the fastest way to receive, sell and count. This screen is for checking and fixing.",
     "created": "{{name}} added",
     "form": {
       "name": "Name",
@@ -271,13 +272,11 @@
     "received_other": "Received {{count}} of {{name}}",
     "adjusted": "{{qty}} {{name}}",
     "undone": "Undone. A reversal line was added.",
-    "onlyYourShops": "Only the shops where your role allows this",
     "sellTitle": "Quick sale",
     "sellButton_one": "Sell {{count}} item",
     "sellButton_other": "Sell {{count}} items",
     "sold_one": "Sold {{count}} of {{name}}",
     "sold_other": "Sold {{count}} of {{name}}",
-    "noShop": "Your role cannot do this in any shop.",
     "needQty": "Set a quantity first."
   },
   "customers": {
@@ -291,8 +290,6 @@
     "emptyBody": "Print your window QR. People join in 30 seconds.",
     "printQr": "Print a QR code",
     "noResults": "No matches",
-    "noAccess": "Customers are not part of your role",
-    "maskedWhy": "Email and phone are partly hidden for your role",
     "emailOn": "Email on",
     "emailOff": "Email off",
     "pushOn": "Push on",
@@ -392,7 +389,6 @@
     "wasNote": "The was price is worked out for you: the lowest price of the last 30 days, as EU rules ask.",
     "until": "Offer ends",
     "audience": "Who gets it",
-    "audienceFoot": "Only shops where your role lets you post are listed.",
     "channels": "Channels",
     "feedSub": "Always on. It is where the post lives.",
     "when": "When",
@@ -414,7 +410,7 @@
     "schedule": "Schedule",
     "submit": "Submit for approval",
     "saveDraft": "Save draft",
-    "approvalRole": "Your role needs an admin to approve posts for these shops.",
+    "approvalRole": "Posts for these shops are checked before they go out.",
     "approvalOrg": "This business asks for approval before posts go out.",
     "cantRecall": "Pushes and emails cannot be taken back once sent.",
     "published_one": "Published. On its way to {{count}} person.",
@@ -432,7 +428,7 @@
   "post": {
     "approve": "Approve and publish",
     "approved": "Approved and published",
-    "waitingApproval": "Waiting for an admin to approve",
+    "waitingApproval": "Waiting for approval",
     "sentOff": "Done",
     "cancel": "Cancel post",
     "cancelled": "Post cancelled",
@@ -457,14 +453,6 @@
     "roles": "Roles",
     "invite": "Invite",
     "members": "People",
-    "rulesFoot": "You can only manage people below your rank, and only give permissions you have yourself.",
-    "blocked": {
-      "self": "This is you",
-      "forbidden": "Your role cannot change people",
-      "rank": "Same rank or above yours",
-      "scope": "Outside your shops",
-      "ceiling": "Has permissions you do not have"
-    },
     "status": {
       "active": "Active",
       "suspended": "Suspended",
@@ -473,13 +461,6 @@
     "email": "Their email",
     "where": "Where",
     "role": "Role",
-    "why": {
-      "scope": "Not in this shop",
-      "ceiling": "Includes permissions you do not have",
-      "rank": "Rank must be below yours",
-      "self": "Not for yourself",
-      "forbidden": "Your role cannot invite"
-    },
     "inviteFoot": "The invite is valid for 7 days and only for this email.",
     "send": "Send invite",
     "invited": "Invite sent to {{email}}",
@@ -503,7 +484,6 @@
     },
     "needEmail": "Add their email.",
     "needRole": "Pick a role.",
-    "cantGive": "Roles you can't give",
     "linkReady": "Invite link ready",
     "linkReadySub": "Send it to {{email}} however you like. It works once, for 7 days.",
     "copyLink": "Copy link",
@@ -515,9 +495,6 @@
     "new": "New role",
     "edit": "Edit role",
     "list": "Roles in this business",
-    "foot": "Roles at or above your rank are locked for you.",
-    "lockedOwner": "The owner role cannot change",
-    "lockedRank": "At or above your rank",
     "name": "Role name",
     "affects_one": "This changes access for {{count}} person right away.",
     "affects_other": "This changes access for {{count}} people right away.",
@@ -528,7 +505,6 @@
     "people_other": "{{count}} people",
     "canManage": "Can manage: {{list}}",
     "managesNobody": "Manages nobody",
-    "youGive": "You can give roles below {{role}}.",
     "manageLabel": "Can manage",
     "nobody": "Nobody",
     "andBelow": "{{role}} and below",
@@ -542,7 +518,6 @@
     "view": "View",
     "chart": "Chart",
     "table": "Table",
-    "moneyHidden": "Money is hidden for your role. Counts are still here.",
     "sales": "Sales per day",
     "salesSub": "{{total}} in 14 days",
     "day": "Day",
@@ -569,7 +544,8 @@
     "reason": "Reason",
     "empty": "Nothing to show yet",
     "units": "{{n}} sold",
-    "topSubMoney": "Sales value, units sold beside it"
+    "topSubMoney": "Sales value, units sold beside it",
+    "noSales": "No sales yet"
   },
   "settings": {
     "title": "Settings",
@@ -618,10 +594,8 @@
     "capValue_other": "{{count}} pushes",
     "quiet": "Quiet hours",
     "quietValue": "{{from}} to {{to}}",
-    "readOnly": "Only an owner or admin can change business settings.",
     "preview": "Preview",
-    "previewFoot": "A product with 7, 2 and 0 in three shops.",
-    "previewProduct": "Thyme honey 450g",
+    "previewFoot": "Your first product, as a customer sees it.",
     "previewNoPrice": "Ask in the shop",
     "previewOff": "Catalog is off, so customers only see posts.",
     "hiddenShop": "Hidden from customers",
@@ -632,6 +606,21 @@
       "off": "Customers see your posts and offers only. Turn the catalog on to let them browse.",
       "subscribers": "Only people who follow you can browse it. Strangers who open the link are asked to join first.",
       "public": "Anyone with the link can browse your catalog. Put it on your window, receipts and social media."
+    },
+    "previewFootEmpty": "How a product will look to customers once you add one.",
+    "previewYourProduct": "Your product",
+    "previewPrice": "Price",
+    "previewExact": "Number in stock",
+    "previewInOrOut": "In stock or out",
+    "logo": {
+      "title": "Logo",
+      "foot": "On your shop page, the home screen icon customers add and your emails. A square logo works best.",
+      "add": "Add logo",
+      "change": "Change logo",
+      "remove": "Remove logo",
+      "saved": "Logo saved",
+      "removed": "Logo removed",
+      "alt": "Logo of {{org}}"
     }
   },
   "links": {
@@ -777,7 +766,7 @@
     },
     "apply": "Apply differences",
     "applied": "Differences applied to stock",
-    "waitingApproval": "Someone with count approval applies this."
+    "waitingApproval": "Waiting for review"
   },
   "transfers": {
     "title": "Transfers",
@@ -818,7 +807,6 @@
     "sentGot": "sent {{sent}}, arrived {{got}}",
     "lost": "{{n}} lost",
     "lostFoot": "Lost items count as shrinkage in reports.",
-    "onlyReceiving": "Only the receiving shop can confirm this.",
     "needLines": "Add at least one product."
   },
   "audit": {
@@ -901,7 +889,7 @@
     "receive": "Receive",
     "count": "Count",
     "mine": "What you did",
-    "mineFoot": "Undo works for an hour. After that, ask a manager.",
+    "mineFoot": "Undo works for an hour.",
     "nothingYet": "Nothing yet today",
     "fromShop": "From {{shop}}",
     "fromOther": "From another shop"
@@ -940,7 +928,7 @@
     "countApplied_one": "{{count}} difference applied",
     "countApplied_other": "{{count}} differences applied",
     "countNoDifferences": "Everything matches. Nothing to change.",
-    "countNeedsApproval": "Counts are applied by a manager. Show them this list.",
+    "countNeedsApproval": "The count is checked before stock changes.",
     "expected": "Expected {{qty}}",
     "clear": "Clear",
     "torch": "Torch",
@@ -950,13 +938,11 @@
     "unknownTitle": "Unknown code",
     "damaged": "This code looks damaged. Check the digits.",
     "createWithCode": "New product with this code",
-    "unknownSaved": "Saved for your manager, who can add it to a product.",
+    "unknownSaved": "Saved, so it can be added to a product later.",
     "cameraWhy": "The camera reads barcodes. Nothing is recorded or saved.",
-    "noModesTitle": "Nothing to scan for your role",
-    "noModesBody": "Your role can look at stock but not change it.",
     "lowStock_one": "{{count}} product just dropped to its reorder point",
     "lowStock_other": "{{count}} products just dropped to their reorder point",
-    "countSubmitted": "Count sent to your manager for review",
+    "countSubmitted": "Count sent for review",
     "submitCount": "Send count for review",
     "lines_one": "{{count}} line",
     "lines_other": "{{count}} lines",
@@ -989,7 +975,7 @@
     "waiting_other": "Waiting: {{count}}",
     "refused_one": "Refused: {{count}}",
     "refused_other": "Refused: {{count}}",
-    "refusedFooter": "The server did not accept these, for the reason shown. Show them to your manager, then remove them here.",
+    "refusedFooter": "The server did not accept these, for the reason shown. Remove them here once they are sorted out.",
     "allSynced": "Everything is synced",
     "retry": "Send now",
     "discard": "Remove refused",
@@ -1031,7 +1017,7 @@
   "push": {
     "staffTitle": "Alerts on this device",
     "staffSub": "Low stock, deliveries on the way, posts to approve.",
-    "staffFoot": "Only on this device, and only what your role can see.",
+    "staffFoot": "Only on this device.",
     "why": {
       "install": "On iPhone, notifications work once this is on your Home Screen.",
       "denied": "Notifications are blocked for this site. Allow them in the browser or phone settings.",
@@ -1041,7 +1027,29 @@
     },
     "nudgeTitle": "Hear it first",
     "nudgeBody": "Turn on notifications and {{org}} can tell you the moment it is back.",
-    "turnOn": "Continue"
+    "turnOn": "Continue",
+    "card": {
+      "turnOn": "Turn on",
+      "notNow": "Not now",
+      "never": "Don't ask again",
+      "staffTitle": "Know when it matters",
+      "staffBody": "Low stock, deliveries on the way and posts waiting for you, as a notification on this device.",
+      "staffLater": "Later: tap your name or initials, then Alerts on this device.",
+      "staffOnTitle": "Alerts are on",
+      "staffOnBody": "This device hears about low stock, deliveries and posts waiting for you.",
+      "customerTitle": "Hear about offers first",
+      "customerBody": "Offers, news and back in stock from {{org}}, as a notification on this device.",
+      "customerLater": "Later: You, then Notifications.",
+      "customerOnTitle": "Notifications are on",
+      "customerOnBody": "{{org}} can reach you on this device. At most 2 a day, never at night."
+    },
+    "test": {
+      "send": "Send a test notification",
+      "sent": "Sent. It should arrive in a few seconds.",
+      "none": "No device has notifications on yet.",
+      "wait": "One test a minute. Try again shortly.",
+      "failed": "That did not work. Try again in a moment."
+    }
   },
   "shopper": {
     "tabsLabel": "Sections",
@@ -1131,6 +1139,500 @@
     "accept": "Sign in and join",
     "accountExists": "This email already has an account. Sign in to accept.",
     "goneTitle": "This invite no longer works",
-    "goneBody": "It was used, revoked or is older than 7 days. Ask for a new one."
+    "goneBody": "It was already used, taken back or has expired. Ask for a new one.",
+    "metaTitle": "Invite"
+  },
+  "password": {
+    "show": "Show password"
+  },
+  "profile": {
+    "add": "Add photo",
+    "change": "Change photo",
+    "remove": "Remove photo",
+    "saved": "Photo saved",
+    "removed": "Photo removed"
+  },
+  "platform": {
+    "title": "All businesses",
+    "subtitle": "Every business on Custock, in one place",
+    "superadmin": "Super admin",
+    "access": "Super admin access",
+    "allBusinesses": "All businesses",
+    "switchBusiness": "Switch business",
+    "yourBusinesses": "Your businesses",
+    "everyBusiness": "Every business",
+    "backTo": "Back to {{name}}",
+    "newBusiness": "New business",
+    "overview": "Across every business",
+    "stat": {
+      "businesses": "Businesses",
+      "paused_one": "{{count}} paused",
+      "paused_other": "{{count}} paused",
+      "shops": "Shops",
+      "staff": "Staff",
+      "customers": "Customers",
+      "confirmed": "confirmed",
+      "products": "Products",
+      "salesToday": "Sales today",
+      "sales14d": "Sales, 14 days",
+      "emails": "Emails sent",
+      "pushes": "Notifications sent",
+      "last14": "last 14 days",
+      "invites": "Invites",
+      "pending": "waiting for an answer"
+    },
+    "businesses": "Businesses",
+    "search": "Search by name, web address or owner",
+    "emptyTitle": "No businesses yet",
+    "emptyBody": "Create the first one and invite its owner. They set their own password from the link.",
+    "noMatch": "Nothing matches that search.",
+    "pausedBadge": "Paused",
+    "ownerInvited": "Owner invited: {{email}}",
+    "noOwner": "No owner yet",
+    "countsLine": "shops {{shops}}, staff {{staff}}, customers {{customers}}",
+    "storage": {
+      "title": "Photo storage",
+      "stored": "Stored",
+      "uploads": "Uploads this month",
+      "photos": "Photo storage",
+      "reads": "Views are not counted here: photos load straight from the bucket. The Cloudflare R2 dashboard shows them.",
+      "stop": "Stop uploads at the free limit",
+      "stopFoot": "New photo uploads are refused at {{pct}}% of the free storage or of the monthly uploads, with a short note for the person uploading."
+    },
+    "switch": {
+      "title": "Emergency switches",
+      "lead": "For the whole platform, effective at once. Turning one on asks first.",
+      "confirm": "Turn on",
+      "nowOn": "Switched on",
+      "nowOff": "Switched off",
+      "pause_email": {
+        "title": "Pause all email",
+        "sub": "Emails wait and go out once this is off.",
+        "short": "email",
+        "confirm": "No email leaves Custock until you turn this off, sign in codes and join confirmations included. They wait and go out after."
+      },
+      "pause_push": {
+        "title": "Pause all notifications",
+        "sub": "Notifications wait and go out once this is off.",
+        "short": "notifications",
+        "confirm": "No notification leaves Custock until you turn this off. They wait and go out after."
+      },
+      "pause_signups": {
+        "title": "Pause new customer signups",
+        "sub": "Join pages turn new people away until this is off.",
+        "short": "new signups",
+        "confirm": "Nobody can join a business from a QR code or link until you turn this off. People who already joined are not affected."
+      },
+      "pause_invites": {
+        "title": "Pause new staff invites",
+        "sub": "Businesses cannot invite staff until this is off.",
+        "short": "staff invites",
+        "confirm": "No business can invite staff until you turn this off. Invites already sent still work."
+      }
+    },
+    "banner": {
+      "paused": "Paused for the whole platform: {{list}}.",
+      "review": "Review",
+      "storage70": "Photo storage is at {{pct}}% of the free tier.",
+      "storage90": "Photo storage is at {{pct}}% of the free tier. Uploads stop at 95%."
+    },
+    "audit": {
+      "title": "Platform audit",
+      "sub": "Everything super admins did, newest first",
+      "emptyTitle": "Nothing yet",
+      "emptyBody": "New businesses, invites and switches show up here.",
+      "system": "Server setup",
+      "more": "Show more",
+      "action": {
+        "business": {
+          "created": "Business created",
+          "controls_changed": "Business settings changed",
+          "deleted": "Business deleted"
+        },
+        "owner": {
+          "invited": "Owner invited",
+          "invite_resent": "Owner invite sent again",
+          "invite_revoked": "Owner invite withdrawn"
+        },
+        "platform": {
+          "settings_changed": "Emergency switches changed"
+        },
+        "superadmin": {
+          "invited": "Super admin invited",
+          "invite_accepted": "Super admin joined",
+          "invite_revoked": "Super admin invite withdrawn",
+          "removed": "Super admin removed",
+          "granted_cli": "Super admin made on the server"
+        }
+      }
+    },
+    "admins": {
+      "title": "Super admins",
+      "lead": "Full access to every business. Only super admins see this.",
+      "invite": "Invite super admin",
+      "you": "You",
+      "remove": "Remove",
+      "removed": "{{name}} is no longer a super admin",
+      "removeTitle": "Remove super admin?",
+      "removeBody": "{{name}} loses access to every business at once. Their account stays.",
+      "lastFoot": "You are the only super admin. The last one can never be removed.",
+      "email": "Email",
+      "formFoot": "They get a link to accept. With an existing account, they sign in with this email.",
+      "confirmTitle": "Give {{email}} full access to every business?",
+      "confirmBody": "A super admin sees and changes every business, creates new ones, invites owners and other super admins, and can pause any business.",
+      "inviteConfirm": "Invite with full access",
+      "already": "That person is already a super admin.",
+      "shareTitle": "Custock super admin invite"
+    },
+    "invite": {
+      "sent": "Invited {{when}}",
+      "expired": "Expired, send it again",
+      "resend": "Send again",
+      "revoke": "Withdraw",
+      "revoked": "Invite withdrawn",
+      "newLink": "Invite link",
+      "emailed": "Sent to {{email}}. You can also share the link yourself.",
+      "shareIt": "Mail is off on this server, so share this link with {{email}} yourself. It works once."
+    },
+    "new": {
+      "name": "Business name",
+      "namePlaceholder": "Lemoni",
+      "slug": "Web address",
+      "slugHint": "Customers find it at {{url}}",
+      "shop": "First shop",
+      "shopPlaceholder": "Main shop",
+      "ownerEmail": "Owner email",
+      "language": "Language",
+      "ownerHint": "The owner gets a link to set their name and password. It works for 14 days.",
+      "create": "Create",
+      "doneTitle": "Business created",
+      "emailed": "The owner invite went to {{email}}.",
+      "share": "Mail is off on this server, so share this link with {{email}} yourself.",
+      "shareTitle": "Your Custock for {{name}}",
+      "slugTaken": "That web address is taken. Try another."
+    },
+    "detail": {
+      "since": "since {{date}}",
+      "reports": "Reports",
+      "open": "Open business",
+      "openShort": "Open",
+      "owners": "Owners",
+      "noOwnerFoot": "No owner yet. Invite one so the business can be run.",
+      "inviteOwner": "Invite an owner",
+      "sendInvite": "Send invite",
+      "inviteFoot": "They become an owner of {{name}}, with every permission inside it.",
+      "numbers": "Numbers",
+      "shops": "Shops"
+    },
+    "features": {
+      "title": "Features",
+      "foot": "A feature switched off is simply not there for the business: no menu item, no button, no message. Only super admins see these switches.",
+      "customer_pages": {
+        "title": "Customer pages and catalog",
+        "sub": "Join pages, the shop page, the catalog and the customer app"
+      },
+      "posts": {
+        "title": "Posts and offers",
+        "sub": "News and offers for customers"
+      },
+      "email": {
+        "title": "Email sending",
+        "sub": "Emails from this business to its customers"
+      },
+      "push": {
+        "title": "Notification sending",
+        "sub": "Notifications from this business"
+      },
+      "transfers": {
+        "title": "Transfers",
+        "sub": "Moving stock between shops"
+      },
+      "counts": {
+        "title": "Stock counts",
+        "sub": "Counting the shelf and fixing stock"
+      },
+      "reports": {
+        "title": "Reports",
+        "sub": "Sales, top sellers, most wanted"
+      },
+      "uploads": {
+        "title": "Photo uploads",
+        "sub": "Photos for products, posts and shops"
+      }
+    },
+    "limits": {
+      "title": "Limits",
+      "shops": "Shops (now {{count}})",
+      "staff": "Staff (now {{count}})",
+      "none": "No limit",
+      "shopsLabel": "Most shops",
+      "staffLabel": "Most staff",
+      "foot": "Empty means no limit. Pending invites count as staff. At the limit the business is not offered the add button.",
+      "saved": "Limits saved"
+    },
+    "status": {
+      "title": "Status",
+      "activeBody": "Active. Its staff and customers use it as usual.",
+      "pausedBody": "Paused. Its staff see a paused screen, its customer pages say it is not available, and nothing is sent for it. You still have full access.",
+      "pause": "Pause business",
+      "resume": "Resume business",
+      "pauseTitle": "Pause {{name}}?",
+      "pauseBody": "Its staff can sign in but see a paused screen. Its customer pages say it is not available right now, and no email or notification goes out for it. Nothing is deleted, and you can resume it at any time.",
+      "pausedToast": "Business paused",
+      "resumed": "Business resumed"
+    },
+    "paused": {
+      "title": "This business is paused for now",
+      "open": "Open {{name}}"
+    },
+    "unavailable": {
+      "title": "Not available right now",
+      "body": "Try again a little later."
+    },
+    "delete": {
+      "title": "Delete",
+      "lead": "Removes the business with everything in it. This cannot be undone.",
+      "button": "Delete business",
+      "sheetTitle": "Delete {{name}}?",
+      "body": "Every product, stock movement, customer, post, invite and photo of this business goes, for good. People who were only in this business lose their account too. Super admins keep theirs.",
+      "type": "Type {{slug}} to confirm",
+      "confirm": "Delete for good",
+      "done": "{{name}} is deleted"
+    },
+    "dev": {
+      "title": "Developer",
+      "api": {
+        "title": "API",
+        "sub": "Every endpoint, who may call it and what it answers",
+        "count_one": "{{count}} endpoint",
+        "count_other": "{{count}} endpoints",
+        "version": "version {{v}}",
+        "search": "Search a path, name or permission",
+        "all": "All",
+        "noMatch": "Nothing matches {{q}}",
+        "download": "Download JSON",
+        "copyPath": "Copy path",
+        "copied": "Path copied",
+        "access": {
+          "public": "No sign in",
+          "user": "Signed in",
+          "org": "Business",
+          "superadmin": "Super admin"
+        },
+        "accessLine": {
+          "public": "Anyone can call it, no sign in needed.",
+          "user": "Needs a signed in person.",
+          "org": "Needs someone who works in the business.",
+          "superadmin": "Super admins only."
+        },
+        "permissions": "Needs one of these permissions",
+        "params": "Parameters",
+        "inPath": "in the path",
+        "inQuery": "in the query",
+        "required": "required",
+        "optional": "optional",
+        "body": "Request body",
+        "response": "Answer",
+        "noBody": "No body",
+        "noSchema": "Not described yet",
+        "errors": "Problems it can answer with",
+        "listOf": "list of {{type}}",
+        "oneOf": "one of",
+        "values": "one of {{list}}",
+        "nullable": "or empty",
+        "loadFailed": "The API description did not load. Try again in a moment.",
+        "retry": "Try again",
+        "tag": {
+          "auth": "Sign in",
+          "account": "Account",
+          "business": "Business",
+          "products": "Products",
+          "stock": "Stock",
+          "counts": "Counts",
+          "transfers": "Transfers",
+          "customers": "Customers",
+          "join-links": "QR codes",
+          "posts": "Posts",
+          "team": "Team",
+          "reports": "Reports",
+          "uploads": "Photos",
+          "customer-app": "Customer app",
+          "public": "Public pages",
+          "platform": "Super admin",
+          "push": "Notifications",
+          "dev": "Development only",
+          "files": "Files",
+          "system": "System"
+        }
+      },
+      "server": {
+        "title": "This server",
+        "sub": "Version, database, sending and background jobs",
+        "updated": "Updated {{when}}",
+        "refresh": "Refresh",
+        "version": "Version",
+        "revision": "Revision",
+        "localBuild": "Local build",
+        "built": "Built",
+        "mode": "Mode",
+        "production": "Production",
+        "development": "Development",
+        "node": "Node.js",
+        "running": "Running",
+        "started": "Started",
+        "uptime": "Uptime",
+        "uptimeDays": "{{d}} d {{h}} h",
+        "uptimeHours": "{{h}} h {{m}} min",
+        "uptimeMinutes": "{{m}} min",
+        "database": "Database",
+        "size": "Size",
+        "wal": "Write ahead log",
+        "migrations": "Migrations",
+        "migrationsCount_one": "{{count}} applied",
+        "migrationsCount_other": "{{count}} applied",
+        "lastMigration": "Latest",
+        "allMigrations": "All migrations",
+        "sending": "Sending",
+        "transport": "Email and push",
+        "live": "Sent for real",
+        "outbox": "Kept in the outbox",
+        "email": "Email",
+        "webpush": "Web push",
+        "fcm": "Firebase, for native apps",
+        "on": "On",
+        "off": "Off",
+        "photos": "Photos",
+        "storage": "Stored in",
+        "s3": "Bucket",
+        "local": "This server's disk",
+        "storageOff": "Uploads off",
+        "bucket": "Bucket",
+        "bucketHost": "Bucket address",
+        "publicHost": "Public address",
+        "jobs": "Background jobs",
+        "status": "Status",
+        "jobsRunning": "Running",
+        "jobsStopped": "Not running",
+        "lastRun": "Last run",
+        "never": "Never",
+        "queued": "Waiting now",
+        "scheduled": "Scheduled",
+        "gaveUp": "Gave up",
+        "last24": "Sending, last 24 hours",
+        "sent": "Sent",
+        "failed": "Failed",
+        "waiting": "Waiting",
+        "loadFailed": "The server details did not load. Try again in a moment.",
+        "retry": "Try again",
+        "foot": "No keys or passwords are ever shown here, only on or off and addresses."
+      }
+    }
+  },
+  "platformInvite": {
+    "metaTitle": "Super admin invite",
+    "title": "Become a super admin",
+    "lead": "You are invited as a super admin of Custock: every business, new businesses and their owners.",
+    "leadBy": "{{name}} invited you as a super admin of Custock: every business, new businesses and their owners.",
+    "accept": "Accept and continue",
+    "goneBody": "This invite was used, withdrawn or is older than 7 days. Ask for a new one."
+  },
+  "forgot": {
+    "metaTitle": "Forgot password",
+    "title": "Forgot your password?",
+    "lead": "Type the email you sign in with. We send you a link to choose a new password.",
+    "email": "Email",
+    "send": "Send link",
+    "sentTitle": "Check your email",
+    "sentLead": "If {{email}} has a Custock account, a link is on its way. It works for 30 minutes.",
+    "sentHint": "Nothing there? Look in spam, or send it again in a minute.",
+    "again": "Send again",
+    "againWait": "Send again ({{time}})",
+    "back": "Back to sign in",
+    "failed": "That did not work. Try again in a moment."
+  },
+  "reset": {
+    "metaTitle": "New password",
+    "title": "Choose a new password",
+    "lead": "At least 10 characters. Every other device gets signed out.",
+    "password": "New password",
+    "save": "Save and sign in",
+    "checking": "Checking the link",
+    "goneTitle": "This link no longer works",
+    "goneLead": "It was used already or is older than 30 minutes. Ask for a new one, it only takes a moment.",
+    "newLink": "Ask for a new link",
+    "failed": "That did not work. Try again in a moment.",
+    "strength": {
+      "label": "Password strength",
+      "short": "At least 10 characters",
+      "weak": "Weak. Add a few more words or characters.",
+      "good": "Good",
+      "strong": "Strong"
+    }
+  },
+  "issues": {
+    "title": "Errors",
+    "sub": "What went wrong in production. Open ones first, newest first.",
+    "search": "Search errors",
+    "status": {
+      "open": "Open",
+      "resolved": "Resolved",
+      "ignored": "Ignored",
+      "all": "All"
+    },
+    "kind": {
+      "all": "All kinds",
+      "api": "Server",
+      "worker": "Background job",
+      "send": "Sending",
+      "storage": "Photo storage",
+      "client": "Browser"
+    },
+    "times_one": "{{count}} time",
+    "times_other": "{{count}} times",
+    "lastSeen": "last {{when}}",
+    "loadFailed": "The errors could not be loaded. Try again in a moment.",
+    "noMatch": "Nothing matches.",
+    "emptyTitle": "No open errors",
+    "emptyBody": "Nothing new has gone wrong. New errors show up here, and you get an email about each new one.",
+    "more": "Show more",
+    "gone": "This error is no longer kept. Errors are kept for 30 days.",
+    "copy": "Copy for a bug report",
+    "copied": "Copied, ready to paste",
+    "toast": {
+      "open": "Open again",
+      "resolved": "Marked resolved",
+      "ignored": "Ignored"
+    },
+    "resolvedNote": "Resolved. It opens again by itself if it happens again.",
+    "ignoredNote": "Ignored. It is still counted, but it stays out of the open list and sends no email.",
+    "resolve": "Mark resolved",
+    "ignore": "Ignore",
+    "reopen": "Open again",
+    "actionsFoot": "Resolve it once it is fixed. Ignore what is expected and harmless.",
+    "detail": {
+      "what": "Details",
+      "where": "Where",
+      "status": "Status code",
+      "frame": "Code",
+      "business": "Business",
+      "user": "Person (id)",
+      "device": "Browser and system",
+      "release": "Server version",
+      "build": "App version",
+      "request": "Request id",
+      "firstSeen": "First seen",
+      "lastSeen": "Last seen",
+      "stack": "Stack",
+      "noStack": "There is no stack for this one."
+    },
+    "navSub_one": "{{count}} open",
+    "navSub_other": "{{count}} open",
+    "navNone": "Nothing open",
+    "boundary": {
+      "title": "This screen did not load",
+      "body": "Try again. If it keeps happening, the details are already with us.",
+      "retry": "Try again",
+      "home": "Go to the start"
+    }
   }
 }

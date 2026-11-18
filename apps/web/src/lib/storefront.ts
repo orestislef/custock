@@ -40,17 +40,39 @@ export async function publicProductById(slug: string, id: string, locale?: strin
   return all?.find((p) => p.id === id) ?? null;
 }
 
-export interface OrgInfo { slug: string; name: string; joinCode: string | null; catalogShared: boolean }
+export interface OrgInfo { slug: string; name: string; joinCode: string | null; catalogShared: boolean; logoUrl: string | null; unavailable?: boolean }
 
-// the business name for frames, manifests and icons. the catalog carries it; the sample business
-// of local development falls back to its join page.
+interface PublicOrg { slug: string; name: string; catalog: string; joinCode: string | null; logoUrl?: string | null; unavailable?: boolean }
+
+// the business's name and its join link for the whole business, from the api. one fetch per request
+const publicOrgOnce = cache(async (slug: string, locale: string): Promise<PublicOrg | null> => {
+  const { mode } = await serverApi(locale || undefined);
+  if (mode === 'fixtures') return null;
+  const base = apiUrl();
+  if (!base) return null;
+  try {
+    const res = await fetch(`${base}/v1/public/orgs/${encodeURIComponent(slug)}`, { headers: await forwardedHeaders(locale || undefined), cache: 'no-store' });
+    // a paused business, or one whose customer pages are off: its pages say it is not available
+    if (res.status === 403) {
+      const code = ((await res.json().catch(() => null)) as { code?: string } | null)?.code;
+      if (code === 'org_suspended' || code === 'feature_off') return { slug, name: slug, catalog: 'off', joinCode: null, unavailable: true };
+    }
+    return res.ok ? ((await res.json()) as PublicOrg) : null;
+  } catch {
+    return null;
+  }
+});
+
+// the business name for frames, manifests and icons, and the way in for visitors. the api knows
+// both; the sample business of local development falls back to its catalog and join page.
 export async function orgInfo(slug: string, locale?: string): Promise<OrgInfo> {
   const items = await publicCatalog(slug, { locale });
-  const joinCode = defaultJoinCode();
-  let name = items?.[0]?.orgName ?? null;
+  const pub = await publicOrgOnce(slug, locale ?? '');
+  const joinCode = pub ? pub.joinCode : defaultJoinCode();
+  let name = pub?.name ?? items?.[0]?.orgName ?? null;
   if (!name && joinCode && devBuild) {
     const { api } = await serverApi(locale);
     name = (await api.joinPage(joinCode).catch(() => null))?.orgName ?? null;
   }
-  return { slug, name: name ?? slug.charAt(0).toUpperCase() + slug.slice(1), joinCode, catalogShared: items != null };
+  return { slug, name: name ?? slug.charAt(0).toUpperCase() + slug.slice(1), joinCode, catalogShared: items != null, logoUrl: pub?.logoUrl ?? null, ...(pub?.unavailable ? { unavailable: true } : {}) };
 }

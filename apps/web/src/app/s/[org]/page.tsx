@@ -7,11 +7,15 @@ import { PublicShell } from '@/components/public/public-shell';
 import { CatalogGrid } from '@/components/public/catalog-grid';
 import { FollowerCatalog } from '@/components/shopper/follower-catalog';
 import { OrgCoach } from '@/components/shopper/org-coach';
+import { CustomerPushCard } from '@/components/shopper/push-card';
 import { Empty } from '@/components/ui/kit';
 import { IconSearch } from '@/components/ui/icons';
 import { orgInfo } from '@/lib/storefront';
 
-export const metadata: Metadata = { title: 'Catalog' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t('catalog.title') };
+}
 
 export default async function CatalogPage({ params, searchParams }: PageProps<'/s/[org]'>) {
   const { org } = await params;
@@ -25,9 +29,10 @@ export default async function CatalogPage({ params, searchParams }: PageProps<'/
   const offers = items?.filter((p) => p.offer).length ?? 0;
 
   return (
-    <PublicShell orgName={info.name} t={t}>
+    <PublicShell orgName={info.name} logoUrl={info.logoUrl} t={t}>
       <h1 className="t-large t-display m-0">{t('catalog.title')}</h1>
       <OrgCoach className="mt-4" />
+      <CustomerPushCard className="mt-4" installCoachShown />
       {items ? (
         <>
           <form className="search mt-4 mb-3" role="search" action="">

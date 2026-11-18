@@ -5,12 +5,13 @@ import { useCallback, useState } from 'react';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { StockTabs } from '@/components/admin/stock-tabs';
-import { Empty, Group, Row, Segmented, Why } from '@/components/ui/kit';
+import { Empty, Group, Row, Segmented } from '@/components/ui/kit';
 import { Picker, Sheet, isMac, useShortcuts } from '@/components/ui/client-kit';
 import { IconClipboard, IconPlus } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { relative } from '@/lib/format';
 import { categoryName } from '@/lib/use-names';
+import { RedirectHome } from '@/components/admin/redirect-home';
 
 export default function CountsPage() {
   const { api, org, t, locale, can, shops, shopId } = useAdmin();
@@ -22,7 +23,7 @@ export default function CountsPage() {
   const canStart = shops.some((s) => can('stock.count', s.id));
   useShortcuts({ create: useCallback(() => { if (canStart) setStarting(true); }, [canStart]) });
 
-  if (!allowed) return <Page title={t('counts.title')}><Why>{t('common:error.forbidden')}</Why></Page>;
+  if (!allowed) return <RedirectHome />;
   const open = (list.data ?? []).filter((c) => c.status === 'open' || c.status === 'review');
   const done = (list.data ?? []).filter((c) => c.status === 'applied' || c.status === 'cancelled');
 

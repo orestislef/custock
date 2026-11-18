@@ -31,7 +31,7 @@ export function FollowerCatalog({ offersOnly }: { offersOnly?: boolean }) {
       : <Empty icon={<IconBox size={40} />} title={offersOnly ? t('offers.emptyTitle') : t('catalog.noResults')} body={offersOnly ? t('offers.emptyBody') : undefined} />;
   }
   return (
-    <Empty icon={<IconBox size={40} />} title={t('catalog.followersTitle', { org: orgName })} body={t('catalog.followersBody')}
+    <Empty icon={<IconBox size={40} />} title={t('catalog.followersTitle', { org: orgName })} body={joinCode ? t('catalog.followersBody') : t('catalog.followersBodyNoLink', { org: orgName })}
       action={
         <div className="flex flex-col gap-2 items-center">
           {joinCode ? <Link href={`/j/${joinCode}`} className="btn btn-primary">{t('catalog.joinToBrowse', { org: orgName })}</Link> : null}
