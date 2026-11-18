@@ -6,7 +6,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { Sheet } from '@/components/ui/client-kit';
-import { IconAddSquare, IconClose, IconShare } from '@/components/ui/icons';
+import { IconAddSquare, IconCheck, IconClose, IconShare } from '@/components/ui/icons';
 import { useT } from '@/lib/i18n-client';
 import { useCoachDismissed, useInstall } from '@/lib/pwa';
 
@@ -71,7 +71,7 @@ export function InstallSteps({ open, onClose, appName, icon }: { open: boolean; 
       <ol className="list mb-3" role="list">
         {step(1, <IconShare size={20} />, t('pwa.step1'))}
         {step(2, <IconAddSquare size={20} />, t('pwa.step2'))}
-        {step(3, <span className="t-headline" style={{ fontSize: 15 }}>{t('pwa.addShort')}</span>, t('pwa.step3', { app: appName }))}
+        {step(3, <IconCheck size={20} />, t('pwa.step3', { app: appName }))}
       </ol>
       <p className="t-foot t-2 m-0 mb-2 px-1">{t('pwa.stepsFoot')}</p>
     </Sheet>

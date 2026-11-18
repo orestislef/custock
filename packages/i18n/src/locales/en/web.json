@@ -1026,7 +1026,6 @@
     "step1": "Tap Share in the Safari toolbar.",
     "step2": "Scroll down and tap Add to Home Screen.",
     "step3": "Tap Add. Open {{app}} from your Home Screen.",
-    "addShort": "Add",
     "stepsFoot": "On iPad the Share button is at the top. In Chrome on iPhone it is in the address bar."
   },
   "push": {
