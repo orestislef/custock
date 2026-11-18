@@ -11,6 +11,7 @@ import { Chips, Why } from '@/components/ui/kit';
 import { IconMinus, IconPlus } from '@/components/ui/icons';
 import { productName, variantLabel } from '@/lib/names';
 import { qtyNumber } from '@/lib/format';
+import { submitMovements } from '@/lib/outbox';
 
 export type StockMode = 'receive' | 'adjust' | 'sell';
 
@@ -58,12 +59,17 @@ export function StockSheet({ open, onClose, product, mode, onDone, variantId }: 
     const id = uuidv7();
     try {
       const kind = mode === 'receive' ? 'receive' : mode === 'sell' ? 'sale' : reason === 'damaged' || reason === 'expired' || reason === 'theft' ? 'damage' : 'adjust';
-      const res = await api.postMovements(org.orgId, [{
+      // without signal the change waits on this device and syncs later (src/lib/outbox.ts)
+      const sent = await submitMovements(api, org.orgId, [{
         id, shopId: shop, variantId: variant, qtyDelta: delta * scale, kind, occurredAt: Date.now(),
         ...(mode === 'adjust' ? { reason } : {}), ...(mode === 'sell' && v?.priceMinor != null ? { unitPriceMinor: v.priceMinor } : {}), ...(note ? { note } : {}),
       }]);
-      if (res.rejected.length) {
+      const res = sent.result;
+      if (res?.rejected.length) {
         setError(t(`common:error.${res.rejected[0]!.code}`));
+      } else if (!res) {
+        toast(mode === 'receive' ? t('offline.savedReceive', { count: qty }) : mode === 'sell' ? t('offline.savedSale', { count: Math.abs(qty), name: productName(product, locale) }) : t('offline.savedAdjust'));
+        onClose();
       } else {
         onDone(res);
         const name = productName(product, locale);
@@ -73,8 +79,8 @@ export function StockSheet({ open, onClose, product, mode, onDone, variantId }: 
         toast(text, {
           label: t('common:action.undo'),
           run: () => {
-            void api.postMovements(org.orgId, [{ id: uuidv7(), shopId: shop, variantId: variant, qtyDelta: -delta * scale, kind: 'reversal', refType: 'reversal', refId: id, occurredAt: Date.now() }])
-              .then((r) => { onDone(r); toast(t('stockSheet.undone')); });
+            void submitMovements(api, org.orgId, [{ id: uuidv7(), shopId: shop, variantId: variant, qtyDelta: -delta * scale, kind: 'reversal', refType: 'reversal', refId: id, occurredAt: Date.now() }])
+              .then((r) => { if (r.result) onDone(r.result); toast(t('stockSheet.undone')); });
           },
         });
         onClose();
