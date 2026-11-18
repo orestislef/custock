@@ -12,7 +12,7 @@
 // authority rules.
 
 import type { Context, Hono } from 'hono';
-import { BusinessPolicyControlsPatch, effectiveAtScope, PolicyPatch, policyDef } from '@custock/core';
+import { BusinessPolicyControlsPatch, effectiveAtScope, PolicyPatch, policyDef, shopsInScope } from '@custock/core';
 import type { AppEnv } from '../types';
 import { cfgOf, nowOf, orgOf, requireAuth } from '../lib/context';
 import { forbidden, notFound } from '../lib/problem';
@@ -41,6 +41,18 @@ function memberUser(c: Context<AppEnv>): string {
   );
   if (!row) throw notFound('member');
   return row.user_id;
+}
+
+// does the person (a membership id) hold a role in a shop where the caller may view members
+function sharesViewShop(c: Context<AppEnv>, membershipId: string): boolean {
+  const o = orgOf(c);
+  const mine = new Set(o.access.shops.filter((s) => s.perms.includes('members.view')).map((s) => s.shopId));
+  if (!mine.size) return false;
+  const scopes = platform(cfgOf(c).db).all<{ scope_type: 'org' | 'group' | 'shop'; scope_id: string }>(
+    'SELECT scope_type, scope_id FROM role_assignments WHERE org_id = @o AND membership_id = @m',
+    { o: o.org.id, m: membershipId },
+  );
+  return scopes.some((a) => shopsInScope(o.topology, { scopeType: a.scope_type, scopeId: a.scope_id }).some((s) => mine.has(s)));
 }
 
 function roleId(c: Context<AppEnv>): string {
@@ -81,6 +93,9 @@ export function policyRoutes(app: Hono<AppEnv>) {
 
   app.get('/v1/orgs/:org/shops/:shop/policies', (c) => {
     const id = shopId(c);
+    // a shop's limits are read by people working there, or by those who run the whole business
+    const actor = actorOf(c);
+    if (!actor.superadmin && !orgOf(c).access.shops.some((x) => x.shopId === id) && !holdsOrg(c, 'shop.settings.manage')) throw notFound('shop');
     return c.json({ entries: policyEntries(cfgOf(c).db, orgOf(c).org.id, actorOf(c), { level: 'shop', shopId: id }) });
   });
 
@@ -114,7 +129,9 @@ export function policyRoutes(app: Hono<AppEnv>) {
   app.get('/v1/orgs/:org/members/:m/policies', (c) => {
     const actor = actorOf(c);
     const userId = memberUser(c);
-    if (!actor.superadmin && userId !== actor.userId && !orgOf(c).access.shops.some((s) => s.perms.includes('members.view')) && !holdsOrg(c, 'members.view')) {
+    // the same people the team list shows: everyone with members.view for the whole business, else
+    // only people with a role in a shop where the caller holds members.view
+    if (!actor.superadmin && userId !== actor.userId && !holdsOrg(c, 'members.view') && !sharesViewShop(c, c.req.param('m')!)) {
       throw forbidden('members.view');
     }
     return c.json({ entries: policyEntries(cfgOf(c).db, orgOf(c).org.id, actor, { level: 'user', userId }) });

@@ -91,6 +91,10 @@ function writePicture(t: Tenant, id: string, input: { iconKey?: CategoryIconKey 
   if (input.imageFileId) {
     const own = t.get("SELECT 1 FROM files WHERE org_id = @org AND id = @f AND purpose = 'category' AND deleted_at IS NULL", { f: input.imageFileId });
     if (!own) throw new ApiProblem(404, 'not_found', 'photo not found', { imageFileId: 'not_found' });
+    // one photo, one category: changing the other one later would retire the file under this one
+    if (t.get('SELECT 1 FROM categories WHERE org_id = @org AND image_file_id = @f AND id <> @id', { f: input.imageFileId, id })) {
+      throw new ApiProblem(409, 'conflict', 'that photo belongs to another category', { imageFileId: 'in_use' });
+    }
   }
   const image = input.imageFileId !== undefined ? input.imageFileId : input.iconKey ? null : current.image_file_id;
   const icon = image ? null : input.iconKey !== undefined ? input.iconKey : null;

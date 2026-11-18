@@ -304,27 +304,47 @@ and the join page interests.
 ## speed
 
 `pnpm --filter @custock/api bench` builds a made up business with 2,000 products, 200,000 stock
-movements and 20,000 customers in a temporary database and times the main reads. On the
-development machine (Windows 10, node 22, sqlite 3.54 with FTS5), median of 7 runs:
+movements and 20,000 customers, plus 300 small businesses, a super admin and 300 open errors, in a
+temporary database and times the main reads and a batch of 50 sales. On the development machine
+(Windows 10, node 22, sqlite 3.54 with FTS5), median of 7 runs, before and after the pre launch
+speed pass:
 
-| endpoint | median ms | worst ms |
-|---|---:|---:|
-| products, first page | 6 | 7 |
-| products, search "meli" | 5 | 7 |
-| products, low stock filter | 28 | 30 |
-| product detail | 3 | 3 |
-| customers, first page (owner) | 52 | 57 |
-| customers, first page (shop manager) | 60 | 67 |
-| customers, search "maria" | 23 | 27 |
-| customers, exact phone | 24 | 24 |
-| movements, first page | 2 | 2 |
-| dashboard (owner, all shops) | 42 | 48 |
-| dashboard (shop manager) | 17 | 18 |
-| sales per day, 30 days | 108 | 109 |
-| top sellers, 30 days | 44 | 45 |
-| most wanted | 3 | 3 |
-| shrinkage, 30 days | 7 | 8 |
-| sync, full (one shop) | 56 | 58 |
+| endpoint | before, median ms | after, median ms | after, worst ms |
+|---|---:|---:|---:|
+| products, first page | 6 | 6 | 7 |
+| products, search "meli" | 6 | 5 | 6 |
+| products, low stock filter | 27 | 24 | 25 |
+| product detail | 3 | 2 | 3 |
+| customers, first page (owner) | 55 | 43 | 46 |
+| customers, first page (shop manager) | 58 | 39 | 41 |
+| customers, search "maria" | 29 | 17 | 18 |
+| customers, exact phone | 29 | 18 | 18 |
+| movements, first page | 4 | 3 | 4 |
+| dashboard (owner, all shops) | 48 | 40 | 42 |
+| dashboard (shop manager) | 19 | 16 | 16 |
+| sales per day, 30 days | 510 | 121 | 124 |
+| top sellers, 30 days | 380 | 58 | 64 |
+| most wanted | 4 | 2 | 3 |
+| shrinkage, 30 days | 9 | 8 | 8 |
+| sync, full (one shop) | 61 | 58 | 60 |
+| me context (owner) | 3 | 2 | 2 |
+| me context (super admin, 301 businesses) | 187 | 10 | 12 |
+| business settings | 4 | 2 | 3 |
+| limits and options (owner) | 3 | 2 | 2 |
+| audit, first page | 2 | 1 | 2 |
+| platform overview (301 businesses) | 561 | 104 | 107 |
+| platform business list (301) | 310 | 26 | 27 |
+| platform errors (300 open) | 2 | 2 | 2 |
+| storage meter (super admin) | 1 | 1 | 1 |
+| 50 sales in one batch | 104 | 64 | 73 |
+
+What changed in that pass: the context of a super admin reads every business in a few queries
+instead of about ten per business, the super admin list and overview count shops, staff, products,
+customers, owners, invites, storage and sales with grouped queries instead of per business, the
+sales reports skip undone sales through an index that holds the movement id, subscription checks
+read status and scope from the index (both migration 0016), and the tenant helper keeps prepared
+statements (up to 1,000 per database) instead of preparing the same sql on every call. The sales
+chart was 108 ms before the undo check existed. The numbers hold after a full `ANALYZE` too.
 
 `CUSTOCK_PERF=1 pnpm --filter @custock/api test` runs the same check as a test (under 150 ms each).
 Search uses FTS5 tables over the normalised `search_key`, kept in step by triggers and rebuilt when

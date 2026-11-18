@@ -8,6 +8,10 @@ import { variantLabel } from '../services/catalog';
 import { dayKey } from '../lib/time';
 import { loadPosts, postShops } from '../services/posts';
 import { canSee, customerVisibility, loadSubscriptions, reachedShops } from '../services/customers';
+
+// a movement someone took back with undo (a reversal points at it) no longer counts as a sale or
+// a loss. the index on (ref_type, ref_id) makes this a lookup per row.
+const NOT_UNDONE = "NOT EXISTS (SELECT 1 FROM stock_movements u WHERE u.ref_type = 'reversal' AND u.ref_id = m.id)";
 import { lowSql } from '../lib/low-stock';
 
 const DAY = 86_400_000;
@@ -126,7 +130,7 @@ export function reportRoutes(app: Hono<AppEnv>) {
             t.get<{ v: number | null }>(
               `SELECT sum(-(CASE WHEN p.uom = 'piece' THEN m.qty_delta ELSE m.qty_delta / 1000.0 END) * coalesce(m.unit_price_minor, v.price_minor, 0)) AS v
                  FROM stock_movements m JOIN product_variants v ON v.id = m.variant_id JOIN products p ON p.id = v.product_id
-                WHERE m.org_id = @org AND m.kind = 'sale' AND m.recorded_at >= @from AND m.shop_id IN (SELECT value FROM json_each(@shops))`,
+                WHERE m.org_id = @org AND m.kind = 'sale' AND ${NOT_UNDONE} AND m.recorded_at >= @from AND m.shop_id IN (SELECT value FROM json_each(@shops))`,
               { shops: money, from: todayStart },
             )?.v ?? 0,
           )
@@ -148,7 +152,7 @@ export function reportRoutes(app: Hono<AppEnv>) {
               sum(CASE WHEN p.uom = 'piece' THEN -m.qty_delta ELSE 0 END) AS pieces,
               sum(-(CASE WHEN p.uom = 'piece' THEN m.qty_delta ELSE m.qty_delta / 1000.0 END) * coalesce(m.unit_price_minor, v.price_minor, 0)) AS value
          FROM stock_movements m JOIN product_variants v ON v.id = m.variant_id JOIN products p ON p.id = v.product_id
-        WHERE m.org_id = @org AND m.kind = 'sale' AND m.recorded_at >= @from AND m.shop_id IN (SELECT value FROM json_each(@shops))
+        WHERE m.org_id = @org AND m.kind = 'sale' AND ${NOT_UNDONE} AND m.recorded_at >= @from AND m.shop_id IN (SELECT value FROM json_each(@shops))
         GROUP BY slot`,
       { shops, from: now - n * DAY },
     );
@@ -177,7 +181,7 @@ export function reportRoutes(app: Hono<AppEnv>) {
                   sum(-m.qty_delta * coalesce(m.unit_price_minor, 0)) AS qp,
                   sum(CASE WHEN m.unit_price_minor IS NULL THEN -m.qty_delta ELSE 0 END) AS unpriced
              FROM stock_movements m
-            WHERE m.org_id = @org AND m.kind = 'sale' AND m.recorded_at >= @from AND m.shop_id IN (SELECT value FROM json_each(@shops))
+            WHERE m.org_id = @org AND m.kind = 'sale' AND ${NOT_UNDONE} AND m.recorded_at >= @from AND m.shop_id IN (SELECT value FROM json_each(@shops))
             GROUP BY m.variant_id
          ) a JOIN product_variants v ON v.id = a.variant_id JOIN products p ON p.id = v.product_id
         WHERE v.org_id = @org
@@ -231,7 +235,7 @@ export function reportRoutes(app: Hono<AppEnv>) {
               sum(-(CASE WHEN p.uom = 'piece' THEN m.qty_delta ELSE m.qty_delta / 1000.0 END) * coalesce(m.unit_cost_minor, v.cost_minor, 0)) AS value
          FROM stock_movements m JOIN product_variants v ON v.id = m.variant_id JOIN products p ON p.id = v.product_id
         WHERE m.org_id = @org AND m.recorded_at >= @from AND m.shop_id IN (SELECT value FROM json_each(@shops))
-          AND (m.kind = 'damage' OR (m.kind IN ('adjust', 'count') AND m.qty_delta < 0))
+          AND (m.kind = 'damage' OR (m.kind IN ('adjust', 'count') AND m.qty_delta < 0)) AND ${NOT_UNDONE}
         GROUP BY coalesce(m.reason, m.kind) ORDER BY qty DESC`,
       { shops, from: nowOf(c) - days(c, 30) * DAY },
     );

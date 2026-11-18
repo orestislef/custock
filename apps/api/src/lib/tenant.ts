@@ -4,6 +4,32 @@
 import type { Db } from '@custock/db';
 
 type Named = Record<string, unknown>;
+// any parameters: the callers pass named objects and positional lists
+type Statement = import('better-sqlite3').Statement<unknown[]>;
+
+// prepared statements are kept per database and reused: preparing the same sql on every call was
+// the biggest cost of a request (a batch of 50 sales prepared a few hundred statements). sqlite
+// re-prepares a kept statement by itself when the schema changes. the least recently used ones go
+// past a cap, so sql built at run time cannot grow it without end.
+const STATEMENT_CAP = 1000;
+const statements = new WeakMap<Db, Map<string, Statement>>();
+
+export function prepared(db: Db, sql: string): Statement {
+  let byDb = statements.get(db);
+  if (!byDb) {
+    byDb = new Map();
+    statements.set(db, byDb);
+  }
+  let st = byDb.get(sql);
+  if (st) {
+    byDb.delete(sql);
+  } else {
+    st = db.prepare<unknown[]>(sql);
+    if (byDb.size >= STATEMENT_CAP) byDb.delete(byDb.keys().next().value as string);
+  }
+  byDb.set(sql, st);
+  return st;
+}
 
 function check(sql: string) {
   if (!sql.includes('@org')) throw new Error(`tenant query without @org: ${sql.slice(0, 80)}`);
@@ -32,26 +58,26 @@ export class Tenant {
 
   all<T>(sql: string, params: Named = {}, positional: unknown[] = []): T[] {
     check(sql);
-    return this.db.prepare(sql).all(...positional, bind({ ...params, org: this.orgId })) as T[];
+    return prepared(this.db, sql).all(...positional, bind({ ...params, org: this.orgId })) as T[];
   }
 
   get<T>(sql: string, params: Named = {}, positional: unknown[] = []): T | undefined {
     check(sql);
-    return this.db.prepare(sql).get(...positional, bind({ ...params, org: this.orgId })) as T | undefined;
+    return prepared(this.db, sql).get(...positional, bind({ ...params, org: this.orgId })) as T | undefined;
   }
 
   run(sql: string, params: Named = {}, positional: unknown[] = []) {
     check(sql);
-    return this.db.prepare(sql).run(...positional, bind({ ...params, org: this.orgId }));
+    return prepared(this.db, sql).run(...positional, bind({ ...params, org: this.orgId }));
   }
 }
 
 // platform level queries (users, sessions, public lookups by code) say so explicitly
 export function platform(db: Db) {
   return {
-    all: <T>(sql: string, params: Named = {}) => db.prepare(sql).all(bind(params)) as T[],
-    get: <T>(sql: string, params: Named = {}) => db.prepare(sql).get(bind(params)) as T | undefined,
-    run: (sql: string, params: Named = {}) => db.prepare(sql).run(bind(params)),
+    all: <T>(sql: string, params: Named = {}) => prepared(db, sql).all(bind(params)) as T[],
+    get: <T>(sql: string, params: Named = {}) => prepared(db, sql).get(bind(params)) as T | undefined,
+    run: (sql: string, params: Named = {}) => prepared(db, sql).run(bind(params)),
   };
 }
 

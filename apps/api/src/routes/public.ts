@@ -71,6 +71,8 @@ export function publicRoutes(app: Hono<AppEnv>) {
       logoUrl: fileUrl(org.logo_key),
       imageUrl: fileUrl(imageKey),
       disabled,
+      pushDailyCap: org.push_daily_cap,
+      quietHours: org.quiet_hours,
       interests: t
         .all<{ id: string; parent_id: string | null; name: string; icon_key: string | null; image_key: string | null }>(
           `SELECT c.id, c.parent_id, ${categoryNameSql('c')} AS name, ${CATEGORY_PICTURE_SQL('c')} FROM categories c WHERE c.org_id = @org AND c.parent_id IS NULL AND c.archived_at IS NULL ORDER BY c.sort`,
@@ -141,6 +143,6 @@ export function publicRoutes(app: Hono<AppEnv>) {
             { loc: readerLocale(c, org.default_locale) },
           )
           .map((x) => ({ id: x.id, name: x.name, ...pictureOf(x) }));
-    return c.json({ slug: org.slug, name: org.name, catalog: org.customer_catalog, joinCode: link?.code ?? null, logoUrl: fileUrl(logo?.storage_key), timezone: org.timezone, categories });
+    return c.json({ slug: org.slug, name: org.name, catalog: org.customer_catalog, joinCode: link?.code ?? null, logoUrl: fileUrl(logo?.storage_key), timezone: org.timezone, quietHours: org.quiet_hours, pushDailyCap: org.push_daily_cap, categories });
   });
 }

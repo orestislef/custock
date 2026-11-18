@@ -410,6 +410,22 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
   // the one click way back from the notice to the old address after a login email change: the old
   // email comes back, every session of the account ends and open reset links stop working.
   // it only works while the account still has the email it was changed to.
+  // the page behind the undo link asks first, so an old or used link says so before any button
+  app.get('/v1/public/email-revert/:token', (c) => {
+    const token = c.req.param('token');
+    if (token.length < 10 || token.length > 200) throw new ApiProblem(410, 'invite_expired', 'this link no longer works');
+    const cfg = cfgOf(c);
+    const p = platform(cfg.db);
+    const row = p.get<{ user_id: string; new_email: string; expires_at: number; used_at: number | null }>(
+      'SELECT user_id, new_email, expires_at, used_at FROM email_reverts WHERE token_hash = @h',
+      { h: sha256(`revert:${token}`) },
+    );
+    if (!row || row.used_at || row.expires_at < nowOf(c)) throw new ApiProblem(410, 'invite_expired', 'this link no longer works');
+    const user = p.get<{ email: string | null; deleted_at: number | null }>('SELECT email, deleted_at FROM users WHERE id = @id', { id: row.user_id });
+    if (!user || user.deleted_at || user.email !== row.new_email) throw new ApiProblem(410, 'invite_expired', 'the email was changed again since');
+    return c.json({ valid: true });
+  });
+
   app.post('/v1/public/email-revert', async (c) => {
     const { token } = z.object({ token: z.string().min(10).max(200) }).parse(await c.req.json());
     const cfg = cfgOf(c);

@@ -192,6 +192,14 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
       const token = randomToken();
       const id = uuidv7(now);
       const email = input.email.trim().toLowerCase();
+      // inviting the same person to the same role and place again replaces the open invite: one
+      // working link, and the staff limit does not count the same person twice
+      t.run(
+        `UPDATE invites SET revoked_at = @now
+          WHERE org_id = @org AND email = @email AND role_id = @role AND scope_type = @st AND scope_id = @sid
+            AND accepted_at IS NULL AND revoked_at IS NULL`,
+        { now, email, role: role.id, st: input.scopeType, sid: input.scopeId },
+      );
       t.run(
         `INSERT INTO invites (id, org_id, email, role_id, scope_type, scope_id, token_hash, locale, invited_by, created_at, expires_at)
          VALUES (@id, @org, @email, @role, @st, @sid, @hash, @locale, @u, @now, @exp)`,

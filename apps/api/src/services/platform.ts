@@ -91,7 +91,59 @@ function counts(db: Db, orgId: string) {
   };
 }
 
-function businessOf(db: Db, r: OrgListRow, now: number): PlatformBusiness {
+// the same numbers for every business at once, a few grouped queries instead of ten per business.
+// the list and the overview of the super admin read these; one business still uses the readers above
+interface PlatformBatch {
+  counts: Map<string, ReturnType<typeof counts>>;
+  owners: Map<string, ReturnType<typeof ownersOf>>;
+  invites: Map<string, PendingInvite[]>;
+  storage: Map<string, number>;
+}
+
+function platformBatch(db: Db, now: number): PlatformBatch {
+  const p = platform(db);
+  const grouped = (sql: string) => new Map(p.all<{ org_id: string; n: number }>(sql).map((r) => [r.org_id, r.n]));
+  const shops = grouped('SELECT org_id, count(*) AS n FROM shops WHERE archived_at IS NULL GROUP BY org_id');
+  const staff = grouped(
+    `SELECT m.org_id, count(*) AS n FROM memberships m JOIN users u ON u.id = m.user_id
+      WHERE m.status = 'active' AND u.platform_role IS NULL GROUP BY m.org_id`,
+  );
+  const products = grouped('SELECT org_id, count(*) AS n FROM products WHERE archived_at IS NULL GROUP BY org_id');
+  const customers = grouped(
+    `SELECT c.org_id, count(*) AS n FROM customers c WHERE c.erased_at IS NULL
+        AND EXISTS (SELECT 1 FROM customer_subscriptions s WHERE s.org_id = c.org_id AND s.customer_id = c.id AND s.status = 'subscribed')
+      GROUP BY c.org_id`,
+  );
+  const orgIds = p.all<{ id: string }>('SELECT id FROM organizations WHERE archived_at IS NULL').map((r) => r.id);
+  const countsMap = new Map(orgIds.map((id) => [id, { shops: shops.get(id) ?? 0, staff: staff.get(id) ?? 0, products: products.get(id) ?? 0, customers: customers.get(id) ?? 0 }]));
+  const owners = new Map<string, ReturnType<typeof ownersOf>>();
+  for (const r of p.all<{ org_id: string; user_id: string; name: string | null; email: string | null }>(
+    `SELECT DISTINCT m.org_id, m.user_id, u.display_name AS name, u.email, m.joined_at
+       FROM memberships m JOIN role_assignments a ON a.membership_id = m.id JOIN roles r ON r.id = a.role_id JOIN users u ON u.id = m.user_id
+      WHERE m.status = 'active' AND r.template_key = 'owner' AND a.scope_type = 'org' AND u.deleted_at IS NULL
+      ORDER BY m.org_id, m.joined_at`,
+  )) {
+    const list = owners.get(r.org_id) ?? [];
+    list.push({ userId: r.user_id, name: r.name, email: r.email });
+    owners.set(r.org_id, list);
+  }
+  const invites = new Map<string, PendingInvite[]>();
+  for (const r of p.all<{ org_id: string; id: string; email: string; created_at: number; expires_at: number }>(
+    `SELECT i.org_id, i.id, i.email, i.created_at, i.expires_at FROM invites i
+       JOIN roles r ON r.id = i.role_id AND r.org_id = i.org_id AND r.template_key = 'owner'
+      WHERE i.accepted_at IS NULL AND i.revoked_at IS NULL ORDER BY i.created_at DESC`,
+  )) {
+    const list = invites.get(r.org_id) ?? [];
+    list.push({ id: r.id, email: r.email, createdAt: r.created_at, expiresAt: r.expires_at, expired: r.expires_at < now });
+    invites.set(r.org_id, list);
+  }
+  const storage = new Map(p.all<{ org_id: string; n: number | null }>(
+    `SELECT org_id, sum(bytes) AS n FROM files WHERE deleted_at IS NULL AND confirmed_at IS NOT NULL AND storage_key NOT LIKE 'http%' GROUP BY org_id`,
+  ).map((r) => [r.org_id, r.n ?? 0]));
+  return { counts: countsMap, owners, invites, storage };
+}
+
+function businessOf(db: Db, r: OrgListRow, now: number, batch?: PlatformBatch): PlatformBusiness {
   const disabled = parseJson<string[]>(r.disabled_features, []);
   return {
     orgId: r.id,
@@ -102,19 +154,20 @@ function businessOf(db: Db, r: OrgListRow, now: number): PlatformBusiness {
     currency: r.currency,
     status: r.status,
     disabledFeatures: FEATURES.filter((f) => disabled.includes(f)),
-    owners: ownersOf(db, r.id),
-    counts: counts(db, r.id),
-    pendingOwnerInvites: pendingOwnerInvites(db, r.id, now),
-    storageBytes: storageBytes(db, r.id),
+    owners: batch ? batch.owners.get(r.id) ?? [] : ownersOf(db, r.id),
+    counts: batch ? batch.counts.get(r.id) ?? { shops: 0, staff: 0, products: 0, customers: 0 } : counts(db, r.id),
+    pendingOwnerInvites: batch ? batch.invites.get(r.id) ?? [] : pendingOwnerInvites(db, r.id, now),
+    storageBytes: batch ? batch.storage.get(r.id) ?? 0 : storageBytes(db, r.id),
   };
 }
 
 const ORG_LIST_COLUMNS = 'id, name, slug, created_at, default_locale, currency, timezone, status, disabled_features';
 
 export function listBusinesses(db: Db, now = Date.now()): PlatformBusiness[] {
+  const batch = platformBatch(db, now);
   return platform(db)
     .all<OrgListRow>(`SELECT ${ORG_LIST_COLUMNS} FROM organizations WHERE archived_at IS NULL ORDER BY name COLLATE NOCASE`)
-    .map((r) => businessOf(db, r, now));
+    .map((r) => businessOf(db, r, now, batch));
 }
 
 function orgRowById(db: Db, orgId: string): OrgListRow {
@@ -141,10 +194,36 @@ function salesSince(db: Db, org: OrgListRow, from: number): number {
   const v = new Tenant(db, org.id).get<{ v: number | null }>(
     `SELECT sum(-(CASE WHEN p.uom = 'piece' THEN m.qty_delta ELSE m.qty_delta / 1000.0 END) * coalesce(m.unit_price_minor, v.price_minor, 0)) AS v
        FROM stock_movements m JOIN product_variants v ON v.id = m.variant_id JOIN products p ON p.id = v.product_id
-      WHERE m.org_id = @org AND m.kind = 'sale' AND m.recorded_at >= @from`,
+      WHERE m.org_id = @org AND m.kind = 'sale' AND m.recorded_at >= @from
+        AND NOT EXISTS (SELECT 1 FROM stock_movements u WHERE u.ref_type = 'reversal' AND u.ref_id = m.id)`,
     { from },
   )?.v;
   return Math.round(v ?? 0);
+}
+
+// sales of every business since its own day start (today) and 13 days before, in one query. the
+// cross join keeps the business list outside: after ANALYZE sqlite would otherwise walk every sale
+// of every business once per business (30 s on the bench instead of 50 ms)
+function salesByOrg(db: Db, orgs: readonly OrgListRow[], now: number): Map<string, { today: number; days14: number }> {
+  // the day starts once per time zone (each is a search over formatted dates), most businesses share one
+  const starts = new Map<string, { t: number; f: number }>();
+  const startsIn = (tz: string) => {
+    let s = starts.get(tz);
+    if (!s) starts.set(tz, (s = { t: localDayStart(now, tz), f: localDayStart(now - 13 * DAY, tz) }));
+    return s;
+  };
+  const from = JSON.stringify(orgs.map((o) => ({ o: o.id, ...startsIn(o.timezone) })));
+  const amount = "-(CASE WHEN p.uom = 'piece' THEN m.qty_delta ELSE m.qty_delta / 1000.0 END) * coalesce(m.unit_price_minor, v.price_minor, 0)";
+  const rows = platform(db).all<{ org_id: string; today: number | null; days14: number | null }>(
+    `WITH f AS (SELECT json_extract(value, '$.o') AS org_id, json_extract(value, '$.t') AS t, json_extract(value, '$.f') AS f FROM json_each(@from))
+     SELECT m.org_id, sum(CASE WHEN m.recorded_at >= f.t THEN ${amount} END) AS today, sum(${amount}) AS days14
+       FROM f CROSS JOIN stock_movements m ON m.org_id = f.org_id AND m.kind = 'sale' AND m.recorded_at >= f.f
+        AND NOT EXISTS (SELECT 1 FROM stock_movements u WHERE u.ref_type = 'reversal' AND u.ref_id = m.id)
+       JOIN product_variants v ON v.id = m.variant_id JOIN products p ON p.id = v.product_id
+      GROUP BY m.org_id`,
+    { from },
+  );
+  return new Map(rows.map((r) => [r.org_id, { today: Math.round(r.today ?? 0), days14: Math.round(r.days14 ?? 0) }]));
 }
 
 function addMoney(list: MoneyByCurrency, currency: string, minor: number) {
@@ -161,16 +240,18 @@ export function overview(db: Db, now = Date.now()): PlatformOverview {
     salesToday: [], sales14d: [], emailsSent14d: 0, pushesSent14d: 0, pendingInvites: 0,
     storage: storageUse(db, now),
   };
+  const batch = platformBatch(db, now);
+  const sales = salesByOrg(db, orgs, now);
   for (const o of orgs) {
     if (o.status === 'suspended') out.suspended++;
-    const c = counts(db, o.id);
+    const c = batch.counts.get(o.id) ?? { shops: 0, staff: 0, products: 0, customers: 0 };
     out.shops += c.shops;
     out.staff += c.staff;
     out.customers += c.customers;
     out.products += c.products;
-    addMoney(out.salesToday, o.currency, salesSince(db, o, localDayStart(now, o.timezone)));
-    addMoney(out.sales14d, o.currency, salesSince(db, o, localDayStart(now - 13 * DAY, o.timezone)));
-    out.pendingInvites += pendingOwnerInvites(db, o.id, now).filter((i) => !i.expired).length;
+    addMoney(out.salesToday, o.currency, sales.get(o.id)?.today ?? 0);
+    addMoney(out.sales14d, o.currency, sales.get(o.id)?.days14 ?? 0);
+    out.pendingInvites += (batch.invites.get(o.id) ?? []).filter((i) => !i.expired).length;
   }
   const sent = p.all<{ channel: string; n: number }>(
     'SELECT channel, count(*) AS n FROM dev_outbox WHERE sent_at IS NOT NULL AND sent_at >= @from GROUP BY channel',

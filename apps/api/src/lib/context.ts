@@ -9,7 +9,8 @@ import { verifyAccess } from './auth';
 import { verifyExternal } from './external-auth';
 import { forbidden, notFound, unauthorized } from './problem';
 import { Tenant, platform } from './tenant';
-import { isSuperadmin, orgFlags, orgFull, platformAssignment } from './platform-access';
+import { FEATURES, type Feature } from '@custock/core';
+import { isSuperadmin, orgFlags, orgFull, platformAssignment, platformPaused, shopsUsed, staffUsed, type OrgFlags } from './platform-access';
 
 export const cfgOf = (c: Context<AppEnv>): Config => c.get('cfg');
 export const nowOf = (c: Context<AppEnv>): number => {
@@ -132,25 +133,101 @@ export const ORG_COLUMNS = `id, name, slug, country, currency, timezone, default
   allow_negative_stock, posts_need_approval, push_daily_cap, quiet_hours, customer_catalog, customer_prices,
   customer_stock, few_left_threshold`;
 
-export function buildContextFor(db: Db, orgId: string, userId: string): OrgContext | null {
+// everything buildContextFor reads for many businesses at once, in a handful of queries. used by
+// /v1/me/context, where a super admin gets every business: one by one that was ten queries each
+export interface ContextPreload {
+  superadmin: boolean;
+  invitesPaused: boolean;
+  orgs: Map<string, OrgRow>;
+  flags: Map<string, OrgFlags>;
+  memberships: Map<string, { id: string; perms_version: number }>;
+  topology: Map<string, ReturnType<typeof loadTopology>>;
+}
+
+export function preloadContexts(db: Db, orgIds: readonly string[], userId: string): ContextPreload {
   const p = platform(db);
-  const org = p.get<OrgRow>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE id = @id AND archived_at IS NULL`, { id: orgId });
+  const ids = JSON.stringify(orgIds);
+  const orgs = new Map<string, OrgRow>();
+  const flags = new Map<string, OrgFlags>();
+  for (const r of p.all<OrgRow & { status: 'active' | 'suspended'; disabled_features: string; max_shops: number | null; max_staff: number | null }>(
+    `SELECT ${ORG_COLUMNS}, status, disabled_features, max_shops, max_staff FROM organizations
+      WHERE archived_at IS NULL AND id IN (SELECT value FROM json_each(@ids))`,
+    { ids },
+  )) {
+    const { status, disabled_features, max_shops, max_staff, ...org } = r;
+    orgs.set(r.id, org as OrgRow);
+    let list: string[] = [];
+    try { list = JSON.parse(disabled_features || '[]') as string[]; } catch { list = []; }
+    flags.set(r.id, { status, disabledFeatures: FEATURES.filter((f: Feature) => list.includes(f)), maxShops: max_shops, maxStaff: max_staff });
+  }
+  const memberships = new Map<string, { id: string; perms_version: number }>();
+  for (const m of p.all<{ org_id: string; id: string; perms_version: number }>(
+    "SELECT org_id, id, perms_version FROM memberships WHERE user_id = @u AND status = 'active'",
+    { u: userId },
+  )) memberships.set(m.org_id, { id: m.id, perms_version: m.perms_version });
+  const shops = p.all<{ org_id: string; id: string; name: string }>(
+    `SELECT org_id, id, name FROM shops WHERE archived_at IS NULL AND org_id IN (SELECT value FROM json_each(@ids)) ORDER BY created_at, name`,
+    { ids },
+  );
+  const groups = p.all<{ org_id: string; id: string; name: string }>(
+    `SELECT org_id, id, name FROM shop_groups WHERE archived_at IS NULL AND org_id IN (SELECT value FROM json_each(@ids))`,
+    { ids },
+  );
+  const links = p.all<{ org_id: string; group_id: string; shop_id: string }>(
+    `SELECT org_id, group_id, shop_id FROM shop_group_shops WHERE org_id IN (SELECT value FROM json_each(@ids))`,
+    { ids },
+  );
+  // built in plain arrays and maps first, the Topology type is read only
+  const work = new Map<string, { shops: string[]; groups: Record<string, string[]>; shopNames: Record<string, string>; groupNames: Record<string, string> }>();
+  for (const id of orgs.keys()) work.set(id, { shops: [], groups: {}, shopNames: {}, groupNames: {} });
+  for (const s of shops) {
+    const w = work.get(s.org_id);
+    if (!w) continue;
+    w.shops.push(s.id);
+    w.shopNames[s.id] = s.name;
+  }
+  for (const g of groups) {
+    const w = work.get(g.org_id);
+    if (!w) continue;
+    w.groups[g.id] = [];
+    w.groupNames[g.id] = g.name;
+  }
+  for (const l of links) {
+    const w = work.get(l.org_id);
+    if (w?.groups[l.group_id] && w.shops.includes(l.shop_id)) w.groups[l.group_id]!.push(l.shop_id);
+  }
+  const topology = new Map<string, ReturnType<typeof loadTopology>>();
+  for (const [id, w] of work) topology.set(id, { topology: { orgId: id, shops: w.shops, groups: w.groups }, shopNames: w.shopNames, groupNames: w.groupNames });
+  return { superadmin: isSuperadmin(db, userId), invitesPaused: platformPaused(db, 'pause_invites'), orgs, flags, memberships, topology };
+}
+
+export function buildContextFor(db: Db, orgId: string, userId: string, pre?: ContextPreload): OrgContext | null {
+  const p = platform(db);
+  const org = pre ? pre.orgs.get(orgId) : p.get<OrgRow>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE id = @id AND archived_at IS NULL`, { id: orgId });
   if (!org) return null;
   const t = new Tenant(db, org.id);
-  const m = t.get<{ id: string; perms_version: number }>(
-    "SELECT id, perms_version FROM memberships WHERE org_id = @org AND user_id = @u AND status = 'active'",
-    { u: userId },
-  );
+  const m = pre
+    ? pre.memberships.get(org.id)
+    : t.get<{ id: string; perms_version: number }>(
+      "SELECT id, perms_version FROM memberships WHERE org_id = @org AND user_id = @u AND status = 'active'",
+      { u: userId },
+    );
   // a super admin has every permission in every business, member or not (lib/platform-access.ts)
-  const superadmin = isSuperadmin(db, userId);
+  const superadmin = pre ? pre.superadmin : isSuperadmin(db, userId);
   if (!m && !superadmin) return null;
-  const { topology, shopNames, groupNames } = loadTopology(db, org.id);
+  const { topology, shopNames, groupNames } = pre?.topology.get(org.id) ?? loadTopology(db, org.id);
   const member = m ? loadAssignments(t, m.id, org) : { assignments: [], roleNames: [] as string[] };
   const assignments = superadmin ? [...member.assignments, platformAssignment(org.id)] : member.assignments;
   const viaPlatform = superadmin && !m;
   t.viaPlatform = viaPlatform;
   const permsVersion = m?.perms_version ?? 1;
-  const flags = orgFlags(db, org.id);
+  const flags = pre ? pre.flags.get(org.id) ?? null : orgFlags(db, org.id);
+  const full = pre
+    ? {
+      shopsFull: flags?.maxShops != null && shopsUsed(db, org.id) >= flags.maxShops,
+      staffFull: pre.invitesPaused || (flags?.maxStaff != null && staffUsed(db, org.id) >= flags.maxStaff),
+    }
+    : orgFull(db, org.id, flags);
   const access = {
     ...buildOrgAccess({
       org: { id: org.id, name: org.name, slug: org.slug, currency: org.currency, timezone: org.timezone, defaultLocale: org.default_locale },
@@ -163,7 +240,7 @@ export function buildContextFor(db: Db, orgId: string, userId: string): OrgConte
     ...(viaPlatform ? { platformAccess: true } : {}),
     ...(flags?.status === 'suspended' ? { suspended: true } : {}),
     ...(flags?.disabledFeatures.length ? { disabledFeatures: [...flags.disabledFeatures] } : {}),
-    ...Object.fromEntries(Object.entries(orgFull(db, org.id, flags)).filter(([, full]) => full)),
+    ...Object.fromEntries(Object.entries(full).filter(([, on]) => on)),
   };
   return { org, t, membershipId: m?.id ?? '', permsVersion, access, topology, assignments, shopNames, groupNames, viaPlatform };
 }

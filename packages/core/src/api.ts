@@ -209,6 +209,8 @@ export interface CustockApi {
   requestEmailChange(newEmail: string, password?: string): Promise<{ sent: true; devCode?: string }>;
   // public, from the notice to the old address: puts the old email back and signs everyone out
   revertEmailChange(token: string): Promise<{ email: string }>;
+  // whether the undo link still works, without using it
+  emailRevertPreview(token: string): Promise<{ valid: true }>;
   confirmEmailChange(newEmail: string, code: string): Promise<void>;
   detachBarcode(orgId: string, variantId: string, barcodeId: string): Promise<void>;
   // movements accepted offline that pushed stock below zero in strict mode

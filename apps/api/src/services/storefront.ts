@@ -64,6 +64,7 @@ export function storefrontProducts(
         id: p.id,
         orgId: org.id,
         orgName: org.name,
+        orgSlug: org.slug,
         timezone: org.timezone,
         name: p.name,
         description: p.description,

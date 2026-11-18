@@ -87,7 +87,9 @@ export function catalogRoutes(app: Hono<AppEnv>) {
       { norm: n.codeNorm, raw: n.code },
     );
     if (!hit) {
-      if (body.shopId) {
+      // a misread (a barcode whose check digit does not match) is not a code the shop is missing,
+      // so it stays out of the unknown codes list and the home count
+      if (body.shopId && n.valid) {
         const now = nowOf(c);
         const open = t.get<{ id: string }>('SELECT id FROM unknown_scans WHERE org_id = @org AND shop_id = @s AND code_norm = @n AND resolved_at IS NULL', { s: body.shopId, n: n.codeNorm });
         if (open) t.run('UPDATE unknown_scans SET times = times + 1, scanned_at = @now, scanned_by = @u WHERE org_id = @org AND id = @id', { now, u: c.get('user').id, id: open.id });

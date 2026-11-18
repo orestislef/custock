@@ -242,6 +242,7 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
 
     requestEmailChange: (newEmail, password) => post('/v1/me/email', { email: newEmail, ...(password ? { password } : {}) }),
     revertEmailChange: (token) => post('/v1/public/email-revert', { token }),
+    emailRevertPreview: (token) => get(`/v1/public/email-revert/${enc(token)}`),
     confirmEmailChange: (newEmail, code) => post('/v1/me/email/verify', { email: newEmail, code }),
     detachBarcode: (orgId, variantId, barcodeId) => del(`${org(orgId)}/variants/${enc(variantId)}/barcodes/${enc(barcodeId)}`),
     presignUpload: (orgId, input) => post(`${org(orgId)}/uploads/presign`, input),

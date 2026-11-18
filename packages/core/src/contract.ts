@@ -341,6 +341,8 @@ export const StockLevel = z.object({
   onHand: z.number(),
   inTransitIn: z.number(),
   reorderPoint: z.number().nullable(),
+  // the shop's own price, when it differs from the base price (null: the base price applies)
+  priceOverrideMinor: z.number().int().nullable().optional(),
   lastMovementAt: z.number().nullable(),
   waiting: z.number(), // customers waiting with notify me, for this shop or any shop
 });
@@ -578,6 +580,8 @@ export const PublicProduct = z.object({
   id: z.string(),
   orgId: z.string(),
   orgName: z.string(),
+  // the business's page is /s/<orgSlug>, for the way in from a shelf QR
+  orgSlug: z.string().optional(),
   // the business's time zone, for dates like the end of an offer
   timezone: z.string().optional(),
   name: z.string(),
@@ -615,6 +619,9 @@ export const JoinPage = z.object({
   imageUrl: z.string().nullable(),
   disabled: z.boolean(),
   interests: z.array(Category),
+  // the business's own push limits, so the page promises what it keeps
+  pushDailyCap: z.number().int().optional(),
+  quietHours: z.string().optional(),
 });
 export type JoinPage = z.infer<typeof JoinPage>;
 

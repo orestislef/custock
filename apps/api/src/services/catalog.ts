@@ -171,8 +171,8 @@ export function loadProducts(t: Tenant, ids: string[], opts: LoadOpts): ProductW
 // stock in one of the shops still gets a level there, at 0, so staff see every shop they work in.
 export function loadLevels(t: Tenant, variantIds: string[], shopIds: string[], fill = false): StockLevel[] {
   if (!variantIds.length || !shopIds.length) return [];
-  const rows = t.all<{ shop_id: string; variant_id: string; on_hand: number; in_transit_in: number; last_movement_at: number | null; reorder_point: number | null }>(
-    `SELECT l.shop_id, l.variant_id, l.on_hand, l.in_transit_in, l.last_movement_at, s.reorder_point
+  const rows = t.all<{ shop_id: string; variant_id: string; on_hand: number; in_transit_in: number; last_movement_at: number | null; reorder_point: number | null; price_override_minor: number | null }>(
+    `SELECT l.shop_id, l.variant_id, l.on_hand, l.in_transit_in, l.last_movement_at, s.reorder_point, s.price_override_minor
        FROM stock_levels l
        LEFT JOIN shop_variant_settings s ON s.shop_id = l.shop_id AND s.variant_id = l.variant_id
       WHERE l.org_id = @org AND l.variant_id IN (SELECT value FROM json_each(@vids)) AND l.shop_id IN (SELECT value FROM json_each(@shops))`,
@@ -192,6 +192,7 @@ export function loadLevels(t: Tenant, variantIds: string[], shopIds: string[], f
     onHand: r.on_hand,
     inTransitIn: r.in_transit_in,
     reorderPoint: r.reorder_point,
+    priceOverrideMinor: r.price_override_minor,
     lastMovementAt: r.last_movement_at,
     waiting: waitingFor(r.variant_id, r.shop_id),
   }));
@@ -204,14 +205,15 @@ export function loadLevels(t: Tenant, variantIds: string[], shopIds: string[], f
   const missing = variantIds.flatMap((v) => visible.filter((s) => !have.has(`${v}:${s}`)).map((s) => ({ v, s })));
   if (!missing.length) return out;
   const points = new Map(
-    t.all<{ shop_id: string; variant_id: string; reorder_point: number | null }>(
-      `SELECT shop_id, variant_id, reorder_point FROM shop_variant_settings
+    t.all<{ shop_id: string; variant_id: string; reorder_point: number | null; price_override_minor: number | null }>(
+      `SELECT shop_id, variant_id, reorder_point, price_override_minor FROM shop_variant_settings
         WHERE org_id = @org AND variant_id IN (SELECT value FROM json_each(@vids)) AND shop_id IN (SELECT value FROM json_each(@shops))`,
       { vids: variantIds, shops: shopIds },
-    ).map((r) => [`${r.variant_id}:${r.shop_id}`, r.reorder_point]),
+    ).map((r) => [`${r.variant_id}:${r.shop_id}`, r]),
   );
   for (const { v, s } of missing) {
-    out.push({ shopId: s, variantId: v, onHand: 0, inTransitIn: 0, reorderPoint: points.get(`${v}:${s}`) ?? null, lastMovementAt: null, waiting: waitingFor(v, s) });
+    const set = points.get(`${v}:${s}`);
+    out.push({ shopId: s, variantId: v, onHand: 0, inTransitIn: 0, reorderPoint: set?.reorder_point ?? null, priceOverrideMinor: set?.price_override_minor ?? null, lastMovementAt: null, waiting: waitingFor(v, s) });
   }
   return out;
 }

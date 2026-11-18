@@ -325,10 +325,12 @@ function rollupOrg(db: Db, org: OrgRow, now: number) {
   {
     const t = new Tenant(db, org.id);
     const since = localDayStart(now - 2 * DAY, org.timezone);
+    // undone movements (a reversal points at them) and the reversals themselves leave the stats
     const moves = t.all<{ shop_id: string; kind: string; qty_delta: number; uom: string; price: number | null; cost: number | null; recorded_at: number }>(
       `SELECT m.shop_id, m.kind, m.qty_delta, p.uom, coalesce(m.unit_price_minor, v.price_minor) AS price, coalesce(m.unit_cost_minor, v.cost_minor) AS cost, m.recorded_at
          FROM stock_movements m JOIN product_variants v ON v.id = m.variant_id JOIN products p ON p.id = v.product_id
-        WHERE m.org_id = @org AND m.recorded_at >= @since`,
+        WHERE m.org_id = @org AND m.recorded_at >= @since AND m.kind <> 'reversal'
+          AND NOT EXISTS (SELECT 1 FROM stock_movements u WHERE u.ref_type = 'reversal' AND u.ref_id = m.id)`,
       { since },
     );
     const rows = new Map<string, Record<string, number | string>>();

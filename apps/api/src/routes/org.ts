@@ -4,7 +4,7 @@ import type { Hono } from 'hono';
 import { can, type MeContext, type OrgSettings, type Shop } from '@custock/core';
 import type { Db } from '@custock/db';
 import type { AppEnv, OrgRow } from '../types';
-import { buildContextFor, categoryNameSql, cfgOf, orgOf, readerLocale, requireAuth } from '../lib/context';
+import { buildContextFor, categoryNameSql, cfgOf, orgOf, preloadContexts, readerLocale, requireAuth } from '../lib/context';
 import { ApiProblem } from '../lib/problem';
 import { platform, Tenant } from '../lib/tenant';
 import { isSuperadmin, platformSettings, storageUse } from '../lib/platform-access';
@@ -90,7 +90,8 @@ export function orgRoutes(app: Hono<AppEnv>) {
         if (!orgIds.includes(o.id)) orgIds.push(o.id);
       }
     }
-    const orgs = orgIds.map((id) => buildContextFor(db, id, user.id)).filter((x) => x !== null).map((x) => x.access);
+    const pre = preloadContexts(db, orgIds, user.id);
+    const orgs = orgIds.map((id) => buildContextFor(db, id, user.id, pre)).filter((x) => x !== null).map((x) => x.access);
     const following = p.all<{ org_id: string; org_name: string; org_slug: string; customer_id: string }>(
       `SELECT c.org_id, o.name AS org_name, o.slug AS org_slug, c.id AS customer_id FROM customers c JOIN organizations o ON o.id = c.org_id
         WHERE c.user_id = @u AND c.erased_at IS NULL AND o.archived_at IS NULL`,
