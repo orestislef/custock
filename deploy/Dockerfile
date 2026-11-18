@@ -19,13 +19,9 @@ COPY packages/core/package.json packages/core/
 COPY packages/db/package.json packages/db/
 COPY packages/i18n/package.json packages/i18n/
 COPY packages/tokens/package.json packages/tokens/
-RUN printf 'packages:
-  - apps/api
-  - packages/*
-onlyBuiltDependencies:
-  - better-sqlite3
-  - esbuild
-' > pnpm-workspace.yaml  && pnpm install --prod --no-frozen-lockfile
+RUN echo "packages: [apps/api, 'packages/*']" > pnpm-workspace.yaml \
+ && echo "onlyBuiltDependencies: [better-sqlite3, esbuild]" >> pnpm-workspace.yaml \
+ && pnpm install --prod --no-frozen-lockfile
 
 # the web as a next.js standalone server
 FROM base AS web
