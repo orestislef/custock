@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-18T01:15:00+02:00",
-  "overall": 88,
+  "updated": "2026-11-18T13:30:00+02:00",
+  "overall": 82,
   "areas": [
     {
       "key": "thinking",
@@ -31,25 +31,28 @@
       "note": "API contract and client interface, design tokens, en/el/ru common translations with tested plurals."
     },
     {
-      "key": "backend",
       "name": "Backend (permissions engine, database, API)",
-      "percent": 97,
+      "percent": 92,
       "state": "building",
-      "note": "All endpoints, ledger, counts, transfers, posts sending, invites, audit log, job worker, security review fixed. New: accepts tokens from an external login server (JWKS), FCM and SMTP transports that stay off unless sending is explicitly allowed, full text search fast on 2,000 products, 200,000 movements and 20,000 customers (every list and report under 150 ms), OpenAPI document, product variants and photos, names in the reader's language, Docker and litestream deploy files, backup scripts. 206 tests passing."
+      "note": "Live on its own server. Web push, email in the app look, photos in a bucket, invite links, first owner setup. Now: super admin, feature switches, error tracking, forgot password."
     },
     {
-      "key": "web",
-      "name": "Web (customer pages and admin)",
-      "percent": 96,
+      "name": "Web app for phone and desktop",
+      "percent": 88,
       "state": "building",
-      "note": "Customer pages and the full admin, every action on the real API, end to end flow passing. Independent Apple design review applied: accessible numbers, home leads with what needs you, staff today screen, real tables on wide screens, role editor as a page, audit log in plain sentences, variants and photo upload, names in the reader's language."
+      "note": "The website is the phone app now: add to home screen, camera scanning, offline stock, push, customer app per business. Now: hiding what people cannot do, profile photos, styled menus."
     },
     {
-      "key": "mobile",
-      "name": "Phone app (Expo)",
+      "name": "Production server",
+      "percent": 80,
+      "state": "building",
+      "note": "One container behind the existing proxy. Real email and push on, photos in Cloudflare R2. Next: super admin, then a full test on desktop and phone."
+    },
+    {
+      "name": "Native phone app (Expo)",
       "percent": 60,
       "state": "building",
-      "note": "Expo SDK 58. Sign in for staff and customers, work side with tabs from permissions, scanning with expo-camera (look up, sell with undo, receive with the back in stock moment, counts), stock and product pages, customers, posts composer, team and settings. Customer side: feed, offers, catalog with merchant stock settings, shops, QR join, profile. Bundles for web and Android, works against the real API. Next: transfers, offline outbox, all writes, native Android build."
+      "note": "Paused. The web app covers phones. The Expo version is kept on its own branch."
     }
   ],
   "log": [
@@ -116,32 +119,68 @@
     {
       "at": "2026-11-18T01:15:00+02:00",
       "text": "Web design review applied: tables on wide screens, staff today screen, audit in plain sentences, photo upload. Screenshots refreshed."
+    },
+    {
+      "at": "2026-11-18T09:00:00+02:00",
+      "text": "Decision: the website is the phone app, added to the home screen. The Expo app moves to its own branch."
+    },
+    {
+      "at": "2026-11-18T11:30:00+02:00",
+      "text": "First production deploy: one container, real email and push, photos in a bucket, every email in the app look."
+    },
+    {
+      "at": "2026-11-18T13:30:00+02:00",
+      "text": "Building super admin, feature switches, error tracking, forgot password and profile photos. Fixes from the first live check."
     }
   ],
   "screens": [
     {
-      "src": "../apps/mobile/screenshots/home-manager-el-light.png",
-      "caption": "Phone app, manager home, Greek"
+      "src": "../apps/web/screenshots/pwa/01-landing-en.jpg",
+      "caption": "Phone (web app): 01 landing en"
     },
     {
-      "src": "../apps/mobile/screenshots/receive-2-moment.png",
-      "caption": "Phone app, receive with the back in stock moment"
+      "src": "../apps/web/screenshots/pwa/02-offline-page-en.jpg",
+      "caption": "Phone (web app): 02 offline page en"
     },
     {
-      "src": "../apps/mobile/screenshots/product-manager-en-light.png",
-      "caption": "Phone app, product with stock per shop"
+      "src": "../apps/web/screenshots/pwa/03-settings-shop-page-el.jpg",
+      "caption": "Phone (web app): 03 settings shop page el"
     },
     {
-      "src": "../apps/mobile/screenshots/stock-staff-ru-dark.png",
-      "caption": "Phone app, staff stock, Russian, dark"
+      "src": "../apps/web/screenshots/pwa/04-staff-home-en.jpg",
+      "caption": "Phone (web app): 04 staff home en"
     },
     {
-      "src": "../apps/mobile/screenshots/feed-anna-ru-light.png",
-      "caption": "Phone app, customer feed, Russian"
+      "src": "../apps/web/screenshots/pwa/05-scan-sell-en.jpg",
+      "caption": "Phone (web app): 05 scan sell en"
     },
     {
-      "src": "../apps/mobile/screenshots/offers-anna-el-dark.png",
-      "caption": "Phone app, customer offers, Greek, dark"
+      "src": "../apps/web/screenshots/pwa/06-offline-outbox-en.jpg",
+      "caption": "Phone (web app): 06 offline outbox en"
+    },
+    {
+      "src": "../apps/api/screenshots/email/backInStock-en-dark.jpg",
+      "caption": "Email: backInStock en dark"
+    },
+    {
+      "src": "../apps/api/screenshots/email/backInStock-en-light.jpg",
+      "caption": "Email: backInStock en light"
+    },
+    {
+      "src": "../apps/api/screenshots/email/changeCode-en-dark.jpg",
+      "caption": "Email: changeCode en dark"
+    },
+    {
+      "src": "../apps/api/screenshots/email/changeCode-en-light.jpg",
+      "caption": "Email: changeCode en light"
+    },
+    {
+      "src": "../apps/api/screenshots/email/emailChanged-en-dark.jpg",
+      "caption": "Email: emailChanged en dark"
+    },
+    {
+      "src": "../apps/api/screenshots/email/emailChanged-en-light.jpg",
+      "caption": "Email: emailChanged en light"
     },
     {
       "src": "../apps/web/screenshots/phone-light-el-home.png",
