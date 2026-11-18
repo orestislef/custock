@@ -19,6 +19,7 @@ import { idempotent } from '../lib/idempotency';
 import { ApiProblem, badRequest, forbidden, notFound } from '../lib/problem';
 import { clientIp, throttle } from '../lib/ratelimit';
 import { platform, Tenant } from '../lib/tenant';
+import { pushReachableSql, recomputePushOk } from '../lib/webpush';
 import { dayKey } from '../lib/time';
 import { devOutboxTransport } from '../lib/transport';
 import { readUnsubToken, unsubKey } from '../lib/unsub';
@@ -38,6 +39,8 @@ export const DEV_TURNSTILE_TOKEN = 'dev-turnstile-ok';
 // asks cloudflare, and without a secret every public signup is refused.
 export async function verifyTurnstile(cfg: Config, token: string | undefined, ip: string): Promise<boolean> {
   if (cfg.dev) return token === undefined || token === DEV_TURNSTILE_TOKEN;
+  // CUSTOCK_TURNSTILE=off: no bot check on purpose (logged at startup), the rate limits stay
+  if (cfg.turnstileOff) return true;
   if (!cfg.turnstileSecret || !token) return false;
   try {
     const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
@@ -126,8 +129,7 @@ function consent(t: Tenant, customerId: string, channel: 'email' | 'push' | 'sms
     t.run('UPDATE customers SET email_ok = CASE WHEN @g = 1 AND email_verified_at IS NOT NULL THEN 1 ELSE 0 END, updated_at = @now WHERE org_id = @org AND id = @c', { g: granted, now, c: customerId });
   } else if (channel === 'push') {
     t.run(
-      `UPDATE customers SET push_ok = CASE WHEN @g = 1 AND user_id IS NOT NULL AND EXISTS (
-         SELECT 1 FROM devices d WHERE d.user_id = customers.user_id AND d.revoked_at IS NULL AND d.fcm_token IS NOT NULL) THEN 1 ELSE 0 END,
+      `UPDATE customers SET push_ok = CASE WHEN @g = 1 AND user_id IS NOT NULL AND ${pushReachableSql('customers.user_id', 'customers.org_id')} THEN 1 ELSE 0 END,
          updated_at = @now WHERE org_id = @org AND id = @c`,
       { g: granted, now, c: customerId },
     );
@@ -428,6 +430,12 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
       if (everything) {
         t.run("UPDATE customer_subscriptions SET status = 'unsubscribed', updated_at = @now WHERE org_id = @org AND customer_id = @c", { now, c: target.customerId });
         setSubscription(t, target.customerId, 'org', org.id, 'unsubscribed', now, 'unsubscribe_link', null);
+        // and this business's home screen app stops getting pushes, unless the person works there
+        const userId = t.get<{ user_id: string | null }>('SELECT user_id FROM customers WHERE org_id = @org AND id = @c', { c: target.customerId })?.user_id;
+        if (userId && !t.get("SELECT 1 FROM memberships WHERE org_id = @org AND user_id = @u AND status = 'active'", { u: userId })) {
+          t.run('DELETE FROM push_subscriptions WHERE org_id = @org AND user_id = @u', { u: userId });
+          recomputePushOk(cfg.db, userId, now);
+        }
       }
     })();
     return c.body(null, 204);
@@ -730,6 +738,7 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
       p.run('DELETE FROM dev_outbox WHERE user_id = @u', { u: user.id });
       p.run('UPDATE sessions SET revoked_at = coalesce(revoked_at, @now) WHERE user_id = @u', { now, u: user.id });
       p.run('UPDATE devices SET revoked_at = coalesce(revoked_at, @now), fcm_token = NULL WHERE user_id = @u', { now, u: user.id });
+      p.run('DELETE FROM push_subscriptions WHERE user_id = @u', { u: user.id });
       p.run('UPDATE users SET email = NULL, phone = NULL, display_name = NULL, password_hash = NULL, deleted_at = @now, updated_at = @now WHERE id = @u', { now, u: user.id });
     })();
     return c.body(null, 204);

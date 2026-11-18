@@ -8,7 +8,9 @@
     "start": "tsx src/main.ts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
-    "bench": "tsx scripts/bench.ts"
+    "bench": "tsx scripts/bench.ts",
+    "cli": "tsx src/cli.ts",
+    "vapid": "tsx scripts/vapid.ts"
   },
   "dependencies": {
     "@custock/core": "workspace:*",
@@ -21,10 +23,12 @@
     "jose": "^6.2.17",
     "nodemailer": "^10.6.0",
     "tsx": "^4.23.15",
+    "web-push": "^3.6.7",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
-    "@types/nodemailer": "^8.0.2"
+    "@types/nodemailer": "^8.0.2",
+    "@types/web-push": "^3.6.4"
   }
 }

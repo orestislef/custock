@@ -20,8 +20,10 @@ Environment:
 | `CUSTOCK_JWT_SECRET` | none | required outside dev, a random value of 32 characters or more. the server refuses to start without it |
 | `CUSTOCK_UNSUB_SECRET` | derived from the jwt secret | key for unsubscribe links |
 | `CUSTOCK_TURNSTILE_SECRET` | none | bot check secret for join pages. outside dev, public signups are refused without it |
+| `CUSTOCK_TURNSTILE` | `on` | `off` takes public signups without the bot check, on purpose and logged loudly at startup. rate limits still apply |
+| `CUSTOCK_INTERNAL_KEY` | none | 32+ random characters shared with the web server in the same container. with it, the web passes the visitor's address in `X-Custock-Client-Ip` for rate limits and consent records |
 | `CUSTOCK_TRUSTED_PROXY` | off | `1` when the api sits behind our own reverse proxy: the rightmost `X-Forwarded-For` hop is the client. otherwise the socket address is used |
-| `CUSTOCK_SEED` | off | `1` seeds the made up Lemoni business into a new database. dev always does |
+| `CUSTOCK_SEED` | off | `1` seeds the made up Lemoni business into a new database. dev always does. outside dev it needs `CUSTOCK_SEED_PASSWORD` |
 | `PORT` | 8787 | |
 | `CUSTOCK_DB` | `apps/api/data/custock.db` | sqlite file |
 | `CUSTOCK_PUBLIC_WEB_URL` | `http://localhost:3000` | base for join, confirm, invite and unsubscribe links |
@@ -32,11 +34,35 @@ Environment:
 | `CUSTOCK_AUTH_MODE` | `local` | `local` is the built in login. `jwks` trusts the real login server |
 | `CUSTOCK_AUTH_JWKS_URL`, `CUSTOCK_AUTH_ISSUER`, `CUSTOCK_AUTH_AUDIENCE` | | required with `jwks` |
 | `CUSTOCK_TRANSPORT` | `outbox` | `outbox` keeps every message in the database. `live` sends them |
-| `CUSTOCK_ALLOW_SENDING` | | must be `yes` for `live`, together with the three below |
-| `CUSTOCK_FCM_SERVICE_ACCOUNT` | | path to the Firebase service account json |
-| `CUSTOCK_SMTP_URL`, `CUSTOCK_MAIL_FROM` | | the mail server and our sender address |
+| `CUSTOCK_ALLOW_SENDING` | | must be `yes` for `live` |
+| `CUSTOCK_VAPID_PUBLIC_KEY`, `CUSTOCK_VAPID_PRIVATE_KEY`, `CUSTOCK_VAPID_SUBJECT` | | web push to the installed web app. `pnpm --filter @custock/api vapid` prints a pair. the subject is `mailto:you@example.com` or an https url. the public key is also served at `GET /v1/push/key`, in any mode |
+| `CUSTOCK_FCM_SERVICE_ACCOUNT` | | path to the Firebase service account json, only for a native app |
+| `CUSTOCK_SMTP_URL`, `CUSTOCK_MAIL_FROM` | | the mail server and our sender address. Gmail: `smtps://name%40gmail.com:apppassword@smtp.gmail.com:465` (the @ of the user written as `%40`, the 16 letter app password without spaces) and `CUSTOCK_MAIL_FROM=name@gmail.com` |
 
 Running on a server: see [deploy/README.md](../../deploy/README.md).
+
+## a production database
+
+A server starts with an empty database. The first business and its owner come from the command
+line, in the container:
+
+```
+docker exec -it custock node --import tsx apps/api/src/cli.ts create-business \
+  --name "Lemoni" --slug lemoni --owner-email eleni@example.com --owner-name "Eleni" --shop "Kifisia"
+docker exec -it custock node --import tsx apps/api/src/cli.ts add-shop --org lemoni --name "Marousi"
+docker exec -it custock node --import tsx apps/api/src/cli.ts set-password --email eleni@example.com
+```
+
+The password comes from `CUSTOCK_NEW_PASSWORD`, or from stdin with `--password-stdin`, otherwise a
+random one is printed once. `create-business` refuses an email that already has an account.
+`set-password` signs the person out everywhere. Locally: `pnpm --filter @custock/api cli <command> ...`.
+
+The owner then invites the team from the admin. While mail is not live the invite comes back with
+its link to share by hand. A new person opens it, sets a name and password and is in.
+
+Customers need mail: joining from a QR code ends with a confirmation email (double opt in), and the
+customer sign in is a code by email. Until `CUSTOCK_SMTP_URL` is live those emails wait in the
+outbox. The join page also needs `CUSTOCK_TURNSTILE_SECRET`, or `CUSTOCK_TURNSTILE=off`.
 
 ## dev logins
 
@@ -93,7 +119,10 @@ Write:
 - stock: `POST /movements` (a batch, one result per movement), counts (`POST /shops/{shop}/counts`, `PUT /counts/{id}/lines/{v}`, `POST /counts/{id}/submit`, `/apply`, `/cancel`), transfers (`POST /transfers`, `/transfers/{id}/send`, `/receive`, `/cancel`)
 - customers: `POST /customers`, `POST /customers/{id}/notes`, `PUT /customers/{id}/tags`, `POST /customers/{id}/erase`, `POST /join-links`, `PATCH /join-links/{id}`
 - posts: `POST /posts`, `PATCH /posts/{id}`, `DELETE /posts/{id}`, `POST /posts/audience-preview`, `POST /posts/{id}/publish` (publishes, or submits for approval when the caller cannot publish), `/approve`, `/cancel`
-- team: `POST /invites`, `POST /invites/{id}/revoke`, `POST /v1/invites/accept`, `POST /members/{m}/assignments`, `DELETE /members/{m}/assignments/{a}`, `PATCH /members/{m}`, `POST /roles`
+- team: `POST /invites` (returns the accept `link` to share by hand, and `emailed`), `POST /invites/{id}/revoke`, `POST /v1/invites/accept`, `POST /members/{m}/assignments`, `DELETE /members/{m}/assignments/{a}`, `PATCH /members/{m}`, `POST /roles`
+- invite link, no sign in: `GET /v1/invites/{token}` (who invites, to what, and whether the email has an account), `POST /v1/invites/register` (a new person sets a name and password and joins). an email that already has an account gets 409 `account_exists`: sign in, then `POST /v1/invites/accept`
+- shops: `POST /orgs/{org}/shops` (needs `shops.create`), `GET /orgs/{org}/shops?all=1` (every shop, for transfer destinations, needs `stock.transfer.send` somewhere)
+- web push: `GET /v1/push/key`, `POST /v1/me/push-subscriptions` (the browser's subscription, optional `orgId` for one business's home screen app), `DELETE /v1/me/push-subscriptions`
 - customer app: `POST /c/join/{code}`, `POST /c/follow`, `POST /c/unfollow`, `PUT /c/channels`, `POST /c/alerts`, `DELETE /c/alerts/{id}`, `PUT /c/favorites/{product}`
 - public: `POST /public/join/{code}`, `POST /public/confirm`, `POST /public/subscription/{token}`
 - me: `POST /me/email`, `POST /me/email/verify` (email change with a code to the new address)
@@ -128,10 +157,18 @@ email are linked when `email_verified` is true. In this mode our own `/v1/auth/*
 ## messages: outbox or live
 
 Every email and push is written to the `dev_outbox` table first. In `outbox` mode (the default)
-that is where it stays, for reading in the admin. In `live` mode the worker drains the table: push
-through FCM HTTP v1 (a service account, one message per device token, a dead token is dropped),
-email through SMTP. Live mode refuses to start unless the credentials exist and
-`CUSTOCK_ALLOW_SENDING=yes`.
+that is where it stays, for reading in the admin. In `live` mode the worker drains the table through
+the channels that are set up, each on its own:
+
+- web push (VAPID): to every web push subscription of the person, the ones for this business and
+  the ones for all businesses. a subscription the push service calls gone (404, 410) is dropped,
+  one that keeps failing too. silent pushes never go by web push.
+- FCM HTTP v1: a service account, one message per device token, a dead token is dropped.
+- email through SMTP.
+
+A channel without any of its settings stays off and its messages wait in the outbox. A channel with
+some settings but not all refuses to start the server, so nothing half works. The startup log has
+one line per channel. `CUSTOCK_ALLOW_SENDING=yes` is needed for any of it.
 
 What a message carries:
 
@@ -139,6 +176,12 @@ What a message carries:
   language, the cover image, `custock://post/<id>` or `custock://product/<id>` as the deep link,
   the org as the iOS thread id so the lock screen groups per business. Permission changes go as
   silent data pushes.
+- web push: json `{ title, body, url, tag, type, orgId, image }` for the service worker. `url` is
+  the page a tap opens under `CUSTOCK_PUBLIC_WEB_URL`: `/s/<slug>?post=<id>` for a post,
+  `/s/<slug>/p/<product>` for back in stock, `/admin/posts/<id>`, `/admin/stock/counts/<id>`,
+  `/admin/stock/transfers/<id>`, `/admin/stock/<product>` (low stock), `/admin/team` for staff.
+  TTL 12 hours for staff alerts (urgency high), 2 days for posts, 3 for back in stock, and a topic
+  so a phone that was offline only gets the newest of the same message.
 - email: "Lemoni Kifisia via Custock" as the sender name with our address, reply-to the shop,
   `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, the unsubscribe link
   in the footer, `Content-Language` set to the reader's language.

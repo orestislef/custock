@@ -1,10 +1,11 @@
 // me/context, org settings, shops, groups, categories
 
 import type { Hono } from 'hono';
-import type { MeContext, OrgSettings, Shop } from '@custock/core';
+import { can, type MeContext, type OrgSettings, type Shop } from '@custock/core';
 import type { Db } from '@custock/db';
 import type { AppEnv, OrgRow } from '../types';
 import { buildContextFor, categoryNameSql, cfgOf, orgOf, readerLocale, requireAuth } from '../lib/context';
+import { ApiProblem } from '../lib/problem';
 import { platform, Tenant } from '../lib/tenant';
 import { fileUrl } from '../services/catalog';
 
@@ -97,8 +98,15 @@ export function orgRoutes(app: Hono<AppEnv>) {
   app.get('/v1/orgs/:org', (c) => c.json(orgSettings(cfgOf(c).db, orgOf(c).org)));
 
   // members see the shops they work in, org wide roles see all
+  // the caller's own shops. ?all=1 lists every shop of the org, so someone who sends transfers can
+  // pick a destination outside their own shops. it needs stock.transfer.send somewhere.
   app.get('/v1/orgs/:org/shops', (c) => {
     const { t, access } = orgOf(c);
+    const all = c.req.query('all');
+    if (all === '1' || all === 'true') {
+      if (!can(access, 'stock.transfer.send')) throw new ApiProblem(403, 'forbidden', 'needs stock.transfer.send at some shop');
+      return c.json(loadShops(t));
+    }
     return c.json(loadShops(t, access.shops.map((s) => s.shopId)));
   });
 

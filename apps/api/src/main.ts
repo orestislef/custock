@@ -1,7 +1,8 @@
 // starts the api on http://localhost:8787.
 // dev features (dev codes, dev outbox endpoints, the bot check stand in, the dev secret, local
 // uploads) only with CUSTOCK_DEV=1 or --dev (pnpm dev:api passes --dev).
-// sending for real only with CUSTOCK_TRANSPORT=live, the credentials and CUSTOCK_ALLOW_SENDING=yes.
+// sending for real only with CUSTOCK_TRANSPORT=live, CUSTOCK_ALLOW_SENDING=yes and the settings of
+// each channel (web push, FCM, SMTP). a channel without settings keeps its messages in the outbox.
 
 import { serve } from '@hono/node-server';
 import { existsSync } from 'node:fs';
@@ -9,7 +10,8 @@ import { dirname, join } from 'node:path';
 import { createRemoteJWKSet } from 'jose';
 import { DEFAULT_DB_PATH, hashPassword, migrate, openDb, rebuildSearch, seed } from '@custock/db';
 import { createApp } from './app';
-import { createLiveSender, liveProblems, type LiveSender } from './lib/live';
+import { createLiveSender, liveChannels, type LiveSender } from './lib/live';
+import { newVapidKeys, vapidProblems } from './lib/webpush';
 import type { Config } from './types';
 import { startWorker } from './worker';
 
@@ -42,14 +44,43 @@ if (authMode === 'jwks') {
 
 // how messages leave: the outbox table only (default), or for real
 let live: LiveSender | undefined;
+let sending = { email: false, fcm: false, webpush: false };
 const transport = env.CUSTOCK_TRANSPORT ?? 'outbox';
 if (transport === 'live') {
-  const problems = liveProblems(env, existsSync);
+  const { problems, channels, lines } = liveChannels(env, existsSync);
   if (problems.length) fail(`CUSTOCK_TRANSPORT=live refused:\n  ${problems.join('\n  ')}`);
-  live = createLiveSender({ serviceAccountPath: env.CUSTOCK_FCM_SERVICE_ACCOUNT!, smtpUrl: env.CUSTOCK_SMTP_URL!, mailFrom: env.CUSTOCK_MAIL_FROM! });
+  for (const l of lines) console.log(l);
+  live = createLiveSender(channels);
+  sending = { email: !!channels.smtp, fcm: !!channels.fcm, webpush: !!channels.vapid };
 } else if (transport !== 'outbox') {
   fail(`unknown CUSTOCK_TRANSPORT ${transport} (outbox or live)`);
+} else {
+  console.log('transport outbox: nothing leaves the server, every email and push stays in the outbox table');
 }
+
+// the key browsers subscribe to web push with. a dev run makes a throwaway pair so the flow can
+// be tried, nothing is sent in dev anyway.
+let vapidPublicKey = env.CUSTOCK_VAPID_PUBLIC_KEY || undefined;
+if (vapidPublicKey) {
+  const pr = vapidProblems({ publicKey: vapidPublicKey, privateKey: env.CUSTOCK_VAPID_PRIVATE_KEY, subject: env.CUSTOCK_VAPID_SUBJECT });
+  if (pr.length) fail(pr.join('\n'));
+} else if (dev) {
+  vapidPublicKey = newVapidKeys().publicKey;
+}
+
+// public signups without the bot check, on purpose
+const turnstile = env.CUSTOCK_TURNSTILE ?? 'on';
+if (turnstile !== 'on' && turnstile !== 'off') fail('CUSTOCK_TURNSTILE is on or off');
+const turnstileOff = turnstile === 'off' && !dev;
+if (turnstileOff) {
+  console.warn('!!! CUSTOCK_TURNSTILE=off: the join pages take signups without a bot check. rate limits still apply.');
+} else if (!dev && !env.CUSTOCK_TURNSTILE_SECRET) {
+  console.warn('no CUSTOCK_TURNSTILE_SECRET: the join pages refuse signups (set it, or CUSTOCK_TURNSTILE=off)');
+}
+
+// shared with the web server next to us, so it can pass on the real client address
+const internalKey = env.CUSTOCK_INTERNAL_KEY || undefined;
+if (internalKey && internalKey.length < 32) fail('CUSTOCK_INTERNAL_KEY must be at least 32 characters');
 
 const dbPath = env.CUSTOCK_DB ?? DEFAULT_DB_PATH;
 const fresh = !existsSync(dbPath);
@@ -82,6 +113,10 @@ const app = createApp({
   apiPublicUrl: env.CUSTOCK_API_URL ?? `http://localhost:${port}`,
   uploadDir: env.CUSTOCK_UPLOAD_DIR ?? join(dirname(dbPath), 'uploads'),
   auth,
+  sending,
+  turnstileOff,
+  vapidPublicKey,
+  internalKey,
 });
 
 const stopWorker =

@@ -26,6 +26,14 @@ export interface Config {
   uploadDir?: string;
   // who issues tokens: our dev login (default) or the real login server through its JWKS
   auth?: { mode: 'local' } | ExternalAuth;
+  // which channels really send (live mode with their settings). missing means none, all in the outbox
+  sending?: { email: boolean; fcm: boolean; webpush: boolean };
+  // CUSTOCK_TURNSTILE=off: public signups without the bot check (rate limits still apply)
+  turnstileOff?: boolean;
+  // the VAPID public key browsers subscribe with. no key, no web push
+  vapidPublicKey?: string;
+  // shared with the web server in the same container: with it, X-Custock-Client-Ip is trusted
+  internalKey?: string;
 }
 
 export interface AuthUser {

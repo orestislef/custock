@@ -24,6 +24,8 @@ import { stockExtraRoutes } from './routes/stock-extra';
 import { MAX_UPLOAD_BYTES, uploadRoutes } from './routes/uploads';
 import { buildOpenApi } from './openapi';
 import { setFileBase } from './services/catalog';
+import { setWebBase } from './lib/webpush';
+import { pushRoutes } from './routes/push';
 
 export function createApp(cfg: Config) {
   const app = new Hono<AppEnv>();
@@ -50,6 +52,7 @@ export function createApp(cfg: Config) {
   const uploadLimit = bodyLimit({ maxSize: MAX_UPLOAD_BYTES, onError: tooLarge });
   app.use('*', (c, next) => (c.req.path.startsWith('/v1/uploads/') ? uploadLimit(c, next) : jsonLimit(c, next)));
   setFileBase(cfg.apiPublicUrl);
+  setWebBase(cfg.publicWebUrl);
   app.use('*', localeMiddleware);
 
   app.get('/health', (c) => c.json({ ok: true, name: 'custock-api' }));
@@ -74,6 +77,7 @@ export function createApp(cfg: Config) {
   devRoutes(app);
   stockExtraRoutes(app);
   uploadRoutes(app);
+  pushRoutes(app);
 
   let openapi: Record<string, unknown> | null = null;
   app.get('/v1/openapi.json', (c) => c.json((openapi ??= buildOpenApi(app))));

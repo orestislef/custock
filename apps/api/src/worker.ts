@@ -11,6 +11,7 @@ import { parseJson, platform, Tenant } from './lib/tenant';
 import { dayKey, localDayStart, quietHoursEnd, inQuietHours } from './lib/time';
 import { devOutboxTransport, type Transport } from './lib/transport';
 import { drainOutbox, type LiveSender } from './lib/live';
+import { setWebBase } from './lib/webpush';
 import { unsubKey, unsubToken } from './lib/unsub';
 import { canEmail, canPush, resolveAudience } from './services/audience';
 import { fileUrl, variantLabel } from './services/catalog';
@@ -36,7 +37,7 @@ interface JobRow {
 
 export interface WorkerDeps {
   cfg: Pick<Config, 'db' | 'jwtSecret' | 'publicWebUrl' | 'unsubSecret'>;
-  // only with CUSTOCK_TRANSPORT=live: drains the outbox through FCM and SMTP
+  // only with CUSTOCK_TRANSPORT=live: drains the outbox through the live channels
   live?: LiveSender;
   transport?: Transport;
   log?: (line: string) => void;
@@ -45,6 +46,7 @@ export interface WorkerDeps {
 // runs every due job once. returns how many ran.
 export async function runJobs(deps: WorkerDeps, now: number = Date.now()): Promise<number> {
   const db = deps.cfg.db;
+  setWebBase(deps.cfg.publicWebUrl);
   const p = platform(db);
   ensureNightly(db, now);
   let ran = 0;

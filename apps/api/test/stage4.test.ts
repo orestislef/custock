@@ -10,7 +10,7 @@ import { migrate, openDb, seed, hashPassword, type Db, type SeedResult } from '@
 import { ean13 } from '@custock/core';
 import { createApp, type App } from '../src/app';
 import { runJobs } from '../src/worker';
-import { buildEmail, buildFcmMessage, drainOutbox, liveProblems, type LiveSender, type OutboxRow } from '../src/lib/live';
+import { buildEmail, buildFcmMessage, drainOutbox, liveChannels, type LiveSender, type OutboxRow } from '../src/lib/live';
 
 type Json = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -113,8 +113,9 @@ describe('transports: messages are built right and never sent', () => {
     expect(q('SELECT count(*) n FROM dev_outbox WHERE sent_at IS NULL').n).toBe(0);
   });
   it('live mode refuses to start without credentials and an explicit yes', () => {
-    expect(liveProblems({}, () => true)).toHaveLength(4);
-    expect(liveProblems({ CUSTOCK_ALLOW_SENDING: 'yes', CUSTOCK_FCM_SERVICE_ACCOUNT: '/x.json', CUSTOCK_SMTP_URL: 'smtps://a:b@c', CUSTOCK_MAIL_FROM: 'a@b' }, () => false)).toEqual([
+    expect(liveChannels({}, () => true).problems).toEqual(['CUSTOCK_ALLOW_SENDING=yes is not set']);
+    expect(liveChannels({ CUSTOCK_ALLOW_SENDING: 'yes' }, () => true).problems).toEqual(['no channel is set up (VAPID, FCM or SMTP)']);
+    expect(liveChannels({ CUSTOCK_ALLOW_SENDING: 'yes', CUSTOCK_FCM_SERVICE_ACCOUNT: '/x.json', CUSTOCK_SMTP_URL: 'smtps://a:b@c', CUSTOCK_MAIL_FROM: 'a@b' }, () => false).problems).toEqual([
       'CUSTOCK_FCM_SERVICE_ACCOUNT points to a missing file',
     ]);
     const dir = mkdtempSync(join(tmpdir(), 'custock-live-'));

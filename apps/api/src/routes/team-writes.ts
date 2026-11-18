@@ -4,13 +4,15 @@
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import {
-  canEditRole, canGrantRole, canManageMember, checkOwnersAfter, effectiveAtScope, InviteInput, isPermission, uuidv7,
-  type AccessAssignment, type AuditEntry, type Invite, type OrgSettings,
+  canEditRole, canGrantRole, canManageMember, checkOwnersAfter, effectiveAtScope, InviteInput, InviteRegisterInput, isPermission, ShopInput, uuidv7,
+  type AccessAssignment, type AuditEntry, type Invite, type InviteCreated, type InvitePreview, type OrgSettings,
 } from '@custock/core';
-import { randomToken, sha256 } from '@custock/db';
+import { hashPassword, randomToken, sha256, type Db } from '@custock/db';
 import { pickLocale, translator } from '@custock/i18n';
 import type { AppEnv } from '../types';
 import { audit, bumpPerms } from '../lib/audit';
+import { issueTokens } from '../lib/auth';
+import { rateLimit } from '../lib/ratelimit';
 import { cfgOf, need, nowOf, orgOf, requireAuth, ORG_COLUMNS } from '../lib/context';
 import { idempotent } from '../lib/idempotency';
 import { permsChanged } from '../lib/notify';
@@ -19,6 +21,7 @@ import { clampLimit, decodeCursor, page, parseJson, platform, Tenant } from '../
 import { devOutboxTransport } from '../lib/transport';
 import { loadRoles } from './team';
 import { loadShops, orgSettings } from './org';
+import { addShop, BootstrapError } from '../services/bootstrap';
 
 const INVITE_TTL = 7 * 86_400_000;
 
@@ -78,6 +81,58 @@ function ownerUserIds(c: Context<AppEnv>, exceptAssignment?: string, exceptMembe
     .map((r) => r.user_id);
 }
 
+interface OpenInvite {
+  id: string; org_id: string; email: string; role_id: string; scope_type: string; scope_id: string;
+  expires_at: number; invited_by: string; locale: string | null;
+}
+
+// an invite that can still be used, or 410
+function openInvite(db: Db, token: string, now: number): OpenInvite {
+  const inv = platform(db).get<OpenInvite & { accepted_at: number | null; revoked_at: number | null }>(
+    'SELECT id, org_id, email, role_id, scope_type, scope_id, expires_at, accepted_at, revoked_at, invited_by, locale FROM invites WHERE token_hash = @h',
+    { h: sha256(token) },
+  );
+  if (!inv || inv.revoked_at || inv.accepted_at || inv.expires_at < now) throw new ApiProblem(410, 'invite_expired');
+  return inv;
+}
+
+// the person joins the org with the invite's role, and the inviter hears about it
+function claimInvite(db: Db, inv: OpenInvite, user: { id: string; name: string }, now: number) {
+  const t = new Tenant(db, inv.org_id);
+  db.transaction(() => {
+    const claimed = t.run(
+      'UPDATE invites SET accepted_at = @now, accepted_by = @u WHERE org_id = @org AND id = @id AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at >= @now',
+      { now, u: user.id, id: inv.id },
+    );
+    if (!claimed.changes) throw new ApiProblem(410, 'invite_expired');
+    let m = t.get<{ id: string; status: string }>('SELECT id, status FROM memberships WHERE org_id = @org AND user_id = @u', { u: user.id });
+    if (!m) {
+      m = { id: uuidv7(now), status: 'active' };
+      t.run("INSERT INTO memberships (id, org_id, user_id, status, perms_version, joined_at) VALUES (@id, @org, @u, 'active', 1, @now)", { id: m.id, u: user.id, now });
+    } else if (m.status !== 'active') {
+      // a suspended or removed member does not get their old roles back through an invite
+      t.run('DELETE FROM role_assignments WHERE org_id = @org AND membership_id = @m', { m: m.id });
+      t.run("UPDATE memberships SET status = 'active', removed_at = NULL WHERE org_id = @org AND id = @id", { id: m.id });
+      audit(t, { id: user.id }, 'member.rejoined_by_invite', { type: 'membership', id: m.id }, { status: m.status }, { status: 'active' }, now);
+    }
+    t.run(
+      `INSERT OR IGNORE INTO role_assignments (id, org_id, membership_id, role_id, scope_type, scope_id, granted_by, created_at)
+       VALUES (@id, @org, @m, @r, @st, @sid, @by, @now)`,
+      { id: uuidv7(now), m: m.id, r: inv.role_id, st: inv.scope_type, sid: inv.scope_id, by: inv.invited_by, now },
+    );
+    bumpPerms(t, [m.id]);
+    audit(t, { id: user.id }, 'invite.accepted', { type: 'invite', id: inv.id }, null, null, now);
+  })();
+  const orgName = t.get<{ name: string }>('SELECT name FROM organizations WHERE id = @org')!.name;
+  const inviter = platform(db).get<{ locale: string }>('SELECT locale FROM users WHERE id = @id', { id: inv.invited_by });
+  const tr = translator(pickLocale(inviter?.locale), 'server');
+  const params = { name: user.name, org: orgName };
+  devOutboxTransport(db, () => {}).send({
+    channel: 'push', orgId: inv.org_id, userId: inv.invited_by, locale: inviter?.locale ?? 'el',
+    title: tr('push.inviteAccepted.title', params), body: tr('push.inviteAccepted.body', params), payload: { type: 'inviteAccepted' },
+  });
+}
+
 function refuse(code: Parameters<typeof forbidden>[1]) {
   if (code === 'last_owner') return new ApiProblem(409, 'last_owner');
   return forbidden(undefined, code);
@@ -126,7 +181,9 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
       const params = { inviter: c.get('user').displayName ?? '', org: org.name, role: roleLabel, scope: scopeName, url };
       devOutboxTransport(cfgOf(c).db).send({ channel: 'email', orgId: org.id, to: email, locale: input.locale, title: tr('email.invite.subject', params), body: tr('email.invite.body', params), payload: { type: 'invite', inviteId: id } });
       audit(t, { id: c.get('user').id }, 'invite.sent', { type: 'invite', id }, null, { email, roleId: role.id, scopeType: input.scopeType, scopeId: input.scopeId }, now);
-      return { status: 201, body: cfgOf(c).dev ? { id, devLink: url } : { id } };
+      // the link always comes back so it can be shared by hand while mail is not live
+      const body: InviteCreated = { id, link: url, emailed: !!cfgOf(c).sending?.email, ...(cfgOf(c).dev ? { devLink: url } : {}) };
+      return { status: 201, body };
     });
   });
 
@@ -147,45 +204,60 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
     const { token } = z.object({ token: z.string().min(10) }).parse(await c.req.json());
     const db = cfgOf(c).db;
     const now = nowOf(c);
-    const inv = platform(db).get<{ id: string; org_id: string; email: string; role_id: string; scope_type: string; scope_id: string; expires_at: number; accepted_at: number | null; revoked_at: number | null; invited_by: string }>(
-      'SELECT id, org_id, email, role_id, scope_type, scope_id, expires_at, accepted_at, revoked_at, invited_by FROM invites WHERE token_hash = @h',
-      { h: sha256(token) },
-    );
-    if (!inv || inv.revoked_at || inv.accepted_at || inv.expires_at < now) throw new ApiProblem(410, 'invite_expired');
+    const inv = openInvite(db, token, now);
     const user = c.get('user');
     if ((user.email ?? '').toLowerCase() !== inv.email) throw forbidden('different email', 'invite_email_mismatch');
-    const t = new Tenant(db, inv.org_id);
-    db.transaction(() => {
-      const claimed = t.run(
-        'UPDATE invites SET accepted_at = @now, accepted_by = @u WHERE org_id = @org AND id = @id AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at >= @now',
-        { now, u: user.id, id: inv.id },
-      );
-      if (!claimed.changes) throw new ApiProblem(410, 'invite_expired');
-      let m = t.get<{ id: string; status: string }>('SELECT id, status FROM memberships WHERE org_id = @org AND user_id = @u', { u: user.id });
-      if (!m) {
-        m = { id: uuidv7(now), status: 'active' };
-        t.run("INSERT INTO memberships (id, org_id, user_id, status, perms_version, joined_at) VALUES (@id, @org, @u, 'active', 1, @now)", { id: m.id, u: user.id, now });
-      } else if (m.status !== 'active') {
-        // a suspended or removed member does not get their old roles back through an invite
-        t.run('DELETE FROM role_assignments WHERE org_id = @org AND membership_id = @m', { m: m.id });
-        t.run("UPDATE memberships SET status = 'active', removed_at = NULL WHERE org_id = @org AND id = @id", { id: m.id });
-        audit(t, { id: user.id }, 'member.rejoined_by_invite', { type: 'membership', id: m.id }, { status: m.status }, { status: 'active' }, now);
-      }
-      t.run(
-        `INSERT OR IGNORE INTO role_assignments (id, org_id, membership_id, role_id, scope_type, scope_id, granted_by, created_at)
-         VALUES (@id, @org, @m, @r, @st, @sid, @by, @now)`,
-        { id: uuidv7(now), m: m.id, r: inv.role_id, st: inv.scope_type, sid: inv.scope_id, by: inv.invited_by, now },
-      );
-      bumpPerms(t, [m.id]);
-      audit(t, { id: user.id }, 'invite.accepted', { type: 'invite', id: inv.id }, null, null, now);
-    })();
-    const orgName = t.get<{ name: string }>('SELECT name FROM organizations WHERE id = @org')!.name;
-    const transport = devOutboxTransport(db, () => {});
-    const inviter = platform(db).get<{ locale: string }>('SELECT locale FROM users WHERE id = @id', { id: inv.invited_by });
-    const tr = translator(pickLocale(inviter?.locale), 'server');
-    const params = { name: user.displayName ?? user.email ?? '', org: orgName };
-    transport.send({ channel: 'push', orgId: inv.org_id, userId: inv.invited_by, locale: inviter?.locale ?? 'el', title: tr('push.inviteAccepted.title', params), body: tr('push.inviteAccepted.body', params), payload: { type: 'inviteAccepted' } });
+    claimInvite(db, inv, { id: user.id, name: user.displayName ?? user.email ?? '' }, now);
     return c.json({ orgId: inv.org_id });
+  });
+
+  // ------------------------------------------------------------ invites without email
+  // the link is the proof: whoever holds it may join with the role it carries. a brand new person
+  // sets a name and password here. an email that already has an account signs in and accepts, so
+  // an invite can never take over an existing account.
+
+  const inviteLimit = rateLimit({ windowMs: 60_000, max: 30, prefix: 'invite' });
+
+  app.get('/v1/invites/:token', inviteLimit, (c) => {
+    const db = cfgOf(c).db;
+    const inv = openInvite(db, c.req.param('token'), nowOf(c));
+    const t = new Tenant(db, inv.org_id);
+    const org = t.get<{ name: string }>('SELECT name FROM organizations WHERE id = @org')!;
+    const scopeName = inv.scope_type === 'org'
+      ? org.name
+      : inv.scope_type === 'group'
+        ? t.get<{ name: string }>('SELECT name FROM shop_groups WHERE org_id = @org AND id = @id', { id: inv.scope_id })?.name ?? ''
+        : t.get<{ name: string }>('SELECT name FROM shops WHERE org_id = @org AND id = @id', { id: inv.scope_id })?.name ?? '';
+    const role = t.get<{ name: string; template_key: string | null }>('SELECT name, template_key FROM roles WHERE org_id = @org AND id = @id', { id: inv.role_id });
+    const roleName = role?.template_key ? translator(c.get('locale'), 'common')(`role.${role.template_key}`) : role?.name ?? '';
+    const accountExists = !!platform(db).get('SELECT 1 FROM users WHERE email = @e AND deleted_at IS NULL', { e: inv.email });
+    const body: InvitePreview = { orgName: org.name, scopeName, roleName, email: inv.email, accountExists, expiresAt: inv.expires_at };
+    return c.json(body);
+  });
+
+  app.post('/v1/invites/register', inviteLimit, async (c) => {
+    const input = InviteRegisterInput.parse(await c.req.json());
+    const cfg = cfgOf(c);
+    if (cfg.auth?.mode === 'jwks') throw new ApiProblem(404, 'not_found', 'accounts are made on the login server');
+    const db = cfg.db;
+    const now = nowOf(c);
+    const inv = openInvite(db, input.token, now);
+    const p = platform(db);
+    if (p.get('SELECT 1 FROM users WHERE email = @e', { e: inv.email })) throw new ApiProblem(409, 'account_exists', 'sign in with that account, then accept');
+    // the email counts as verified only when the invite really went out by email
+    const emailed = !!p.get("SELECT 1 FROM dev_outbox WHERE channel = 'email' AND sent_at IS NOT NULL AND json_extract(payload, '$.inviteId') = @id", { id: inv.id });
+    const userId = uuidv7(now);
+    const hash = hashPassword(input.password);
+    db.transaction(() => {
+      p.run(
+        `INSERT INTO users (id, email, display_name, password_hash, email_verified_at, locale, created_at, updated_at)
+         VALUES (@id, @e, @n, @h, @v, @l, @now, @now)`,
+        { id: userId, e: inv.email, n: input.displayName, h: hash, v: emailed ? now : null, l: input.locale ?? inv.locale ?? c.get('locale'), now },
+      );
+      claimInvite(db, inv, { id: userId, name: input.displayName }, now);
+    })();
+    const { sessionId: _s, ...tokens } = await issueTokens(cfg, userId, { userAgent: c.req.header('User-Agent') });
+    return c.json({ ...tokens, orgId: inv.org_id }, 201);
   });
 
   // ------------------------------------------------------------ assignments and members
@@ -332,6 +404,19 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
     })();
     const fresh = platform(cfgOf(c).db).get<typeof org>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE id = @id`, { id: org.id })!;
     return c.json(orgSettings(cfgOf(c).db, fresh) satisfies OrgSettings);
+  });
+
+  app.post('/v1/orgs/:org/shops', async (c) => {
+    need(c, 'shops.create');
+    const input = ShopInput.parse(await c.req.json());
+    const { t } = orgOf(c);
+    try {
+      const shop = addShop(cfgOf(c).db, t.orgId, input, { id: c.get('user').id }, nowOf(c));
+      return c.json(loadShops(t, [shop.id])[0], 201);
+    } catch (err) {
+      if (err instanceof BootstrapError) throw new ApiProblem(409, 'conflict', err.message);
+      throw err;
+    }
   });
 
   app.patch('/v1/orgs/:org/shops/:shop', async (c) => {

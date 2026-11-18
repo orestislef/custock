@@ -43,9 +43,14 @@ export function resolveAudience(db: Db, org: OrgRow, topology: Topology, audienc
     ? new Set(t.all<{ customer_id: string }>('SELECT DISTINCT customer_id FROM customer_favorites WHERE org_id = @org AND product_id IN (SELECT value FROM json_each(@ids))', { ids: opts.productIds }).map((r) => r.customer_id))
     : null;
   const scopeShops = audience.scopes.map((s) => shopsInScope(topology, s));
+  // people a push can reach for this business: a phone with the app, or a web push subscription
   const devices = new Set(
     platform(db)
-      .all<{ user_id: string }>('SELECT DISTINCT user_id FROM devices WHERE revoked_at IS NULL AND fcm_token IS NOT NULL')
+      .all<{ user_id: string }>(
+        `SELECT user_id FROM devices WHERE revoked_at IS NULL AND fcm_token IS NOT NULL
+         UNION SELECT user_id FROM push_subscriptions WHERE org_id IS NULL OR org_id = @o`,
+        { o: org.id },
+      )
       .map((r) => r.user_id),
   );
   const suppressed = new Set(platform(db).all<{ email: string }>('SELECT email FROM email_suppressions').map((r) => r.email));

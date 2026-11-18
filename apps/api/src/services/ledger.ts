@@ -8,6 +8,7 @@ import type { OrgRow } from '../types';
 import { audit } from '../lib/audit';
 import { notifyMembers } from '../lib/notify';
 import { platform, Tenant } from '../lib/tenant';
+import { pushReachableSql } from '../lib/webpush';
 import { enqueue } from '../worker';
 import { variantLabel } from './catalog';
 
@@ -240,7 +241,7 @@ function notifyWaiting(ctx: LedgerCtx, variantId: string, shopId: string): numbe
   );
   for (const a of alerts) {
     t.run("UPDATE stock_alerts SET status = 'notified', notified_at = @now WHERE org_id = @org AND id = @id", { now, id: a.id });
-    const hasDevice = a.user_id ? !!platform(ctx.db).get('SELECT 1 FROM devices WHERE user_id = @u AND revoked_at IS NULL AND fcm_token IS NOT NULL', { u: a.user_id }) : false;
+    const hasDevice = a.user_id ? !!platform(ctx.db).get(`SELECT 1 WHERE ${pushReachableSql('@u', '@o')}`, { u: a.user_id, o: t.orgId }) : false;
     const suppressed = a.email ? !!platform(ctx.db).get('SELECT 1 FROM email_suppressions WHERE email = @e', { e: a.email }) : false;
     // notify me is consent for this one message, so a known email is enough
     const channel = a.push_ok && hasDevice ? 'push' : a.email && a.email_verified_at && !suppressed ? 'email' : null;

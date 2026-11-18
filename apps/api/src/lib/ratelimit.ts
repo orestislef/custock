@@ -1,7 +1,11 @@
 // rate limits. per ip in memory, per email in the database.
 // the client ip is the socket address, or the rightmost X-Forwarded-For hop when we sit behind our
 // own proxy (CUSTOCK_TRUSTED_PROXY=1). the leftmost hop is whatever the client wrote, so never that.
+// the web server in the same container calls us for its pages from 127.0.0.1. it passes the real
+// visitor in X-Custock-Client-Ip, which only counts together with the shared CUSTOCK_INTERNAL_KEY.
 
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { isIP } from 'node:net';
 import type { Context, MiddlewareHandler } from 'hono';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Db } from '@custock/db';
@@ -9,8 +13,18 @@ import type { AppEnv } from '../types';
 import { ApiProblem } from './problem';
 import { platform } from './tenant';
 
+const digest = (v: string) => createHash('sha256').update(v).digest();
+
+export const INTERNAL_KEY_HEADER = 'X-Custock-Internal';
+export const CLIENT_IP_HEADER = 'X-Custock-Client-Ip';
+
 export function clientIp(c: Context<AppEnv>): string {
   const cfg = c.get('cfg');
+  if (cfg.internalKey) {
+    const key = c.req.header(INTERNAL_KEY_HEADER);
+    const ip = c.req.header(CLIENT_IP_HEADER)?.trim();
+    if (key && ip && isIP(ip) && timingSafeEqual(digest(key), digest(cfg.internalKey))) return ip;
+  }
   if (cfg.trustedProxy) {
     const hops = (c.req.header('x-forwarded-for') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
     if (hops.length) return hops[hops.length - 1]!;
