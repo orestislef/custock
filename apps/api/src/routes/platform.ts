@@ -252,6 +252,10 @@ export function platformRoutes(app: Hono<AppEnv>) {
     const userId = uuidv7(now);
     const hash = await hashPasswordAsync(input.password);
     db.transaction(() => {
+      // a second tab with the same link got past the checks above during the hash: check again
+      const still = p.get<{ accepted_at: number | null; revoked_at: number | null }>('SELECT accepted_at, revoked_at FROM platform_invites WHERE id = @id', { id: inv.id });
+      if (!still || still.accepted_at || still.revoked_at) throw new ApiProblem(410, 'invite_expired');
+      if (p.get('SELECT 1 FROM users WHERE email = @e', { e: inv.email })) throw new ApiProblem(409, 'account_exists', 'sign in with that account, then accept');
       p.run(
         `INSERT INTO users (id, email, display_name, password_hash, email_verified_at, locale, created_at, updated_at)
          VALUES (@id, @e, @n, @h, @v, @l, @now, @now)`,

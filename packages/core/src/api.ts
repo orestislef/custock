@@ -14,7 +14,8 @@ import type {
   StockCountLine, SyncResult, Transfer, TransferInput, UncountedPolicy, UnsubscribePage, PresignInput, PresignResult,
   PushSubscriptionInput, InviteCreated, InvitePreview, InviteRegisterInput, ShopInput,
 } from './contract';
-import type { BusinessPolicyControl, BusinessPolicyControlsPatch, PlatformPolicyEntry, PolicyEntry, PolicyPatch, PolicyValue } from './policies';
+import type { BusinessPolicyControl, PlatformPolicyEntry, PolicyEntry, PolicyValue } from './policies';
+import type { BusinessPolicyControlsPatch, PolicyPatch } from './policy-schemas';
 
 import type {
   BusinessCreated, NewBusinessInput, OrgControls, OrgControlsPatch, PlatformAuditEntry, PlatformBusiness, PlatformBusinessDetail,
@@ -80,7 +81,7 @@ export interface CustockApi {
   scan(orgId: string, code: string, symbology?: string, shopId?: string): Promise<ScanResult>;
   attachBarcode(orgId: string, variantId: string, code: string, packQty?: number): Promise<void>;
   postMovements(orgId: string, movements: MovementInput[]): Promise<MovementBatchResult>;
-  movements(orgId: string, query: { shopId?: string; variantId?: string; cursor?: string; limit?: number }): Promise<Page<Movement>>;
+  movements(orgId: string, query: { shopId?: string; variantId?: string; productId?: string; cursor?: string; limit?: number }): Promise<Page<Movement>>;
   unknownScans(orgId: string, shopId?: string): Promise<{ id: string; code: string; shopId: string; times: number; scannedAt: number }[]>;
 
   // customers
@@ -231,6 +232,9 @@ export interface CustockApi {
   // one test notification to the caller's own devices: the staff app (orgId null) or one business's app.
   // devices is how many subscriptions or phones it went to, 0 when none has alerts on
   testPush(orgId?: string | null): Promise<{ devices: number }>;
+  // other devices signed in to this account, and signing them all out (a lost phone)
+  otherSessions(): Promise<{ others: number }>;
+  signOutOthers(): Promise<{ signedOut: number }>;
 
   // ---------------------------------------------------------------- production onboarding
 

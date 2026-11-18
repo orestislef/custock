@@ -2,6 +2,7 @@
 
 import type { CustockApi, CustomerQuery, ProductQuery } from './api';
 import type { ErrorCode, Locale, Problem } from './contract';
+import { uuidv7 } from './ids';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -50,6 +51,29 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
   const base = opts.baseUrl.replace(/\/$/, '');
   const doFetch = opts.fetch ?? globalThis.fetch.bind(globalThis);
 
+  // what was loaded is what gets saved: the ETag of a product or post read here goes back as
+  // If-Match on its save, so a second person saving the same thing gets 412 instead of silently
+  // overwriting the first one's changes
+  const etags = new Map<string, string>();
+  // a create sent again with the same body within two minutes (a retry after the network dropped,
+  // a second tap) carries the same Idempotency-Key, so the server answers the first result
+  // instead of making it twice
+  const recentKeys = new Map<string, { key: string; at: number }>();
+  const REPLAY_MS = 120_000;
+  // only the creates where the same thing twice is a mistake. a count line or a scan sent twice on
+  // purpose (the same item scanned again) must count twice, so those never get a key
+  const ONCE = /^\/v1\/orgs\/[^/]+\/(products|posts|customers|join-links|transfers|invites|shops\/[^/]+\/counts)$/;
+  function idempotencyKey(path: string, body: unknown): string {
+    const now = Date.now();
+    for (const [sig, v] of recentKeys) if (now - v.at > REPLAY_MS) recentKeys.delete(sig);
+    const sig = `${path} ${body === undefined ? '' : JSON.stringify(body)}`;
+    const hit = recentKeys.get(sig);
+    if (hit) return hit.key;
+    const key = uuidv7(now);
+    recentKeys.set(sig, { key, at: now });
+    return key;
+  }
+
   async function request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
     const extra = typeof opts.headers === 'function' ? await opts.headers() : opts.headers;
     const headers: Record<string, string> = { ...(extra ?? {}), Accept: 'application/json' };
@@ -64,12 +88,28 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
       if (v != null) headers['X-Perms-Version'] = String(v);
     }
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    const res = await doFetch(`${base}${path}${qs(query)}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    if ((method === 'PATCH' || method === 'PUT') && etags.has(path)) headers['If-Match'] = etags.get(path)!;
+    if (method === 'POST' && ONCE.test(path)) headers['Idempotency-Key'] = idempotencyKey(path, body);
+    let res: Response;
+    try {
+      res = await doFetch(`${base}${path}${qs(query)}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    } catch (e) {
+      // no answer at all, the signal dropped mid save. it stays a TypeError (the stock outbox
+      // keeps the work for later on those) and gets the code of its own plain line, not "our side"
+      const err = e instanceof TypeError ? e : new TypeError(String((e as Error | null)?.message ?? e));
+      throw Object.assign(err, { code: 'network' });
+    }
     if (orgId && res.headers.get('X-Perms-Stale') === '1') opts.onPermsStale?.(orgId);
+    const etag = res.headers.get('ETag');
+    if (res.ok && etag && (method === 'GET' || method === 'PATCH' || method === 'PUT')) etags.set(path, etag);
+    // after a 412 the next save is a deliberate "keep mine": it goes without the old version
+    if (res.status === 412) etags.delete(path);
+    // our own change to a part of something (publish, archive, a barcode) moves its version on too
+    if (res.ok && method !== 'GET') for (const k of etags.keys()) if (path.startsWith(`${k}/`)) etags.delete(k);
     if (res.status === 204) return undefined as T;
     const text = await res.text();
     const data = text ? JSON.parse(text) : undefined;
@@ -260,6 +300,8 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     savePushSubscription: (input) => request('POST', '/v1/me/push-subscriptions', input),
     deletePushSubscription: (endpoint) => request('DELETE', '/v1/me/push-subscriptions', { endpoint }),
     testPush: (orgId) => post('/v1/me/push/test', { orgId: orgId ?? null }),
+    otherSessions: () => get('/v1/me/sessions'),
+    signOutOthers: () => post('/v1/me/sessions/sign-out-others'),
 
     invitePreview: (token) => get(`/v1/invites/${enc(token)}`),
     registerWithInvite: (input) => post('/v1/invites/register', input),

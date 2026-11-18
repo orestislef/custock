@@ -11,7 +11,8 @@
     "bench": "tsx scripts/bench.ts",
     "cli": "tsx src/cli.ts",
     "vapid": "tsx scripts/vapid.ts",
-    "email-shots": "tsx scripts/email-shots.ts"
+    "email-shots": "tsx scripts/email-shots.ts",
+    "big-db": "tsx scripts/big-db.ts"
   },
   "dependencies": {
     "@custock/core": "workspace:*",

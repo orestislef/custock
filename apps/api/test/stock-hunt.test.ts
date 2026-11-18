@@ -48,7 +48,10 @@ describe('stock bug hunt', () => {
     }
     variant = q(
       `SELECT l.variant_id AS v FROM stock_levels l JOIN product_variants pv ON pv.id = l.variant_id JOIN products p ON p.id = pv.product_id
-        WHERE l.shop_id = ? AND l.on_hand > 5 AND p.uom = 'piece' AND p.archived_at IS NULL LIMIT 1`,
+        WHERE l.shop_id = ? AND l.on_hand > 5 AND p.uom = 'piece' AND p.archived_at IS NULL
+          -- a product without any offer, so the shop price test sees the shop price and not an offer
+          AND NOT EXISTS (SELECT 1 FROM post_products pp WHERE pp.variant_id = l.variant_id AND pp.offer_price_minor IS NOT NULL)
+        ORDER BY l.variant_id LIMIT 1`,
       s.shops.kifisia,
     ).v;
   });

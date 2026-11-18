@@ -41,6 +41,10 @@ interface PostRow {
 export interface PostLoadOpts {
   withStats: boolean;
   showPrices: boolean;
+  // with prices hidden, may an offer still show its own price (and the was price)? default yes
+  offerPrices?: boolean;
+  // customers never see a product card for something taken off the shelf; staff still do
+  hideArchived?: boolean;
   // linked product names in this language
   locale?: string;
   // customers do not see audience filters (tags, interests), only the scopes
@@ -69,8 +73,10 @@ export function loadPosts(t: Tenant, ids: string[], opts: PostLoadOpts): Post[] 
             coalesce((SELECT ptr.name FROM product_translations ptr WHERE ptr.product_id = pr.id AND ptr.locale = @loc), pr.name) AS name, v.price_minor, v.options,
             (SELECT f.storage_key FROM product_images i JOIN files f ON f.id = i.file_id WHERE i.product_id = pr.id ORDER BY i.sort LIMIT 1) AS storage_key
        FROM post_products pp JOIN product_variants v ON v.id = pp.variant_id JOIN products pr ON pr.id = v.product_id
-      WHERE pr.org_id = @org AND pp.post_id IN (SELECT value FROM json_each(@ids)) ORDER BY pp.sort`,
-    { ids, loc: opts.locale ?? '' },
+      WHERE pr.org_id = @org AND pp.post_id IN (SELECT value FROM json_each(@ids))
+        AND (@hide = 0 OR (pr.archived_at IS NULL AND v.archived_at IS NULL))
+      ORDER BY pp.sort`,
+    { ids, loc: opts.locale ?? '', hide: opts.hideArchived ? 1 : 0 },
   );
   const stats = opts.withStats
     ? t.all<{ post_id: string; status: string; n: number }>(
@@ -104,8 +110,9 @@ export function loadPosts(t: Tenant, ids: string[], opts: PostLoadOpts): Post[] 
             name: p.name,
             imageUrl: fileUrl(p.storage_key),
             priceMinor: opts.showPrices ? p.price_minor : null,
-            offerPriceMinor: opts.showPrices || r.kind === 'offer' ? p.offer_price_minor : null,
-            wasMinor: p.offer_price_minor != null ? wasPrice(t, p.variant_id, from) : null,
+            ...((opts.showPrices || (r.kind === 'offer' && opts.offerPrices !== false))
+              ? { offerPriceMinor: p.offer_price_minor, wasMinor: p.offer_price_minor != null ? wasPrice(t, p.variant_id, from) : null }
+              : { offerPriceMinor: null, wasMinor: null }),
           })),
         coverUrl: fileUrl(r.cover_key),
         scheduledAt: r.scheduled_at,

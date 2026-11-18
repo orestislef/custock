@@ -1,7 +1,7 @@
 // errors seen in production, for the super admin: issues grouped by fingerprint, and what a
 // browser may report about itself. nothing personal goes in here.
 
-import { z } from 'zod';
+import { z } from './zod';
 
 export const IssueKind = z.enum(['api', 'worker', 'send', 'storage', 'client']);
 export type IssueKind = z.infer<typeof IssueKind>;

@@ -2,7 +2,7 @@
 // the api description the docs screen reads (GET /v1/openapi.json). nothing secret ever goes in
 // here: no keys, no passwords, no tokens, only on or off and hostnames.
 
-import { z } from 'zod';
+import { z } from './zod';
 
 export const ServerInfo = z.object({
   build: z.object({

@@ -2,12 +2,8 @@
 // shapes follow thinking/14-api-sketch.md and thinking/db/schema.sql.
 // money is integer minor units, quantities are integer base units, times are epoch ms.
 
-import { z } from 'zod';
+import { z } from './zod';
 
-// in the browser the pages run under a Content-Security-Policy without 'unsafe-eval'. zod would try
-// Function('') once to see if it may compile schemas, which the policy refuses (and reports), so the
-// browser parses without compiling. the server keeps the faster compiled parsers.
-if (typeof (globalThis as { window?: unknown }).window !== 'undefined') z.config({ jitless: true });
 import { CATEGORY_ICON_KEYS, type CategoryIconKey } from './category-icons';
 import {
   LIMITS, MAX_MONEY_MINOR, MAX_QTY_BASE, cleanLine, cleanText, emailProblem, httpsUrlProblem, isAllowedVat,

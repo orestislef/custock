@@ -62,7 +62,7 @@ function feedItems(c: Context<AppEnv>, kind?: 'offer'): FeedItem[] {
          AND (@kind IS NULL OR coalesce(valid_from, sent_at) <= @now)`,
       { kind: kind ?? null, now },
     );
-    const posts = loadPosts(t, rows.map((r) => r.id), { withStats: false, showPrices: !!f.org.customer_prices, publicAudience: true, locale: readerLocale(c, f.org.default_locale) });
+    const posts = loadPosts(t, rows.map((r) => r.id), { withStats: false, showPrices: !!f.org.customer_prices, offerPrices: !!f.org.customer_offer_prices, hideArchived: true, publicAudience: true, locale: readerLocale(c, f.org.default_locale) });
     for (const full of posts) {
       const reach = postShops(t, full, f.topology).filter((s) => f.shops.includes(s));
       if (!reach.length) continue;

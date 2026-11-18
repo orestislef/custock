@@ -29,6 +29,7 @@ import { setBucketBase, setFileBase } from './services/catalog';
 import { setWebBase } from './lib/webpush';
 import { setPlatformNotifyBase } from './lib/platform-notify';
 import { pushRoutes } from './routes/push';
+import { sessionRoutes } from './routes/sessions';
 import { platformGuards, platformRoutes } from './routes/platform';
 import { emailRoutes } from './routes/email';
 import { setEmailAssetBase } from './email/layout';
@@ -100,6 +101,7 @@ export function createApp(cfg: Config) {
   stockExtraRoutes(app);
   uploadRoutes(app);
   pushRoutes(app);
+  sessionRoutes(app);
   platformRoutes(app);
   policyRoutes(app);
   errorRoutes(app);

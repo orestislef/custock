@@ -23,7 +23,10 @@ export async function idempotent(c: Context<AppEnv>, run: () => Promise<{ status
     c.header('Idempotent-Replay', 'true');
     return c.json(JSON.parse(hit.response) as object, hit.status as 200);
   }
-  const r = await run();
+  // the work and the record of it happen without a pause between them: an await here would let a
+  // second request with the same key pass the check above before this one is written down
+  const out = run();
+  const r = out instanceof Promise ? await out : out;
   if (r.status < 300) {
     db.run(
       'INSERT OR IGNORE INTO idempotency_keys (user_id, key, org_id, method, path, status, response, created_at) VALUES (@u, @k, @o, @m, @p, @s, @r, @now)',

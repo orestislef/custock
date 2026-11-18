@@ -59,6 +59,7 @@ export function inQuietHours(ts: number, window: string, timeZone: string): bool
 export function quietHoursEnd(ts: number, window: string, timeZone: string): number {
   if (!inQuietHours(ts, window, timeZone)) return ts;
   let t = ts - (ts % 60_000);
-  for (let i = 0; i < 24 * 60 && inQuietHours(t, window, timeZone); i++) t += 60_000;
+  // 26 hours, not 24: the night the clocks go back is an hour longer, and a window can be almost a day
+  for (let i = 0; i < 26 * 60 && inQuietHours(t, window, timeZone); i++) t += 60_000;
   return t;
 }

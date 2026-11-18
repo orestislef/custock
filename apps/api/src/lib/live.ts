@@ -246,6 +246,15 @@ export function tidyOutbox(db: Db, now: number): { redacted: number; deleted: nu
   return { redacted, deleted };
 }
 
+// nodemailer reports the server's answer in responseCode. 550 to 554 with a recipient error mean
+// the mailbox is gone for good; 4xx and everything else are worth another try
+export function isHardBounce(err: unknown): boolean {
+  const e = err as { responseCode?: number; code?: string; command?: string } | null;
+  const code = Number(e?.responseCode ?? 0);
+  if (code < 550 || code > 554) return false;
+  return e?.command === 'RCPT TO' || e?.code === 'EENVELOPE' || code === 550 || code === 553;
+}
+
 export async function drainOutbox(db: Db, sender: LiveSender, now: number, limit = 200): Promise<{ sent: number; failed: number }> {
   const p = platform(db);
   const channels = [sender.email ? 'email' : null, sender.push || sender.webpush ? 'push' : null].filter(Boolean);
@@ -318,8 +327,16 @@ export async function drainOutbox(db: Db, sender: LiveSender, now: number, limit
       redactOutboxRow(db, row.id);
       sent++;
     } catch (err) {
-      p.run('UPDATE dev_outbox SET attempts = attempts + 1, last_error = @e WHERE id = @id', { e: String(err).slice(0, 500), id: row.id });
       failed++;
+      // the mail server says the mailbox does not exist (a 55x answer): a hard bounce. the address
+      // is suppressed for every business and the message is not tried again
+      if (row.channel === 'email' && row.to_address && isHardBounce(err)) {
+        p.run(`INSERT INTO email_suppressions (email, reason, created_at) VALUES (@e, 'hard_bounce', @now) ON CONFLICT (email) DO NOTHING`, { e: row.to_address.toLowerCase(), now });
+        p.run('UPDATE dev_outbox SET attempts = 5, last_error = @e WHERE id = @id', { e: 'hard_bounce', id: row.id });
+        redactOutboxRow(db, row.id);
+        continue;
+      }
+      p.run('UPDATE dev_outbox SET attempts = attempts + 1, last_error = @e WHERE id = @id', { e: String(err).slice(0, 500), id: row.id });
       captureError(db, { kind: 'send', error: err, route: `send ${row.channel}`, orgId: row.org_id }, { now });
     }
   }

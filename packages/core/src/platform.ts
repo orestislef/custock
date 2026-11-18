@@ -1,18 +1,14 @@
 // the platform level above every business: super admins, the businesses they look after, the
 // features and limits they set per business, and the emergency switches for the whole platform.
 
-import { z } from 'zod';
+import { z } from './zod';
 import { Locale, zEmail, zLine } from './contract';
 import { LIMITS } from './validate';
+import { FEATURES } from './features';
 
-// features a super admin can switch off for one business. on unless listed in disabledFeatures
-export const FEATURES = ['customer_pages', 'posts', 'email', 'push', 'transfers', 'counts', 'reports', 'uploads'] as const;
+// the features a super admin can switch off (features.ts, with featureOn)
 export const Feature = z.enum(FEATURES);
 export type Feature = z.infer<typeof Feature>;
-
-export function featureOn(access: { disabledFeatures?: readonly string[] } | null | undefined, feature: Feature): boolean {
-  return !access?.disabledFeatures?.includes(feature);
-}
 
 // platform wide emergency switches, on means paused
 export const PLATFORM_SWITCHES = ['pause_email', 'pause_push', 'pause_signups', 'pause_invites'] as const;

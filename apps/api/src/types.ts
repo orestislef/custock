@@ -69,6 +69,7 @@ export interface OrgRow {
   customer_prices: number;
   customer_stock: 'off' | 'availability' | 'exact';
   few_left_threshold: number;
+  customer_offer_prices: number;
 }
 
 export interface OrgContext {

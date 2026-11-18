@@ -74,7 +74,8 @@ export function storefrontProducts(
         categoryIconKey: p.categoryIconKey ?? null,
         priceMinor: prices ? v.priceMinor : null,
         currency: org.currency,
-        offer: offerRow
+        // with prices hidden, a running offer still shows its price only when the business allows it
+        offer: offerRow && (prices || !!org.customer_offer_prices)
           ? {
               postId: offerRow.post_id,
               priceMinor: offerRow.offer_price_minor,

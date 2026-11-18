@@ -55,6 +55,7 @@ export interface WorkerDeps {
 
 let lastTidy = 0;
 let lastHousekeeping = 0;
+let lastDeliverySweep = 0;
 
 // runs every due job once. returns how many ran.
 export async function runJobs(deps: WorkerDeps, now: number = Date.now()): Promise<number> {
@@ -86,6 +87,12 @@ export async function runJobs(deps: WorkerDeps, now: number = Date.now()): Promi
       }
       ran++;
     }
+  }
+  // deliveries waiting with no job to carry them: a restart in the middle of a send, a send bigger
+  // than one batch, a platform pause that was lifted. at most once a minute they go out
+  if (now - lastDeliverySweep > 60_000) {
+    lastDeliverySweep = now;
+    if (p.get("SELECT 1 AS x FROM deliveries WHERE status = 'queued' OR (status = 'held' AND send_after <= @now) LIMIT 1", { now })) sendDeliveries(deps, now);
   }
   // every mode, at most once a minute: token links do not outlive their tokens, unused upload slots go
   if (now - lastHousekeeping > 60_000) {
@@ -234,7 +241,7 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
       if (d.channel === 'email') {
         const token = unsubToken({ customerId: c.id, scopeType: (scope?.scope_type as 'org' | 'group' | 'shop') ?? 'org', scopeId: scope?.scope_id ?? org.id }, unsubKey(deps.cfg));
         const url = `${web}/unsubscribe/${token}`;
-        const post = loadPosts(t, [d.post_id], { withStats: false, showPrices: !!org.customer_prices, locale })[0];
+        const post = loadPosts(t, [d.post_id], { withStats: false, showPrices: !!org.customer_prices, offerPrices: !!org.customer_offer_prices, hideArchived: true, locale })[0];
         const mail = postEmail(locale, {
           sender: shopName ? `${org.name} ${shopName}` : org.name,
           senderLogo: orgLogoUrl(deps.cfg.db, org.id),
@@ -295,11 +302,16 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
         link: a ? `custock://product/${a.product_id}` : null, image: fileUrl(extra?.storage_key), ...senderOf(t, org, a?.shop_id ?? null),
       };
     }
-    const sent = transport.send({
-      channel: d.channel, orgId: org.id, customerId: c.id, userId: c.user_id, to: d.channel === 'email' ? c.email : null,
-      locale, title, body, html, payload,
-    });
-    t.run("UPDATE deliveries SET status = 'sent', provider_id = @pid, updated_at = @now WHERE org_id = @org AND id = @id", { pid: sent.id, now, id: d.id });
+    // the message and the delivery's new state are one step: a restart in between can neither lose
+    // the message nor write it twice, the next run picks up exactly what is still queued
+    db.transaction(() => {
+      if (t.run("UPDATE deliveries SET status = 'sent', updated_at = @now WHERE org_id = @org AND id = @id AND status IN ('queued', 'held')", { now, id: d.id }).changes === 0) return;
+      const sent = transport.send({
+        channel: d.channel, orgId: org.id, customerId: c.id, userId: c.user_id, to: d.channel === 'email' ? c.email : null,
+        locale, title, body, html, payload,
+      });
+      t.run('UPDATE deliveries SET provider_id = @pid WHERE org_id = @org AND id = @id', { pid: sent.id, id: d.id });
+    })();
   }
 }
 
@@ -318,7 +330,49 @@ export function rollup(db: Db, now: number, log?: (line: string) => void) {
       log?.(`[worker] rollup for ${org.id} failed: ${String(err)}`);
       captureError(db, { kind: 'worker', error: err, route: 'job rollup_day', orgId: org.id }, { now });
     }
+    try {
+      const fixed = reconcileStock(db, org.id, now);
+      if (fixed) {
+        log?.(`[worker] stock levels of ${org.id} drifted from the ledger, ${fixed} rebuilt`);
+        captureError(db, { kind: 'worker', message: `stock levels drifted from the ledger, ${fixed} rebuilt`, route: 'job rollup_day stock check', orgId: org.id }, { now });
+      }
+    } catch (err) {
+      captureError(db, { kind: 'worker', error: err, route: 'job rollup_day stock check', orgId: org.id }, { now });
+    }
   }
+}
+
+// the cached stock_levels must always equal the ledger. once a night every (shop, variant) is
+// checked against the sum of its movements, a drifted row is rebuilt from the ledger and the
+// count is returned so the super admin hears about it. the ledger itself is never touched.
+export function reconcileStock(db: Db, orgId: string, now: number): number {
+  const t = new Tenant(db, orgId);
+  const drift = t.all<{ shop_id: string; variant_id: string; ledger: number; cached: number | null }>(
+    `SELECT m.shop_id, m.variant_id, sum(m.qty_delta) AS ledger, l.on_hand AS cached
+       FROM stock_movements m
+       LEFT JOIN stock_levels l ON l.shop_id = m.shop_id AND l.variant_id = m.variant_id
+      WHERE m.org_id = @org
+      GROUP BY m.shop_id, m.variant_id
+     HAVING l.on_hand IS NULL OR l.on_hand != sum(m.qty_delta)`,
+  );
+  // levels with no movement at all must be zero
+  const orphans = t.all<{ shop_id: string; variant_id: string }>(
+    `SELECT l.shop_id, l.variant_id FROM stock_levels l
+      WHERE l.org_id = @org AND l.on_hand != 0
+        AND NOT EXISTS (SELECT 1 FROM stock_movements m WHERE m.shop_id = l.shop_id AND m.variant_id = l.variant_id)`,
+  );
+  if (!drift.length && !orphans.length) return 0;
+  db.transaction(() => {
+    for (const d of drift) {
+      t.run(
+        `INSERT INTO stock_levels (org_id, shop_id, variant_id, on_hand, last_movement_at) VALUES (@org, @s, @v, @n, @now)
+         ON CONFLICT (shop_id, variant_id) DO UPDATE SET on_hand = excluded.on_hand`,
+        { s: d.shop_id, v: d.variant_id, n: d.ledger, now },
+      );
+    }
+    for (const o of orphans) t.run('UPDATE stock_levels SET on_hand = 0 WHERE org_id = @org AND shop_id = @s AND variant_id = @v', { s: o.shop_id, v: o.variant_id });
+  })();
+  return drift.length + orphans.length;
 }
 
 function rollupOrg(db: Db, org: OrgRow, now: number) {

@@ -11,8 +11,8 @@
 // the narrowest value that is set wins, always held inside the levels above it (see `cap`). a
 // super admin also decides per business whether its people may change a key at all (delegation).
 // defaults are exactly what the app did before the engine existed.
-
-import { z } from 'zod';
+// the zod shapes of the api live in policy-schemas.ts, so screens that only read the registry stay
+// small in the browser.
 
 export type PolicyLevel = 'platform' | 'limit' | 'business' | 'shop' | 'role' | 'user';
 export type PolicyValue = number | boolean | string;
@@ -74,6 +74,7 @@ export const POLICIES: readonly PolicyDef[] = [
   // what customers see
   { key: 'catalog.mode', group: 'customers', type: 'enum', default: 'subscribers', options: ['off', 'subscribers', 'public'], levels: ['platform', 'limit', 'business'], cap: 'free', permission: 'org.settings.manage', column: 'customer_catalog', delegatedByDefault: true },
   { key: 'catalog.prices', group: 'customers', type: 'bool', default: true, levels: ['platform', 'limit', 'business'], cap: 'free', permission: 'org.settings.manage', column: 'customer_prices', delegatedByDefault: true },
+  { key: 'catalog.offerPrices', group: 'customers', type: 'bool', default: true, levels: ['platform', 'limit', 'business'], cap: 'free', permission: 'org.settings.manage', column: 'customer_offer_prices', delegatedByDefault: true },
   { key: 'catalog.stock', group: 'customers', type: 'enum', default: 'off', options: ['off', 'availability', 'exact'], levels: ['platform', 'limit', 'business'], cap: 'free', permission: 'org.settings.manage', column: 'customer_stock', delegatedByDefault: true },
 
   // staff alerts, a person's own choice. the business and roles set the starting point
@@ -264,10 +265,6 @@ export function resolvePolicy(def: PolicyDef, layers: PolicyLayers, stopAt?: 'bu
 
 // ------------------------------------------------------------------ api shapes
 
-export const PolicyValueSchema = z.union([z.number(), z.boolean(), z.string().max(40)]);
-// a patch of values for one level: a value sets it, null takes it away (back to the level above)
-export const PolicyPatch = z.record(z.string().max(60), PolicyValueSchema.nullable());
-export type PolicyPatch = z.infer<typeof PolicyPatch>;
 
 // one key as a screen shows it
 export interface PolicyEntry {
@@ -296,9 +293,3 @@ export interface PlatformPolicyEntry {
   default: PolicyValue;
   effective: PolicyValue;
 }
-
-export const BusinessPolicyControlsPatch = z.record(
-  z.string().max(60),
-  z.object({ limit: PolicyValueSchema.nullable().optional(), delegated: z.boolean().optional() }),
-);
-export type BusinessPolicyControlsPatch = z.infer<typeof BusinessPolicyControlsPatch>;
