@@ -21,6 +21,10 @@ interface ShopperState {
   // the version of the business icon, part of its url (logo or monogram)
   iconVersion: string;
   joinCode: string | null;
+  // the business's quiet hours, 'HH:MM-HH:MM': pushes wait outside them
+  quietHours: string;
+  // the most pushes one customer gets from this business in a day
+  pushDailyCap: number;
   status: 'loading' | 'signedOut' | 'signedIn';
   me: MeContext | null;
   follow: Follow | null; // this business, when the signed in person follows it
@@ -48,7 +52,7 @@ function getApi(): CustockApi {
   return api;
 }
 
-export function ShopperProvider({ slug, orgName, joinCode, iconVersion = '', timeZone, children }: { slug: string; orgName: string; joinCode: string | null; iconVersion?: string; timeZone?: string; children: ReactNode }) {
+export function ShopperProvider({ slug, orgName, joinCode, iconVersion = '', timeZone, quietHours = '22:00-09:00', pushDailyCap = 2, children }: { slug: string; orgName: string; joinCode: string | null; iconVersion?: string; timeZone?: string; quietHours?: string; pushDailyCap?: number; children: ReactNode }) {
   // dates on this business's pages show in its time zone
   setDisplayTimeZone(timeZone);
   const locale = useLocale() as Locale;
@@ -99,8 +103,8 @@ export function ShopperProvider({ slug, orgName, joinCode, iconVersion = '', tim
   }, []);
 
   const value = useMemo<ShopperState>(() => ({
-    api: getApi(), slug, orgName, joinCode, iconVersion, status, me, follow, requestCode, verifyCode, signOut, reload: () => setVersion((v) => v + 1),
-  }), [slug, orgName, joinCode, iconVersion, status, me, follow, requestCode, verifyCode, signOut]);
+    api: getApi(), slug, orgName, joinCode, iconVersion, quietHours, pushDailyCap, status, me, follow, requestCode, verifyCode, signOut, reload: () => setVersion((v) => v + 1),
+  }), [slug, orgName, joinCode, iconVersion, quietHours, pushDailyCap, status, me, follow, requestCode, verifyCode, signOut]);
 
   return <Ctx.Provider value={value}><div className="has-tabbar">{children}</div></Ctx.Provider>;
 }

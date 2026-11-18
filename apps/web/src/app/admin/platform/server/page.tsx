@@ -24,9 +24,11 @@ export default function PlatformServerPage() {
   );
 }
 
+// in the reader's units ("740 kB", "1,1 МБ")
 function mb(bytes: number, locale: string): string {
-  if (bytes < 1024 * 1024) return `${new Intl.NumberFormat(intlLocale(locale), { maximumFractionDigits: 0 }).format(Math.max(1, Math.round(bytes / 1024)))} KB`;
-  return `${new Intl.NumberFormat(intlLocale(locale), { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024))} MB`;
+  const f = (v: number, unit: string, digits: number) => new Intl.NumberFormat(intlLocale(locale), { style: 'unit', unit, unitDisplay: 'short', maximumFractionDigits: digits }).format(v);
+  if (bytes < 1024 * 1024) return f(Math.max(1, Math.round(bytes / 1024)), 'kilobyte', 0);
+  return f(bytes / (1024 * 1024), 'megabyte', 1);
 }
 
 // a dot and a word, so the state never rests on colour alone

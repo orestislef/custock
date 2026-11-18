@@ -312,6 +312,8 @@ function ShopSwitcher({ shops, shopId, onChange, canAll }: { shops: { id: string
     <Picker
       label={t('admin.shop')}
       icon={<IconShop size={16} />}
+      // long names ("Όλα τα καταστήματα") shrink with an ellipsis instead of pushing the bar wider
+      className="shop-switch"
       value={shopId ?? 'all'}
       onChange={(v) => onChange(v === 'all' ? null : v)}
       options={[...(canAll ? [{ value: 'all', label: t('common:scope.allShops') }] : []), ...shops.map((s) => ({ value: s.id, label: s.name }))]}

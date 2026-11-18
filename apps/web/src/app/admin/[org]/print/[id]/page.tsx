@@ -37,7 +37,7 @@ export default function PosterPage({ params }: { params: Promise<{ id: string }>
           {lines.map((line, i) => <p key={i} style={{ fontSize: i === 0 ? 26 : 20, margin: 0, color: i === 0 ? '#16171B' : '#5E6068', fontWeight: i === 0 ? 600 : 400 }}>{line}</p>)}
         </div>
         <span style={{ flex: 1 }} />
-        <p style={{ fontSize: 13, color: '#8A8C93', margin: '12mm 0 0' }}>{url.replace(/^https?:\/\//, '')}</p>
+        <p style={{ fontSize: 13, color: '#5E6068', margin: '12mm 0 0' }}>{url.replace(/^https?:\/\//, '')}</p>
       </div>
     </div>
   );

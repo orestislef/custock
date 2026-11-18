@@ -6,6 +6,7 @@ import { getT } from '@/lib/i18n-server';
 import { PublicShell } from '@/components/public/public-shell';
 import { ProductView } from '@/components/public/product-view';
 import { defaultJoinCode } from '@/lib/env';
+import { orgInfo } from '@/lib/storefront';
 
 // the shelf QR lands here. the staff app reads the same code as a stock look up.
 export async function generateMetadata({ params }: PageProps<'/p/[code]'>): Promise<Metadata> {
@@ -26,8 +27,10 @@ export default async function ShelfProductPage({ params, searchParams }: PagePro
   const p = result;
   if (!p) notFound();
 
-  // a poster QR can carry the shop's join code, so "notify me" and "join" land on the right shop
-  const joinCode = typeof sp.j === 'string' ? sp.j : defaultJoinCode();
+  // a poster QR can carry the shop's join code, so "notify me" and "join" land on the right shop.
+  // without one, the business's own join link, so a visitor is never left without a way in
+  const businessJoin = p.orgSlug ? (await orgInfo(p.orgSlug, locale)).joinCode : null;
+  const joinCode = typeof sp.j === 'string' ? sp.j : businessJoin ?? defaultJoinCode();
   const joinHref = joinCode ? `/j/${encodeURIComponent(joinCode)}` : null;
   const notifyHref = joinHref ? `${joinHref}?notify=${encodeURIComponent(p.name)}` : null;
 

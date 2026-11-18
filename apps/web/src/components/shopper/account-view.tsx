@@ -6,6 +6,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { PublicProduct, StockAlertItem } from '@custock/core';
+import { normalizeOtp } from '@custock/core';
 import { AppIcon, InstallRow, InstallSteps } from '@/components/pwa/install-coach';
 import { PushRow } from '@/components/pwa/push-row';
 import { ProfilePhoto } from '@/components/ui/profile-photo';
@@ -22,7 +23,7 @@ import { useShopper } from './shopper-context';
 export function AccountView() {
   const t = useT();
   const toast = useToast();
-  const { api, status, me, follow, slug, orgName, joinCode, signOut, reload, iconVersion } = useShopper();
+  const { api, status, me, follow, slug, orgName, joinCode, signOut, reload, iconVersion, quietHours, pushDailyCap } = useShopper();
   const [alerts, setAlerts] = useState<StockAlertItem[] | null>(null);
   const [saved, setSaved] = useState<PublicProduct[] | null>(null);
   const [emailOn, setEmailOn] = useState(true);
@@ -133,9 +134,9 @@ export function AccountView() {
               <span className="row-main"><span className="row-title block">{t('common:channel.email')}</span></span>
               <Switch checked={emailOn} label={t('common:channel.email')} onChange={(v) => { setEmailOn(v); void api.setChannel(follow.orgId, 'email', v).catch(() => setEmailOn(!v)); }} />
             </div>
-            <PushRow api={api} orgId={follow.orgId} title={t('shopper.me.push')} sub={t('shopper.me.pushSub')} onInstall={() => setSteps(true)} icon={<span className="icon-tile"><IconBell size={18} /></span>} />
+            <PushRow api={api} orgId={follow.orgId} title={t('shopper.me.push')} sub={pushDailyCap > 0 ? t('shopper.me.pushSubCap', { count: pushDailyCap }) : t('shopper.me.pushSub')} onInstall={() => setSteps(true)} icon={<span className="icon-tile"><IconBell size={18} /></span>} />
           </div>
-          <p className="inset-group-foot">{t('shopper.me.channelsFoot')}</p>
+          <p className="inset-group-foot">{t('shopper.me.channelsFoot', { from: quietHours.split('-')[0], to: quietHours.split('-')[1] })}</p>
         </section>
       ) : (
         <Empty icon={<IconPeople size={40} />} title={t('shopper.news.notFollowingTitle', { org: orgName })} body={t('shopper.news.notFollowingBody')}
@@ -245,7 +246,7 @@ export function AccountView() {
             <p className="t-sub t-2 m-0 mb-2">{t('shopper.me.deleteCodeSent', { email: me?.user.email ?? '' })}</p>
             <label className="block">
               <span className="t-foot t-2 block mb-1">{t('shopper.me.deleteCodeLabel')}</span>
-              <input className="field tnum" inputMode="numeric" pattern="[0-9]*" autoComplete="one-time-code" autoCorrect="off" spellCheck={false} enterKeyHint="done" maxLength={6} value={secret} onChange={(e) => setSecret(e.target.value.replace(/\D/g, '').slice(0, 6))} autoFocus />
+              <input className="field tnum" inputMode="numeric" pattern="[0-9]*" autoComplete="one-time-code" autoCorrect="off" spellCheck={false} enterKeyHint="done" maxLength={16} value={secret} onChange={(e) => setSecret(normalizeOtp(e.target.value))} data-autofocus />
             </label>
             <button type="button" className="btn btn-plain mt-2" disabled={busy} onClick={() => void askToConfirm()}>{t('shopper.me.deleteResend')}</button>
           </form>

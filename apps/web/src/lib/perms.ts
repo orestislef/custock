@@ -1,8 +1,22 @@
 import { can as coreCan, PERMISSIONS, PERMISSION_KEYS, type OrgAccess } from '@custock/core';
 
 // the ui side of permissions. the server always decides, this only hides and explains.
+// rights that belong to a feature the super admin switched off for the business are not offered
+// at all, so no screen asks the api for something it will refuse (and nothing says why)
+const FEATURE_OF: [prefix: string, feature: string][] = [
+  ['posts.channel.email', 'email'], ['posts.channel.push', 'push'], ['posts.', 'posts'],
+  ['stock.transfer.', 'transfers'], ['stock.count.', 'counts'], ['reports.', 'reports'], ['joinlinks.', 'customer_pages'],
+];
+
+export function featureOff(org: { disabledFeatures?: readonly string[] } | null | undefined, perm: string): boolean {
+  const off = org?.disabledFeatures;
+  if (!off?.length) return false;
+  return FEATURE_OF.some(([prefix, feature]) => (perm === prefix || perm.startsWith(prefix)) && off.includes(feature));
+}
+
 export function can(org: OrgAccess | null | undefined, perm: string, shopId?: string | null): boolean {
   if (!org) return false;
+  if (featureOff(org as { disabledFeatures?: readonly string[] }, perm)) return false;
   return coreCan(org, perm, shopId ?? null);
 }
 

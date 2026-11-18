@@ -47,12 +47,12 @@ export async function publicProductById(slug: string, id: string, locale?: strin
 // a category on the business's page: its name in the visitor's language and its picture
 export interface PublicCategory { id: string; name: string; iconKey: string | null; imageUrl: string | null }
 
-export interface OrgInfo { slug: string; name: string; joinCode: string | null; catalogShared: boolean; logoUrl: string | null; timeZone: string; categories: PublicCategory[]; unavailable?: boolean }
+export interface OrgInfo { slug: string; name: string; joinCode: string | null; catalogShared: boolean; logoUrl: string | null; timeZone: string; quietHours: string; pushDailyCap: number; categories: PublicCategory[]; unavailable?: boolean; missing?: boolean }
 
-interface PublicOrg { slug: string; name: string; catalog: string; joinCode: string | null; logoUrl?: string | null; timezone?: string; categories?: PublicCategory[]; unavailable?: boolean }
+interface PublicOrg { slug: string; name: string; catalog: string; joinCode: string | null; logoUrl?: string | null; timezone?: string; quietHours?: string; pushDailyCap?: number; categories?: PublicCategory[]; unavailable?: boolean }
 
 // the business's name and its join link for the whole business, from the api. one fetch per request
-const publicOrgOnce = cache(async (slug: string, locale: string): Promise<PublicOrg | null> => {
+const publicOrgOnce = cache(async (slug: string, locale: string): Promise<PublicOrg | 'missing' | null> => {
   const { mode } = await serverApi(locale || undefined);
   if (mode === 'fixtures') return null;
   const base = apiUrl();
@@ -64,6 +64,8 @@ const publicOrgOnce = cache(async (slug: string, locale: string): Promise<Public
       const code = ((await res.json().catch(() => null)) as { code?: string } | null)?.code;
       if (code === 'org_suspended' || code === 'feature_off') return { slug, name: slug, catalog: 'off', joinCode: null, unavailable: true };
     }
+    // no business by that name: the page is not found, it never makes one up from the address
+    if (res.status === 404) return 'missing';
     return res.ok ? ((await res.json()) as PublicOrg) : null;
   } catch {
     return null;
@@ -74,12 +76,14 @@ const publicOrgOnce = cache(async (slug: string, locale: string): Promise<Public
 // both; the sample business of local development falls back to its catalog and join page.
 export async function orgInfo(slug: string, locale?: string): Promise<OrgInfo> {
   const items = await publicCatalog(slug, { locale });
-  const pub = await publicOrgOnce(slug, locale ?? '');
+  const found = await publicOrgOnce(slug, locale ?? '');
+  if (found === 'missing') return { slug, name: slug, joinCode: null, catalogShared: false, logoUrl: null, timeZone: DEFAULT_TIME_ZONE, quietHours: '22:00-09:00', pushDailyCap: 2, categories: [], missing: true };
+  const pub = found;
   const joinCode = pub ? pub.joinCode : defaultJoinCode();
   let name = pub?.name ?? items?.[0]?.orgName ?? null;
   if (!name && joinCode && devBuild) {
     const { api } = await serverApi(locale);
     name = (await api.joinPage(joinCode).catch(() => null))?.orgName ?? null;
   }
-  return { slug, name: name ?? slug.charAt(0).toUpperCase() + slug.slice(1), joinCode, catalogShared: items != null, logoUrl: pub?.logoUrl ?? null, timeZone: pub?.timezone || DEFAULT_TIME_ZONE, categories: pub?.categories ?? [], ...(pub?.unavailable ? { unavailable: true } : {}) };
+  return { slug, name: name ?? slug.charAt(0).toUpperCase() + slug.slice(1), joinCode, catalogShared: items != null, logoUrl: pub?.logoUrl ?? null, timeZone: pub?.timezone || DEFAULT_TIME_ZONE, quietHours: pub?.quietHours || '22:00-09:00', pushDailyCap: pub?.pushDailyCap ?? 2, categories: pub?.categories ?? [], ...(pub?.unavailable ? { unavailable: true } : {}) };
 }

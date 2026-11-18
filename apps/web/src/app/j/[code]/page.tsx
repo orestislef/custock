@@ -47,7 +47,7 @@ export default async function JoinPageRoute({ params, searchParams }: PageProps<
       {page.disabled ? (
         <div className="tip"><span className="t-sub">{t('common:error.join_link_disabled')}</span></div>
       ) : (
-        <JoinForm code={code} interests={page.interests} notifyName={notifyName} orgName={page.orgName} />
+        <JoinForm code={code} interests={page.interests} notifyName={notifyName} orgName={page.orgName} cap={page.pushDailyCap ?? 2} />
       )}
     </PublicShell>
   );

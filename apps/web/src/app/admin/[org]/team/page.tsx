@@ -15,6 +15,7 @@ import { useAsync } from '@/lib/use-async';
 import { RedirectHome } from '@/components/admin/redirect-home';
 import { normalizeEmail } from '@custock/core';
 import { EmailInput } from '@/components/ui/field-kit';
+import { roleNameLabel } from '@/lib/names';
 
 export default function TeamPage() {
   const { api, org, t, can, locale } = useAdmin();
@@ -55,7 +56,7 @@ export default function TeamPage() {
             title={m.name}
             subtitle={
               <span className="block">
-                {m.assignments.map((a) => `${t(`common:role.${a.roleName}`, { defaultValue: a.roleName })} · ${a.scopeName}`).join(', ')}
+                {m.assignments.map((a) => `${roleNameLabel(t, a.roleName)} · ${a.scopeName}`).join(', ')}
               </span>
             }
             value={m.status === 'active' ? undefined : t(`team.status.${m.status}`)}
@@ -68,7 +69,7 @@ export default function TeamPage() {
       {invites.data?.length ? (
         <Group title={t('team.pending')} footer={t('team.pendingFoot')}>
           {invites.data.map((i) => (
-            <Row key={i.id} title={i.email} subtitle={`${t(`common:role.${i.roleName}`, { defaultValue: i.roleName })} · ${t('team.expires', { when: relative(i.expiresAt, locale) })}`}
+            <Row key={i.id} title={i.email} subtitle={`${roleNameLabel(t, i.roleName)} · ${t('team.expires', { when: relative(i.expiresAt, locale) })}`}
               trailing={<button type="button" className="btn btn-plain" style={{ color: 'var(--c-error)' }} onClick={() => void api.revokeInvite(org.orgId, i.id).then(() => { toast(t('team.revoked')); void invites.reload(); }).catch((e: { code?: string }) => toast(t(`common:error.${e.code ?? 'internal'}`)))}>{t('team.revoke')}</button>} />
           ))}
         </Group>
@@ -96,7 +97,7 @@ function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
   const sc = scopes[Number(scope)];
   const roles = useAsync(() => (open && sc ? api.grantableRoles(org.orgId, sc.type, sc.id) : Promise.resolve([])), [open, scope]);
   const available = (roles.data ?? []).filter((r) => r.ok);
-  const label = (r: { name: string }) => t(`common:role.${r.name}`, { defaultValue: r.name });
+  const label = (r: { name: string }) => roleNameLabel(t, r.name);
 
   async function send() {
     if (!sc || !roleId) return;
@@ -193,7 +194,7 @@ function MemberSheet({ member, onClose, onDone }: { member: Member; onClose: () 
     <Sheet open onClose={onClose} title={member.name ?? ''} error={error}>
       <div className="list mb-4">
         {member.assignments.map((a) => (
-          <div key={a.id} className="row"><span className="row-main row-title">{t(`common:role.${a.roleName}`, { defaultValue: a.roleName })}</span><span className="row-value">{a.scopeName}</span></div>
+          <div key={a.id} className="row"><span className="row-main row-title">{roleNameLabel(t, a.roleName)}</span><span className="row-value">{a.scopeName}</span></div>
         ))}
       </div>
       <LevelPolicies level={{ kind: 'member', membershipId: member.membershipId }} title={t('team.limits')} />

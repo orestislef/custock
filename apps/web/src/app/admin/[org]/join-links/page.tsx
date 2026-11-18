@@ -52,7 +52,8 @@ export default function JoinLinksPage() {
                 <p className="t-foot t-2 m-0 mt-0.5">{t('links.conversion', { pct: percent(l.confirmed / Math.max(1, l.opens), locale) })}</p>
                 <span className="flex-1" />
                 <span className="flex items-center gap-2 mt-3 flex-wrap">
-                  <Link href={`/admin/print/${l.id}`} className="btn btn-tinted" aria-disabled={l.disabled}><IconPrint size={18} />{t('links.poster')}</Link>
+                  {/* the column next to the code is narrow on a phone: a long label wraps instead of running out of the card */}
+                  <Link href={`/admin/print/${l.id}`} className="btn btn-tinted max-w-full whitespace-normal text-center py-2" aria-disabled={l.disabled}><IconPrint size={18} className="flex-none" />{t('links.poster')}</Link>
                   <label className="inline-flex items-center gap-2 t-foot t-2 ml-auto">
                     {l.disabled ? t('links.off') : t('links.on')}
                     <Switch checked={!l.disabled} label={t('links.activeFor', { label: l.label ?? scopeName(l) })}

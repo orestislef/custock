@@ -248,7 +248,10 @@
   .row-main { flex: 1; min-width: 0; }
   .row-title { font-size: 17px; line-height: 22px; overflow-wrap: anywhere; }
   .row-sub { font-size: 15px; line-height: 20px; color: var(--c-ink-2); overflow-wrap: anywhere; }
-  .row-value { color: var(--c-ink-2); font-size: 17px; white-space: nowrap; }
+  /* a long value or picker ("Europe / Athens (GMT+2)") gives way with an ellipsis before it squeezes
+     the label next to it ("Ζώνη ώρας") into one letter per line */
+  .row-value { color: var(--c-ink-2); font-size: 17px; white-space: nowrap; min-width: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+  .row > .picker { min-width: 0; flex-shrink: 1; max-width: 60%; }
   .chev { color: var(--c-ink-3); flex: none; }
   /* icon tiles stay quiet: a fill and the secondary ink. color is for meaning, not decoration */
   .icon-tile {
@@ -337,6 +340,10 @@
   .picker:has(select:focus-visible) { outline: 2px solid color-mix(in srgb, var(--c-accent) 70%, transparent); outline-offset: 2px; }
   html:not([data-input="keyboard"]) .picker:has(select:focus-visible) { outline: none; }
   .picker[aria-disabled="true"] { cursor: default; opacity: 0.6; }
+  /* a picker that may shrink: its text truncates with an ellipsis, the icon and chevron stay */
+  .picker > .truncate { min-width: 0; }
+  .picker > svg { flex: none; }
+  .picker.shop-switch { min-width: 0; flex-shrink: 1; max-width: 12rem; }
 
   /* the open menu. where the browser lets us style it (chromium, appearance: base-select) it sits on
      the app surface like the app's own menus: 12px radius, soft shadow, 44px rows, an accent check
@@ -429,6 +436,8 @@
   .tabs a { display: inline-flex; align-items: center; min-height: 44px; color: var(--c-ink-2); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -0.5px; }
   .tabs a:hover { color: var(--c-ink); text-decoration: none; }
   .tabs a[aria-current="page"] { color: var(--c-ink); border-bottom-color: var(--c-accent); font-weight: 600; }
+  .tabs.fade-x { overflow-y: hidden; }
+  .tabs.fade-x a { flex: none; white-space: nowrap; }
 
   /* stock state badges: color plus icon plus word */
   .badge {
@@ -579,8 +588,10 @@
 
   /* phone sizes: 44 pt targets for segmented controls and pickers */
   @media (max-width: 767px) {
-    .seg { min-height: 44px; display: grid; width: 100%; min-width: max-content; }
-    .seg button { min-height: 40px; font-size: 15px; }
+    /* full width and never wider than the screen: long labels (Russian, Greek) shrink their padding
+       and end in an ellipsis instead of pushing the last segment off the edge */
+    .seg { min-height: 44px; display: grid; width: 100%; min-width: 0; }
+    .seg button { min-height: 40px; font-size: 15px; min-width: 0; padding-inline: 6px; overflow: hidden; text-overflow: ellipsis; }
     .picker.filled { min-height: 44px; }
   }
 

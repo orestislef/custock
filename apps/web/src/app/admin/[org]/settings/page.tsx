@@ -4,7 +4,7 @@ import type { CustomerCatalogMode, CustomerStockMode, OrgSettings, Product, Shop
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { Group, Row, Segmented, StockBadge, Switch } from '@/components/ui/kit';
-import { Picker, useToast } from '@/components/ui/client-kit';
+import { Picker, Sheet, useToast } from '@/components/ui/client-kit';
 import { IconCopy, IconInfo, IconLink, IconShop } from '@/components/ui/icons';
 import { basePath } from '@/lib/api-client';
 import { useAsync } from '@/lib/use-async';
@@ -13,7 +13,9 @@ import { uploadLogo } from '@/lib/upload';
 import { useRef, useState } from 'react';
 import { RedirectHome } from '@/components/admin/redirect-home';
 import { PolicyGroups, policyText, usePolicySaver } from '@/components/policy/policy-list';
-import { policyDef, type PolicyEntry } from '@custock/core';
+import { LIMITS, cleanLine, policyDef, type PolicyEntry } from '@custock/core';
+import { LOCALE_NAMES } from '@custock/i18n';
+import { IconChevronRight } from '@/components/ui/icons';
 
 export default function SettingsPage() {
   const { api, org, t, can, refresh } = useAdmin();
@@ -83,6 +85,8 @@ export default function SettingsPage() {
     <Page title={t('settings.title')} subtitle={org.name}>
       <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_340px] gap-x-8">
         <div>
+          {canOrg ? <BusinessGroup s={s} onPatch={(p) => void patch(p)} /> : null}
+
           <h2 className="t-title3 m-0 mb-1">{t('settings.customerPage')}</h2>
           {canOrg ? <p className="t-sub t-2 m-0 mb-5">{t('settings.customerPageLead')}</p> : <div className="mb-5" />}
 
@@ -134,9 +138,10 @@ export default function SettingsPage() {
             {shops.filter((sh) => canOrg || can('shop.settings.manage', sh.id)).map((sh) => {
               const value = !sh.customerVisible ? 'hidden' : sh.customerStock ?? 'default';
               return (
-                <div key={sh.id} className="row">
+                // the choice goes under the shop name when both do not fit on a phone
+                <div key={sh.id} className="row flex-wrap gap-y-1">
                   <span className="icon-tile"><IconShop size={18} /></span>
-                  <span className="row-main">
+                  <span className="row-main min-w-[7rem]">
                     <span className="row-title block">{sh.name}</span>
                   </span>
                   <Picker variant="plain" label={t('settings.shopStock', { shop: sh.name })} value={value}
@@ -145,7 +150,7 @@ export default function SettingsPage() {
                       { value: 'default', label: t('settings.useBusiness') },
                       ...(['off', 'availability', 'exact'] as const).map((v) => ({ value: v, label: t(`settings.stockMode.${v}`) })),
                       { value: 'hidden', label: t('settings.hiddenShop') },
-                    ]} />
+                    ]} className="ml-auto" />
                 </div>
               );
             })}
@@ -316,5 +321,68 @@ function ShopPageCard({ slug, mode, canOrg, onPublic }: { slug: string; mode: Cu
         </div>
       </div>
     </section>
+  );
+}
+
+// the business itself: its name, the language for customers whose own is unknown, and the time
+// zone every date, quiet hour and report follows
+function zoneLabel(zone: string): string {
+  let offset = '';
+  try {
+    offset = new Intl.DateTimeFormat('en-GB', { timeZone: zone, timeZoneName: 'shortOffset' }).formatToParts(Date.now()).find((x) => x.type === 'timeZoneName')?.value ?? '';
+  } catch {
+    // an alias the browser does not know
+  }
+  return `${zone.replace(/_/g, ' ').replace(/\//g, ' / ')}${offset ? ` (${offset})` : ''}`;
+}
+
+function timeZones(current: string): string[] {
+  const all: string[] = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['Europe/Athens', 'Europe/Nicosia', 'Europe/Moscow', 'Europe/London', 'UTC'];
+  return all.includes(current) ? all : [current, ...all];
+}
+
+function BusinessGroup({ s, onPatch }: { s: OrgSettings; onPatch: (p: Partial<OrgSettings>) => void }) {
+  const { t } = useAdmin();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(s.name);
+  const clean = cleanLine(name);
+  const valid = clean.length >= 1 && clean.length <= LIMITS.businessName && clean !== s.name;
+  const zones = timeZones(s.timezone);
+  return (
+    <>
+      <h2 className="t-title3 m-0 mb-4">{t('settings.business.title')}</h2>
+      <Group footer={t('settings.business.foot')}>
+        <button type="button" className="row" onClick={() => { setName(s.name); setEditing(true); }}>
+          <span className="row-main row-title">{t('settings.business.name')}</span>
+          <span className="t-body t-2 text-right min-w-0 truncate">{s.name}</span>
+          <IconChevronRight size={16} className="chev" />
+        </button>
+        <div className="row">
+          <span className="row-main row-title">{t('settings.business.language')}</span>
+          <Picker variant="plain" label={t('settings.business.language')} value={s.defaultLocale}
+            onChange={(v) => onPatch({ defaultLocale: v })}
+            options={(['en', 'el', 'ru'] as const).map((l) => ({ value: l, label: LOCALE_NAMES[l] }))} />
+        </div>
+        <div className="row">
+          <span className="row-main row-title">{t('settings.business.timezone')}</span>
+          <Picker variant="plain" label={t('settings.business.timezone')} value={s.timezone}
+            onChange={(v) => onPatch({ timezone: v })}
+            options={zones.map((z) => ({ value: z, label: zoneLabel(z) }))} />
+        </div>
+      </Group>
+      <Sheet open={editing} onClose={() => setEditing(false)} title={t('settings.business.name')}
+        footer={<>
+          <button type="button" className="btn btn-gray" onClick={() => setEditing(false)}>{t('common:action.cancel')}</button>
+          <button type="button" className="btn btn-primary" disabled={!valid} onClick={() => { onPatch({ name: clean }); setEditing(false); }}>{t('common:action.save')}</button>
+        </>}>
+        <form onSubmit={(e) => { e.preventDefault(); if (valid) { onPatch({ name: clean }); setEditing(false); } }}>
+          <label className="block">
+            <span className="t-foot t-2 block mb-1">{t('settings.business.name')}</span>
+            <input className="field" type="text" autoComplete="organization" autoCapitalize="words" enterKeyHint="done"
+              maxLength={LIMITS.businessName} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setName(cleanLine(name))} data-autofocus />
+          </label>
+        </form>
+      </Sheet>
+    </>
   );
 }

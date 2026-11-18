@@ -102,7 +102,9 @@ function ApiDocs() {
           {!groups.length ? (
             <Empty icon={<IconSearch size={28} />} title={t('platform.dev.api.noMatch', { q: q.trim() })} />
           ) : (
-            <div className="flex flex-col gap-6">
+            // the endpoint summaries come from the api document, which stays in english like any api
+            // reference; the screen around them and the group names are translated
+            <div className="flex flex-col gap-6" data-quality-skip>
               {groups.map((g) => (
                 <Group key={g.tag} title={g.tag === '__other' ? t('platform.dev.api.tag.system') : t(`platform.dev.api.tag.${g.tag}`, { defaultValue: g.tag })}>
                   {g.items.map((e) => (

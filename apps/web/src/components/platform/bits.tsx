@@ -10,13 +10,16 @@ import { useToast } from '@/components/ui/client-kit';
 import { IconCopy, IconShare, IconWarning } from '@/components/ui/icons';
 import { money, number, intlLocale } from '@/lib/format';
 
+// sizes in the reader's language and units ("75,3 kB", "1,2 ГБ"), decimal like the bucket counts them
 export function bytes(n: number, locale: string): string {
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const units = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte'];
   let v = n;
   let i = 0;
   while (v >= 1000 && i < units.length - 1) { v /= 1000; i++; }
   const digits = v >= 100 || i === 0 ? 0 : 1;
-  return `${new Intl.NumberFormat(intlLocale(locale), { maximumFractionDigits: digits }).format(v)} ${units[i]}`;
+  const parts = new Intl.NumberFormat(intlLocale(locale), { style: 'unit', unit: units[i], unitDisplay: 'short', maximumFractionDigits: digits }).formatToParts(v);
+  // english and greek spell the byte out ("70 byte"), the symbol reads better next to kB and MB
+  return parts.map((x) => (x.type === 'unit' && x.value === 'byte' ? 'B' : x.value)).join('');
 }
 
 export function moneyList(list: MoneyByCurrency, locale: string): string {
@@ -27,7 +30,8 @@ export function moneyList(list: MoneyByCurrency, locale: string): string {
 export function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="card p-4 flex flex-col gap-1 min-w-0">
-      <span className="t-foot t-2 truncate">{label}</span>
+      {/* labels may take two lines: "Отправлено уведомлений" does not fit half a phone */}
+      <span className="t-foot t-2 line-clamp-2">{label}</span>
       <span className="t-title2 t-display tnum truncate">{value}</span>
       {sub ? <span className="t-foot t-2 truncate">{sub}</span> : null}
     </div>

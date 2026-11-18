@@ -12,6 +12,7 @@ import { createBrowserApi, loadTokens, saveTokens } from '@/lib/api-client';
 import { useLocale, useT } from '@/lib/i18n-client';
 import { checkText, cleanLine, LIMITS, passwordProblem, type FieldError } from '@custock/core';
 import { FieldMessage } from '@/components/ui/field-kit';
+import { roleNameLabel } from '@/lib/names';
 
 type Mode = 'register' | 'signin';
 
@@ -97,7 +98,7 @@ export function InviteAccept({ token }: { token: string }) {
           <>
             <span className="inline-grid place-items-center w-14 h-14 rounded-[14px] mb-4" style={{ background: 'var(--c-accent-tint)', color: 'var(--c-accent)' }}><IconShield size={28} /></span>
             <h1 className="t-title1 t-display m-0">{t('invite.title', { org: preview.orgName })}</h1>
-            <p className="t-body t-2 mt-2 mb-6">{t('invite.lead', { role: t(`common:role.${preview.roleName}`, { defaultValue: preview.roleName }), scope: preview.scopeName })}</p>
+            <p className="t-body t-2 mt-2 mb-6">{t('invite.lead', { role: roleNameLabel(t, preview.roleName), scope: preview.scopeName })}</p>
 
             {mode === 'register' ? (
               <form onSubmit={(e) => void register(e)} noValidate>

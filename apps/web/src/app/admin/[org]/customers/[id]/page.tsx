@@ -1,7 +1,7 @@
 'use client';
 
 import Link from '@/components/admin/org-link';
-import { use, useState } from 'react';
+import { use, useRef, useState } from 'react';
 import { useOrgRouter as useRouter } from '@/components/admin/org-link';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Avatar, Group, Row } from '@/components/ui/kit';
@@ -23,6 +23,9 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
   const [tag, setTag] = useState('');
   const editable = can('customers.edit', null);
   const [erasing, setErasing] = useState(false);
+  // one save at a time: a double tap must not add the same note or tag twice
+  const busy = useRef(false);
+  const [saving, setSaving] = useState(false);
   const router = useRouter();
 
   const d = c.data;
@@ -31,20 +34,31 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
   const scopeName = (type: string, sid: string) =>
     type === 'org' ? org.name : type === 'group' ? groups.data?.find((g) => g.id === sid)?.name ?? sid : shops.find((s) => s.id === sid)?.name ?? sid;
 
+  async function once(run: () => Promise<void>) {
+    if (busy.current) return;
+    busy.current = true;
+    setSaving(true);
+    try { await run(); } finally { busy.current = false; setSaving(false); }
+  }
+
   async function addNote() {
     if (!note.trim()) return;
-    await api.addCustomerNote(org.orgId, id, cleanText(note).slice(0, LIMITS.customerNote));
-    setNote('');
-    void c.reload();
-    toast(t('customer.noteSaved'));
+    await once(async () => {
+      await api.addCustomerNote(org.orgId, id, cleanText(note).slice(0, LIMITS.customerNote));
+      setNote('');
+      void c.reload();
+      toast(t('customer.noteSaved'));
+    });
   }
 
   async function addTag() {
     const v = cleanLine(tag).toLowerCase().slice(0, LIMITS.tag);
     if (!v || !d) return;
-    await api.setCustomerTags(org.orgId, id, [...new Set([...d.tags, v])]);
-    setTag('');
-    void c.reload();
+    await once(async () => {
+      await api.setCustomerTags(org.orgId, id, [...new Set([...d.tags, v])]);
+      setTag('');
+      void c.reload();
+    });
   }
 
   async function removeTag(x: string) {
@@ -68,14 +82,16 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
         <div>
           {/* contact details only for those who may see them, the language for everyone */}
           <Group title={t('customer.contact')}>
-            {!d.contactMasked ? <Row leading={<span className="icon-tile"><IconMail size={18} /></span>} title={d.email ?? '-'} subtitle={t('common:channel.email')} /> : null}
-            {!d.contactMasked ? <Row leading={<span className="icon-tile"><IconPhone size={18} /></span>} title={<span className="tnum">{d.phone ?? '-'}</span>} subtitle={t('customer.phone')} /> : null}
+            {/* only what the customer gave: no empty rows with a dash */}
+            {!d.contactMasked && d.email ? <Row leading={<span className="icon-tile"><IconMail size={18} /></span>} title={d.email} subtitle={t('common:channel.email')} /> : null}
+            {!d.contactMasked && d.phone ? <Row leading={<span className="icon-tile"><IconPhone size={18} /></span>} title={<span className="tnum">{d.phone}</span>} subtitle={t('customer.phone')} /> : null}
             <Row title={t('customer.language')} value={LOCALE_NAMES[d.locale]} />
           </Group>
 
           <Group title={t('customer.channels')} footer={t('customer.channelsFoot')}>
-            {(['email', 'push', 'sms'] as const).map((ch) => {
-              const on = ch === 'email' ? d.emailOk : ch === 'push' ? d.pushOk : d.smsOk;
+            {/* the channels the app really sends on. sms is not one of them */}
+            {(['email', 'push'] as const).map((ch) => {
+              const on = ch === 'email' ? d.emailOk : d.pushOk;
               return <Row key={ch} title={t(`common:channel.${ch}`)} value={<span style={{ color: on ? 'var(--c-success)' : 'var(--c-ink-3)' }}>{on ? t('customer.on') : t('customer.off')}</span>} />;
             })}
           </Group>
@@ -98,7 +114,7 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
             {editable ? (
               <form className="row-sep relative flex items-center" onSubmit={(e) => { e.preventDefault(); void addTag(); }}>
                 <input className="field" value={tag} onChange={(e) => setTag(e.target.value)} onBlur={() => setTag((v) => cleanLine(v))} maxLength={LIMITS.tag} autoComplete="off" autoCapitalize="none" enterKeyHint="done" placeholder={t('customer.addTag')} aria-label={t('customer.addTag')} />
-                <button type="submit" className="icon-btn mr-1" aria-label={t('common:action.add')} disabled={!tag.trim()}><IconPlus size={20} /></button>
+                <button type="submit" className="icon-btn mr-1" aria-label={t('common:action.add')} disabled={!tag.trim() || saving}><IconPlus size={20} /></button>
               </form>
             ) : null}
           </Group> : null}
@@ -123,7 +139,7 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
                 <form className={`${d.notes.length ? 'row-sep' : ''} relative`} onSubmit={(e) => { e.preventDefault(); void addNote(); }}>
                   <textarea className="field" value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => setNote((v) => cleanText(v))} maxLength={LIMITS.customerNote} autoCapitalize="sentences" placeholder={t('customer.addNote')} aria-label={t('customer.addNote')} rows={2} />
                   <Counter value={note} max={LIMITS.customerNote} />
-                  <div className="flex justify-end px-3 pb-3"><button className="btn btn-tinted" type="submit" disabled={!note.trim()}>{t('common:action.save')}</button></div>
+                  <div className="flex justify-end px-3 pb-3"><button className="btn btn-tinted" type="submit" disabled={!note.trim() || saving}>{t('common:action.save')}</button></div>
                 </form>
               ) : null}
             </Group>

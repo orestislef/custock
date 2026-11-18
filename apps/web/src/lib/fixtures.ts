@@ -930,6 +930,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async startAccountDelete() { return { method: 'code' as const, sent: true as const, devCode: '000000' }; },
     async deleteMyAccount() { /* kept on the real api */ },
     async revertEmailChange() { return { email: 'an***@example.com' }; },
+    async emailRevertPreview() { return { valid: true as const }; },
 
     async joinPage(code): Promise<JoinPage> {
       const link = joinLinks.find((j) => j.code === code);

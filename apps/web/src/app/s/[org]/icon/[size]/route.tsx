@@ -36,6 +36,7 @@ export async function GET(req: Request, { params }: RouteContext<'/s/[org]/icon/
   const url = new URL(req.url);
   const maskable = url.searchParams.has('maskable');
   const info = await infoOf(org);
+  if (info.missing) return new Response('Not found', { status: 404 });
   const version = iconVersion(info.name, info.logoUrl);
   // a url with the current version never changes, so it may be kept for good. without it, or with
   // an old one, only for a few minutes, so a new logo shows up soon everywhere

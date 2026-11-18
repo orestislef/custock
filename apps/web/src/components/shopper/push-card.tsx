@@ -11,12 +11,12 @@ import { useShopper } from './shopper-context';
 
 export function CustomerPushCard({ className, installCoachShown }: { className?: string; installCoachShown?: boolean }) {
   const t = useT();
-  const { api, status, follow, slug, orgName, iconVersion } = useShopper();
+  const { api, status, follow, slug, orgName, iconVersion, pushDailyCap } = useShopper();
   if (status !== 'signedIn' || !follow) return null;
   return (
     <PushCard api={api} orgId={follow.orgId} place={`org.${slug}`} className={className} installCoachShown={installCoachShown}
       title={t('push.card.customerTitle')} body={t('push.card.customerBody', { org: orgName })} later={t('push.card.customerLater')}
-      onTitle={t('push.card.customerOnTitle')} onBody={t('push.card.customerOnBody', { org: orgName })}
+      onTitle={t('push.card.customerOnTitle')} onBody={pushDailyCap > 0 ? t('push.card.customerOnBodyCap', { org: orgName, count: pushDailyCap }) : t('push.card.customerOnBody', { org: orgName })}
       appName={orgName} appIcon={<AppIcon src={orgIconSrc(slug, iconVersion)} size={44} label={orgName} />} />
   );
 }

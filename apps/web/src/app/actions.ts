@@ -9,6 +9,11 @@ import { getLocale } from '@/lib/i18n-server';
 export interface JoinState {
   status: 'idle' | 'pending' | 'error';
   error?: ErrorCode | 'over15' | 'email' | 'name';
+  // every field that needs a fix, all at once, and what the person typed so nothing is lost
+  fields?: { name?: true; email?: true; over15?: true };
+  values?: { name: string; emailNews: boolean; push: boolean; over15: boolean };
+  // a new value per answer, so the form starts again from the typed values after each try
+  at?: number;
   devConfirmLink?: string;
   email?: string;
 }
@@ -29,18 +34,20 @@ export async function joinAction(code: string, _prev: JoinState, form: FormData)
     over15: form.get('over15') === 'on',
     interests: form.getAll('interests').map(String),
   };
-  if (!raw.over15) return { status: 'error', error: 'over15', email: raw.email };
+  const values = { name: raw.name, emailNews: raw.emailNews, push: raw.push, over15: raw.over15 };
   const parsed = JoinInput.safeParse(raw);
   if (!parsed.success) {
     const at = (f: string) => parsed.error.issues.some((i) => i.path[0] === f);
-    return { status: 'error', error: at('email') ? 'email' : at('name') ? 'name' : 'validation', email: raw.email };
+    const fields = { ...(at('name') ? { name: true as const } : {}), ...(at('email') ? { email: true as const } : {}), ...(at('over15') ? { over15: true as const } : {}) };
+    const first = fields.name ? 'name' : fields.email ? 'email' : fields.over15 ? 'over15' : 'validation';
+    return { status: 'error', error: first, fields, values, email: raw.email, at: Date.now() };
   }
   try {
     const { api } = await serverApi(locale);
     const res = await api.join(code, parsed.data);
     return { status: 'pending', email: raw.email, devConfirmLink: isDev ? res.devConfirmLink : undefined };
   } catch (e) {
-    return { status: 'error', error: errorCode(e), email: raw.email };
+    return { status: 'error', error: errorCode(e), values, email: raw.email, at: Date.now() };
   }
 }
 

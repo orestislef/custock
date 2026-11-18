@@ -4,6 +4,7 @@ import Link from '@/components/admin/org-link';
 import { useSectionPath as usePathname } from '@/components/admin/org-link';
 import { featureOn } from '@custock/core';
 import { useAdmin } from './admin-context';
+import { FadeRow } from '@/components/ui/client-kit';
 
 // products, counts and transfers live under stock. underline tabs on phones and tablets,
 // the sidebar shows them as a second level on wide screens.
@@ -19,10 +20,14 @@ export function StockTabs() {
   if (tabs.length < 2) return null;
   const active = (href: string) => (href === '/admin/stock' ? !/\/admin\/stock\/(counts|transfers|categories)/.test(pathname) : pathname.startsWith(href));
   return (
-    <nav aria-label={t('stockTabs.label')} className="tabs md:hidden">
-      {tabs.map((x) => (
-        <Link key={x.href} href={x.href} aria-current={active(x.href) ? 'page' : undefined}>{t(`stockTabs.${x.key}`)}</Link>
-      ))}
+    // greek and russian names do not fit a phone side by side: the row scrolls and fades instead of
+    // pushing the page wider than the screen
+    <nav aria-label={t('stockTabs.label')} className="md:hidden">
+      <FadeRow className="tabs" label={t('stockTabs.label')}>
+        {tabs.map((x) => (
+          <Link key={x.href} href={x.href} aria-current={active(x.href) ? 'page' : undefined}>{t(`stockTabs.${x.key}`)}</Link>
+        ))}
+      </FadeRow>
     </nav>
   );
 }

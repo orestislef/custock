@@ -72,7 +72,6 @@ export function StockSheet({ open, onClose, product, mode, onDone, variantId }: 
   const after = current + Math.round(delta * scale);
   const big = Math.abs(qty) > 50;
   const negative = after < 0;
-  const v = product.variants.find((x) => x.id === variant);
 
   async function submit() {
     if (!shop || qty === 0) return;
@@ -86,7 +85,8 @@ export function StockSheet({ open, onClose, product, mode, onDone, variantId }: 
       // without signal the change waits on this device and syncs later (src/lib/outbox.ts)
       const sent = await submitMovements(api, org.orgId, [{
         id, shopId: shop, variantId: variant, qtyDelta: Math.round(delta * scale), kind, occurredAt: Date.now(),
-        ...(mode === 'adjust' ? { reason } : {}), ...(mode === 'sell' && v?.priceMinor != null ? { unitPriceMinor: v.priceMinor } : {}), ...(note ? { note } : {}),
+        // no price from here: the server uses the shop price or a running offer (effectivePrice)
+        ...(mode === 'adjust' ? { reason } : {}), ...(note ? { note } : {}),
       }]);
       const res = sent.result;
       if (res?.rejected.length) {
@@ -100,11 +100,23 @@ export function StockSheet({ open, onClose, product, mode, onDone, variantId }: 
         const text = mode === 'receive' ? t('stockSheet.received', { count: qty, name })
           : mode === 'sell' ? t('stockSheet.sold', { count: Math.abs(qty), name })
           : t('stockSheet.adjusted', { qty: qty > 0 ? `+${qty}` : `−${Math.abs(qty)}`, name });
+        // one undo per change, and an undo the server refuses says so instead of "undone"
+        let undone = false;
         toast(text, {
           label: t('common:action.undo'),
           run: () => {
+            if (undone) return;
+            undone = true;
             void submitMovements(api, org.orgId, [{ id: uuidv7(), shopId: shop, variantId: variant, qtyDelta: -Math.round(delta * scale), kind: 'reversal', refType: 'reversal', refId: id, occurredAt: Date.now() }])
-              .then((r) => { if (r.result) onDone(r.result); toast(t('stockSheet.undone')); });
+              .then((r) => {
+                const refused = r.result?.rejected[0];
+                if (refused) { toast(t(`common:error.${refused.code}`)); return; }
+                if (r.result) onDone(r.result);
+                toast(t('stockSheet.undone'));
+              }, (e) => {
+                undone = false;
+                toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
+              });
           },
         });
         onClose();

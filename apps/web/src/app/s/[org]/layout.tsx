@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { ShopperProvider } from '@/components/shopper/shopper-context';
 import { ShopperTabs } from '@/components/shopper/shopper-tabs';
 import { getLocale } from '@/lib/i18n-server';
@@ -16,9 +17,10 @@ export async function generateMetadata({ params }: LayoutProps<'/s/[org]'>): Pro
 export default async function OrgLayout({ children, params }: LayoutProps<'/s/[org]'>) {
   const { org } = await params;
   const info = await orgInfo(org, await getLocale());
+  if (info.missing) notFound();
   if (info.unavailable) return <Unavailable />;
   return (
-    <ShopperProvider slug={org} orgName={info.name} joinCode={info.joinCode} iconVersion={iconVersion(info.name, info.logoUrl)} timeZone={info.timeZone}>
+    <ShopperProvider slug={org} orgName={info.name} joinCode={info.joinCode} iconVersion={iconVersion(info.name, info.logoUrl)} timeZone={info.timeZone} quietHours={info.quietHours} pushDailyCap={info.pushDailyCap}>
       {children}
       <ShopperTabs />
     </ShopperProvider>

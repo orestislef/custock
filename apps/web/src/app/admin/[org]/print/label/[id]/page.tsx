@@ -46,7 +46,7 @@ function BarsSvg({ bars, widthMm, heightMm }: { bars: Bars; widthMm: number; hei
 
 export default function LabelPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { api, org, t, locale, can, settings } = useAdmin();
+  const { api, org, t, locale, can, settings, shopId } = useAdmin();
   const allowed = can('products.edit', null) || can('products.create', null);
   const product = useAsync(() => (allowed ? api.product(org.orgId, id) : Promise.resolve(null)), [id, allowed]);
   const [size, setSize] = useState<Size>(() => {
@@ -66,8 +66,10 @@ export default function LabelPage({ params }: { params: Promise<{ id: string }> 
   const s = SIZES[size];
   const name = productName(p, locale);
   const options = variant.options ? Object.values(variant.options).join(' · ') : '';
-  // the base price, only when customers see prices
-  const priceMinor = variant.priceMinor;
+  // the price of the shop picked in the header (its own price when it has one), only when
+  // customers see prices. with every shop picked, the base price
+  const own = shopId ? p.levels?.find((l) => l.variantId === variant.id && l.shopId === shopId)?.priceOverrideMinor : null;
+  const priceMinor = own ?? variant.priceMinor;
   const showPrice = !!settings?.customerPrices && priceMinor != null;
   const shelfUrl = code ? `${window.location.origin}${basePath}/p/${encodeURIComponent(code)}` : null;
   const pickSize = (v: Size) => { setSize(v); try { localStorage.setItem(SIZE_KEY, v); } catch {} };

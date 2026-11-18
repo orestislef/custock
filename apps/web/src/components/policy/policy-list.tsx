@@ -123,7 +123,15 @@ export function PolicyControl({ entry, onChange, busy, title: titleOverride, sub
     );
   }
   const { min, max } = rangeFor(def, entry.inherited, hardBounds);
-  return <Row title={title} subtitle={subtitle} trailing={control(<Stepper def={def} value={Number(current)} min={min} max={max} label={text} busy={busy} onChange={(v) => onChange(v)} />)} />;
+  return (
+    // like the time window: on a narrow phone the stepper goes under the name instead of squeezing it
+    <div className="row flex-wrap gap-y-1">
+      <span className="row-main min-w-[9rem]"><span className="row-title block">{title}</span>{subtitle ? <span className="row-sub block">{subtitle}</span> : null}</span>
+      <span className="ml-auto" data-policy-control={def.key}>
+        <Stepper def={def} value={Number(current)} min={min} max={max} label={text} busy={busy} onChange={(v) => onChange(v)} />
+      </span>
+    </div>
+  );
 }
 
 // entries grouped like the registry, one inset group each, with the key's own footnote

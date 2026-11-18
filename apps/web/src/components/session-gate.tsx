@@ -8,7 +8,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { safeReturnPath } from '@custock/core';
-import { createBrowserApi, loadTokens, saveTokens } from '@/lib/api-client';
+import { createBrowserApi, handOffMe, loadTokens, saveTokens } from '@/lib/api-client';
 
 function show() {
   document.documentElement.removeAttribute('data-session');
@@ -29,8 +29,10 @@ export function SessionGate({ honorNext = false }: { honorNext?: boolean }) {
           : me.platformRole === 'superadmin' ? '/admin/platform'
           : me.following.length ? `/s/${me.following[0]!.orgSlug}`
           : null);
-      if (dest) router.replace(dest);
-      else show();
+      if (dest) {
+        if (dest.startsWith('/admin')) handOffMe(me);
+        router.replace(dest);
+      } else show();
     }, (e: { status?: number; code?: string }) => {
       if (!alive) return;
       // a session that is over (the refresh failed too): the page, signed out

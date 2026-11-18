@@ -10,7 +10,7 @@ import { cleanLine, normalizeEmail } from '@custock/core';
 
 const initial: JoinState = { status: 'idle' };
 
-export function JoinForm({ code, interests, notifyName, orgName }: { code: string; interests: Category[]; notifyName: string | null; orgName: string }) {
+export function JoinForm({ code, interests, notifyName, orgName, cap = 2 }: { code: string; interests: Category[]; notifyName: string | null; orgName: string; cap?: number }) {
   const t = useT();
   const locale = useLocale();
   const [state, action, pending] = useActionState(joinAction.bind(null, code), initial);
@@ -35,9 +35,13 @@ export function JoinForm({ code, interests, notifyName, orgName }: { code: strin
   }
 
   const err = state.status === 'error' ? state.error : undefined;
+  const bad = state.status === 'error' ? state.fields ?? {} : {};
+  const was = state.values;
+  // a new key per answer: the fields start again from what was typed, not empty
+  const round = state.status === 'error' ? String(state.at ?? 0) : 'idle';
 
   return (
-    <form action={action} noValidate>
+    <form action={action} noValidate key={round}>
       {notifyName ? (
         <div className="tip mb-5"><span className="t-sub">{t('join.notifyIntent', { product: notifyName })}</span></div>
       ) : null}
@@ -46,18 +50,18 @@ export function JoinForm({ code, interests, notifyName, orgName }: { code: strin
         <div className="list">
           <label className="block">
             <span className="field-label">{t('join.name')}</span>
-            <input className="field pt-1" name="name" autoComplete="name" autoCapitalize="words" enterKeyHint="next" required maxLength={40} placeholder={t('join.namePlaceholder')} aria-invalid={err === 'name'}
+            <input className="field pt-1" name="name" autoComplete="name" autoCapitalize="words" enterKeyHint="next" required maxLength={40} placeholder={t('join.namePlaceholder')} defaultValue={was?.name} aria-invalid={!!bad.name || err === 'name'}
               onBlur={(e) => { e.currentTarget.value = cleanLine(e.currentTarget.value); }} />
           </label>
           <label className="block row-sep relative">
             <span className="field-label">{t('join.email')}</span>
             <input className="field pt-1" name="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="done" maxLength={254}
-              required placeholder="name@example.com" defaultValue={state.email} aria-invalid={err === 'email'}
+              required placeholder="name@example.com" defaultValue={state.email} aria-invalid={!!bad.email || err === 'email'}
               onBlur={(e) => { e.currentTarget.value = normalizeEmail(e.currentTarget.value); }} />
           </label>
         </div>
-        {err === 'name' ? <p className="inset-group-foot" style={{ color: 'var(--c-error)' }}>{t('join.nameInvalid')}</p> : null}
-        {err === 'email' ? <p className="inset-group-foot" style={{ color: 'var(--c-error)' }}>{t('join.emailInvalid')}</p> : null}
+        {bad.name || err === 'name' ? <p className="inset-group-foot" role="alert" style={{ color: 'var(--c-error)' }}>{t('join.nameInvalid')}</p> : null}
+        {bad.email || err === 'email' ? <p className="inset-group-foot" role="alert" style={{ color: 'var(--c-error)' }}>{t('join.emailInvalid')}</p> : null}
       </section>
 
       {interests.length ? (
@@ -82,8 +86,8 @@ export function JoinForm({ code, interests, notifyName, orgName }: { code: strin
       <section className="inset-group">
         <h2 className="inset-group-head">{t('join.channels')}</h2>
         <div className="list">
-          <Check name="emailNews" title={t('join.emailNews')} sub={t('join.emailNewsSub', { org: orgName })} />
-          <Check name="push" title={t('join.push')} sub={t('join.pushSub')} />
+          <Check name="emailNews" title={t('join.emailNews')} sub={t('join.emailNewsSub', { org: orgName })} on={was?.emailNews} />
+          <Check name="push" title={t('join.push')} sub={cap > 0 ? t('join.pushSubCap', { count: cap }) : t('join.pushSub')} on={was?.push} />
         </div>
         <p className="inset-group-foot">{t('join.channelsFoot')}</p>
       </section>
@@ -91,11 +95,11 @@ export function JoinForm({ code, interests, notifyName, orgName }: { code: strin
       <section className="inset-group">
         <div className="list">
           <label className="row cursor-pointer">
-            <input type="checkbox" className="check" name="over15" aria-invalid={err === 'over15'} />
+            <input type="checkbox" className="check" name="over15" defaultChecked={was?.over15} aria-invalid={!!bad.over15 || err === 'over15'} />
             <span className="row-main row-title">{t('join.over15')}</span>
           </label>
         </div>
-        {err === 'over15' ? <p className="inset-group-foot" style={{ color: 'var(--c-error)' }}>{t('join.over15Needed')}</p> : null}
+        {bad.over15 || err === 'over15' ? <p className="inset-group-foot" role="alert" style={{ color: 'var(--c-error)' }}>{t('join.over15Needed')}</p> : null}
       </section>
 
       {err && err !== 'email' && err !== 'over15' && err !== 'name' ? (
@@ -110,7 +114,7 @@ export function JoinForm({ code, interests, notifyName, orgName }: { code: strin
   );
 }
 
-function Check({ name, title, sub, invalid }: { name: string; title: string; sub?: string; invalid?: boolean }) {
+function Check({ name, title, sub, invalid, on }: { name: string; title: string; sub?: string; invalid?: boolean; on?: boolean }) {
   return (
     <label className="row cursor-pointer">
       <span className="row-main">
@@ -118,7 +122,7 @@ function Check({ name, title, sub, invalid }: { name: string; title: string; sub
         {sub ? <span className="row-sub block">{sub}</span> : null}
       </span>
       <span className="switch">
-        <input type="checkbox" role="switch" name={name} aria-invalid={invalid} />
+        <input type="checkbox" role="switch" name={name} aria-invalid={invalid} defaultChecked={on} />
         <span className="track" />
         <span className="knob" />
       </span>

@@ -10,6 +10,7 @@ export async function GET(_req: Request, { params }: RouteContext<'/s/[org]/mani
   const locale = await getLocale();
   const t = translator(locale, 'web');
   const info = await orgInfo(org, locale);
+  if (info.missing) return new Response('Not found', { status: 404 });
   const base = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
   const home = `${base}/s/${encodeURIComponent(org)}`;
   const v = iconVersion(info.name, info.logoUrl);

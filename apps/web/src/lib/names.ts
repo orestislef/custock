@@ -20,3 +20,11 @@ export function variantLabel(options: Record<string, string> | null | undefined)
 export function roleLabel(t: TFunction, r: Pick<Role, 'templateKey' | 'name'>): string {
   return r.templateKey ? t(`common:role.${r.templateKey}`, { defaultValue: r.name }) : r.name;
 }
+
+// a role known only by its name (team assignments, invites): the default roles are translated,
+// a role the business made itself keeps its own name
+const DEFAULT_ROLES = new Set(['owner', 'admin', 'manager', 'staff', 'viewer']);
+export function roleNameLabel(t: TFunction, name: string): string {
+  const key = name.trim().toLowerCase();
+  return DEFAULT_ROLES.has(key) ? t(`common:role.${key}`, { defaultValue: name }) : name;
+}

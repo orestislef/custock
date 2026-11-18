@@ -60,8 +60,9 @@ export function SuperAdminsSection() {
   const admins = list.data?.admins ?? [];
   return (
     <section aria-labelledby="admins-h">
-      <div className="flex items-end gap-3 mb-1">
-        <h2 id="admins-h" className="t-title3 m-0 flex-1">{t('platform.admins.title')}</h2>
+      {/* the button drops under the title when a long greek or russian label does not fit beside it */}
+      <div className="flex flex-wrap items-end gap-x-3 gap-y-2 mb-1">
+        <h2 id="admins-h" className="t-title3 m-0 flex-1 min-w-[8rem]">{t('platform.admins.title')}</h2>
         <button type="button" className="btn btn-tinted" onClick={() => setInviting(true)}><IconPlus size={18} />{t('platform.admins.invite')}</button>
       </div>
       <p className="t-sub t-2 m-0 mb-3">{t('platform.admins.lead')}</p>

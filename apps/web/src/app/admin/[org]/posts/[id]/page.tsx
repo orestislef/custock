@@ -67,7 +67,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         {can('posts.delete', null) ? (deleting ? (
           <span className="inline-flex items-center gap-2 flex-wrap">
             <span className="t-sub" style={{ color: 'var(--c-neg-text)' }}>{p.status === 'sent' ? t('post.deleteSent') : t('post.deleteConfirm')}</span>
-            <button type="button" className="btn btn-danger" style={{ background: 'var(--c-neg-tint)' }} disabled={busy} onClick={() => void api.deletePost(org.orgId, p.id).then(() => { toast(t('post.deleted')); router.replace('/admin/posts'); }).catch((e: { code?: string }) => toast(t(`common:error.${e.code ?? 'internal'}`)))}>{t('common:action.delete')}</button>
+            <button type="button" className="btn btn-danger" style={{ background: 'var(--c-neg-tint)' }} disabled={busy} onClick={() => { setBusy(true); void api.deletePost(org.orgId, p.id).then(() => { toast(t('post.deleted')); router.replace('/admin/posts'); }).catch((e: { code?: string }) => { setBusy(false); toast(t(`common:error.${e.code ?? 'internal'}`)); }); }}>{t('common:action.delete')}</button>
             <button type="button" className="btn btn-gray" onClick={() => setDeleting(false)}>{t('common:action.cancel')}</button>
           </span>
         ) : <button type="button" className="btn btn-danger" onClick={() => setDeleting(true)}>{t('common:action.delete')}</button>) : null}

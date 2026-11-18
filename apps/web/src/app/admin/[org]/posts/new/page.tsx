@@ -251,7 +251,10 @@ function ScopeRow({ label, sub, on, toggle }: { label: string; sub: string; on: 
 }
 
 function AudienceExplainer({ preview, push, email }: { preview: AudiencePreview | null; push: boolean; email: boolean }) {
-  const { t, locale } = useAdmin();
+  const { t, locale, settings } = useAdmin();
+  // this business's own quiet hours and daily cap, never fixed numbers
+  const [quietFrom, quietTo] = (settings?.quietHours ?? '22:00-09:00').split('-');
+  const cap = settings?.pushDailyCap ?? 2;
   if (!preview) {
     return <div className="card p-4"><p className="t-sub t-2 m-0">{t('composer.pickAudience')}</p></div>;
   }
@@ -266,7 +269,7 @@ function AudienceExplainer({ preview, push, email }: { preview: AudiencePreview 
           <p className="t-sub m-0">
             {t('composer.pushTo', { n: n(preview.push.count) })}
             {preview.push.turnedOff || preview.push.noApp ? <span className="t-2"> {t('composer.pushNot', { off: n(preview.push.turnedOff), noApp: n(preview.push.noApp) })}</span> : null}
-            {preview.push.heldForQuietHours ? <span className="block t-2 mt-1">{t('composer.quietHours')}</span> : <span className="block t-2 mt-1">{t('composer.quietHoursRule')}</span>}
+            {preview.push.heldForQuietHours ? <span className="block t-2 mt-1">{t('composer.quietHours', { to: quietTo })}</span> : <span className="block t-2 mt-1">{t('composer.quietHoursRule', { from: quietFrom, to: quietTo })}</span>}
           </p>
         </div>
       ) : null}
@@ -279,7 +282,7 @@ function AudienceExplainer({ preview, push, email }: { preview: AudiencePreview 
           </p>
         </div>
       ) : null}
-      <p className="t-foot t-2 m-0 mt-3 flex gap-1.5"><IconInfo size={15} className="flex-none mt-px" />{t('composer.capRule')}</p>
+      <p className="t-foot t-2 m-0 mt-3 flex gap-1.5"><IconInfo size={15} className="flex-none mt-px" />{t('composer.capRule', { count: cap })}</p>
     </div>
   );
 }

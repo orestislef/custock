@@ -134,7 +134,10 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
               <Row
                 title={t('product.shopPrice', { shop: shops.find((s) => s.id === shopId)?.name ?? '' })}
                 subtitle={t('product.shopPriceSub')}
-                value={t('product.samePrice')}
+                value={(() => {
+                  const own = p.levels.find((l) => l.variantId === v0?.id && l.shopId === shopId)?.priceOverrideMinor;
+                  return own != null ? money(own, org.currency, locale) : t('product.samePrice');
+                })()}
               />
             ) : null}
             {v0 && v0.costMinor !== undefined ? (

@@ -9,7 +9,7 @@ import Link from '@/components/admin/org-link';
 import { useSearchParams } from 'next/navigation';
 import { useOrgRouter as useRouter } from '@/components/admin/org-link';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ean13, featureOn, uuidv7, type MovementBatchResult, type Product, type ScanResult, type Shop, type StockLevel } from '@custock/core';
+import { ean13, featureOn, uuidv7, type MovementBatchResult, type Product, type ScanResult, type Shop, type StockCount, type StockLevel } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { OutboxBadge } from '@/components/admin/outbox-badge';
 import { Camera } from '@/components/scan/camera';
@@ -41,7 +41,7 @@ export default function ScanPage() {
 }
 
 function Scan() {
-  const { api, org, t, locale, can, shopId, shops } = useAdmin();
+  const { api, org, t, locale, can, shopId, shops, me } = useAdmin();
   const router = useRouter();
   const params = useSearchParams();
   const toast = useToast();
@@ -71,6 +71,7 @@ function Scan() {
   const [busy, setBusy] = useState(false);
   const [unknown, setUnknown] = useState<ScanResult | null>(null);
   const [toShop, setToShop] = useState<string | null>(null);
+  const [archived, setArchived] = useState<Product | null>(null);
   const countId = useRef<string | null>(null);
   const inFlight = useRef(false);
 
@@ -118,12 +119,21 @@ function Scan() {
     }
     if (sent.result) afterMovements(sent.result);
     addLine(product, variantId, n);
+    // one undo per sale: a second tap, or an undo the server refuses, never takes the line off twice
+    let undone = false;
     toast(sent.queued ? t('offline.savedSale', { count: n, name: name(product) }) : t('scanner.sold', { count: n, name: name(product) }), {
       label: t('common:action.undo'),
       run: () => {
-        void submitMovements(api, org.orgId, [{ id: uuidv7(), shopId: workShop, variantId, qtyDelta: n, kind: 'reversal', refType: 'reversal', refId: id, occurredAt: now() }]).then(() => {
+        if (undone) return;
+        undone = true;
+        void submitMovements(api, org.orgId, [{ id: uuidv7(), shopId: workShop, variantId, qtyDelta: n, kind: 'reversal', refType: 'reversal', refId: id, occurredAt: now() }]).then((res) => {
+          const refused = res.result?.rejected[0];
+          if (refused) { toast(t(`common:error.${refused.code}`)); return; }
           setLines((cur) => cur.map((l) => (l.variantId === variantId ? { ...l, qty: l.qty - n } : l)).filter((l) => l.qty > 0));
           toast(t('stockSheet.undone'));
+        }, (e) => {
+          undone = false;
+          toast(isNetworkError(e) ? t('offline.needsSignal') : t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
         });
       },
     });
@@ -132,7 +142,14 @@ function Scan() {
   // counts live on the server, several phones can count the same shop at once
   async function countScan(product: Product, variantId: string, n: number, how: 'add' | 'set') {
     if (!workShop) return;
-    if (!countId.current) countId.current = (await api.startCount(org.orgId, workShop, { kind: 'partial' })).id;
+    if (!countId.current) {
+      // carry on with this person's own open count in this shop (the page was left, the mode
+      // changed), so counting from the scanner never leaves a trail of half counts behind
+      const mine = (await api.counts(org.orgId, { shopId: workShop, status: 'open' }).catch(() => [] as StockCount[]))
+        .filter((c) => c.kind === 'partial' && c.startedBy === me.user.id)
+        .sort((a, b) => b.startedAt - a.startedAt)[0];
+      countId.current = mine ? mine.id : (await api.startCount(org.orgId, workShop, { kind: 'partial' })).id;
+    }
     const line = await api.setCountLine(org.orgId, countId.current, variantId, n, how);
     setLines((cur) => [{ variantId, product, qty: line.countedQty, expected: line.expectedQty }, ...cur.filter((l) => l.variantId !== variantId)]);
   }
@@ -153,9 +170,13 @@ function Scan() {
       }
       if (r.match === 'unknown' || !r.product || !r.variantId) {
         setUnknown(r);
+        setArchived(null);
         return;
       }
       setUnknown(null);
+      // an archived product is not sold, received or counted from the scanner; look up still opens it
+      if (r.match === 'archived' && mode !== 'lookup') { setArchived(r.product); return; }
+      setArchived(null);
       const levels = (r.product as Product & { levels?: StockLevel[] }).levels;
       if (mode === 'lookup') router.push(`/admin/stock/${r.product.id}`);
       else if (mode === 'sell') await sellOne(r.product, r.variantId, r.packQty);
@@ -177,7 +198,16 @@ function Scan() {
         id: uuidv7(), shopId: workShop, variantId: l.variantId, qtyDelta: l.qty, kind: 'receive' as const, batchId, occurredAt: now(),
       }));
       const sent = await submitMovements(api, org.orgId, movements);
-      if (sent.result?.rejected.length) { toast(t(`common:error.${sent.result.rejected[0]!.code}`)); return; }
+      const refused = sent.result?.rejected ?? [];
+      if (refused.length) {
+        // what went in stays in: only the refused lines are left on screen, so a second tap cannot
+        // receive the accepted ones twice
+        const kept = new Set(refused.map((r) => movements.find((m) => m.id === r.id)?.variantId));
+        if (sent.result) afterMovements(sent.result);
+        setLines((cur) => cur.filter((l) => kept.has(l.variantId)));
+        toast(t(`common:error.${refused[0]!.code}`));
+        return;
+      }
       if (sent.result) afterMovements(sent.result);
       toast(sent.queued ? t('offline.savedReceive', { count: total }) : t('scanner.received', { count: total }));
       setLines([]);
@@ -232,6 +262,7 @@ function Scan() {
     try { localStorage.setItem(MODE_KEY, m); } catch {}
     setLines([]);
     setUnknown(null);
+    setArchived(null);
     countId.current = null;
   }
 
@@ -292,10 +323,17 @@ function Scan() {
             <p className="t-headline m-0">{t('scanner.unknownTitle')}</p>
             <p className="t-sub t-2 m-0 mt-1 tnum">{unknown.valid ? unknown.codeNorm.replace(/^0+(?=\d{8})/, '') : t('scanner.damaged')}</p>
             <div className="mt-3">
-              {can('products.create', null) ? (
+              {!unknown.valid ? null : can('products.create', null) ? (
                 <Link className="btn btn-tinted" href={`/admin/stock/new?code=${encodeURIComponent(unknown.codeNorm.replace(/^0+(?=\d{8})/, ''))}`}><IconPlus size={18} />{t('scanner.createWithCode')}</Link>
               ) : <p className="t-sub t-2 m-0">{t('scanner.unknownSaved')}</p>}
             </div>
+          </div>
+        ) : null}
+
+        {archived ? (
+          <div className="card p-4 page-in" role="status">
+            <p className="t-headline m-0">{t('scanner.archivedTitle')}</p>
+            <p className="t-sub t-2 m-0 mt-1">{t('scanner.archivedBody', { name: name(archived) })}</p>
           </div>
         ) : null}
 
@@ -305,7 +343,12 @@ function Scan() {
               <p className="t-foot t-2 m-0">
                 {mode === 'sell' ? t('scanner.listHead.sell', { count: total }) : `${t('scanner.lines', { count: lines.length })} · ${t(`scanner.listHead.${mode}`, { count: total })}`}
               </p>
-              {mode !== 'sell' ? <button type="button" className="btn btn-plain" style={{ minHeight: 32, padding: '0 4px' }} onClick={() => { setLines([]); countId.current = null; }}>{t('scanner.clear')}</button> : null}
+              {mode !== 'sell' ? <button type="button" className="btn btn-plain" style={{ minHeight: 32, padding: '0 4px' }} onClick={() => {
+                // clearing a count starts it over: the open count on the server goes too
+                if (mode === 'count' && countId.current) void api.cancelCount(org.orgId, countId.current).catch(() => {});
+                setLines([]);
+                countId.current = null;
+              }}>{t('scanner.clear')}</button> : null}
             </div>
             <ul className="list" role="list">
               {lines.map((l) => (

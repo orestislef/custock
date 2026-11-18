@@ -3,7 +3,7 @@
 // the api for the browser. real client through the /api rewrite when the dev server was started
 // with CUSTOCK_API_URL, fixtures in memory otherwise.
 
-import { createApiClient, type CustockApi } from '@custock/core';
+import { createApiClient, type CustockApi, type MeContext } from '@custock/core';
 import { reportError } from './report-error';
 
 // a production build always talks to the real api, sample data exists only while developing
@@ -27,6 +27,19 @@ export function loadTokens(): StoredTokens | null {
 export function saveTokens(tokens: StoredTokens | null) {
   if (tokens) localStorage.setItem(TOKENS_KEY, JSON.stringify(tokens));
   else localStorage.removeItem(TOKENS_KEY);
+}
+
+// the front door reads who this is to choose where to go. the admin it opens a moment later takes
+// that answer instead of asking again: once, within 10 seconds, for the same session
+let handedMe: { me: MeContext; session: string; at: number } | null = null;
+export function handOffMe(me: MeContext) {
+  const tk = loadTokens();
+  handedMe = tk ? { me, session: tk.refreshToken, at: Date.now() } : null;
+}
+export function takeHandedMe(): MeContext | null {
+  const h = handedMe;
+  handedMe = null;
+  return h && loadTokens()?.refreshToken === h.session && Date.now() - h.at < 10_000 ? h.me : null;
 }
 
 // access tokens live 15 minutes. before one runs out it is swapped for a new pair with the

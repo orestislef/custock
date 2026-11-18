@@ -7,7 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { usePathname, useRouter } from 'next/navigation';
 import type { CustockApi, MeContext, OrgAccess, OrgSettings, Shop } from '@custock/core';
 import type { TFunction } from '@custock/i18n';
-import { basePath, createBrowserApi, loadTokens, saveTokens } from '@/lib/api-client';
+import { basePath, createBrowserApi, loadTokens, saveTokens, takeHandedMe } from '@/lib/api-client';
 import { returnParam } from '@custock/core';
 import { useLocale, useT } from '@/lib/i18n-client';
 import { can as canFn } from '@/lib/perms';
@@ -135,7 +135,7 @@ function pickOrg(me: MeContext, urlSlug: string | null) {
 }
 
 async function loadSession(api: CustockApi, urlSlug: string | null): Promise<Loaded> {
-  const me = await api.me();
+  const me = takeHandedMe() ?? await api.me();
   const org = pickOrg(me, urlSlug);
   if (!org) return { me, orgId: null, settings: null, shops: [], shopId: null };
   session.versions.set(org.orgId, org.permsVersion);

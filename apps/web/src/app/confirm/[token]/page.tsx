@@ -16,7 +16,7 @@ export default async function ConfirmPage({ params }: PageProps<'/confirm/[token
   const slug = (result as { orgSlug?: string } | null)?.orgSlug ?? defaultOrgSlug();
 
   return (
-    <PublicShell orgName={result?.orgName ?? 'Custock'} t={t}>
+    <PublicShell orgName={result?.orgName ?? 'Custock'} t={t} brand={!result}>
       <div className="card p-7 text-center mt-6 page-in">
         {result ? (
           <>
