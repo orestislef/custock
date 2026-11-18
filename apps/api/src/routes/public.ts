@@ -56,6 +56,7 @@ export function publicRoutes(app: Hono<AppEnv>) {
     }
     const body: JoinPage = {
       code: c.req.param('code'),
+      orgSlug: org.slug,
       orgName: org.name,
       scopeName,
       scopeType: link.scope_type,

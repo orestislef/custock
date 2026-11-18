@@ -5,6 +5,7 @@ import { uuidv7 } from '@custock/core';
 import type { Db } from '@custock/db';
 import { platform } from './tenant';
 import { pushUrl } from './webpush';
+import type { RenderedEmail } from '../email/layout';
 
 export interface OutgoingMessage {
   channel: 'email' | 'push' | 'sms';
@@ -14,7 +15,9 @@ export interface OutgoingMessage {
   to?: string | null;
   locale?: string | null;
   title: string;
+  // the plain text. emails also carry html, push never
   body: string;
+  html?: string | null;
   payload?: Record<string, unknown>;
 }
 
@@ -31,11 +34,11 @@ export function devOutboxTransport(db: Db, log: (line: string) => void = (l) => 
         msg = { ...msg, payload: { ...(msg.payload ?? {}), url: pushUrl(db, msg.orgId ?? null, !!msg.customerId, msg.payload ?? {}) } };
       }
       platform(db).run(
-        `INSERT INTO dev_outbox (id, channel, org_id, user_id, customer_id, to_address, locale, title, body, payload, created_at)
-         VALUES (@id, @channel, @org, @user, @customer, @to, @locale, @title, @body, @payload, @now)`,
+        `INSERT INTO dev_outbox (id, channel, org_id, user_id, customer_id, to_address, locale, title, body, html, payload, created_at)
+         VALUES (@id, @channel, @org, @user, @customer, @to, @locale, @title, @body, @html, @payload, @now)`,
         {
           id, channel: msg.channel, org: msg.orgId ?? null, user: msg.userId ?? null, customer: msg.customerId ?? null,
-          to: msg.to ?? null, locale: msg.locale ?? null, title: msg.title, body: msg.body,
+          to: msg.to ?? null, locale: msg.locale ?? null, title: msg.title, body: msg.body, html: msg.channel === 'email' ? msg.html ?? null : null,
           payload: msg.payload ? JSON.stringify(msg.payload) : null, now: Date.now(),
         },
       );
@@ -43,4 +46,9 @@ export function devOutboxTransport(db: Db, log: (line: string) => void = (l) => 
       return { id };
     },
   };
+}
+
+// an email from a rendered template: subject, plain text and html together
+export function emailMessage(r: RenderedEmail, m: Omit<OutgoingMessage, 'channel' | 'title' | 'body' | 'html'>): OutgoingMessage {
+  return { ...m, channel: 'email', title: r.subject, body: r.text, html: r.html };
 }

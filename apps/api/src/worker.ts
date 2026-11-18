@@ -2,7 +2,7 @@
 // kinds: send_post (fan out into deliveries), send_deliveries (through the dev transport, in each
 // recipient's language), rollup_day (daily stats from the ledger).
 
-import { followsShop, shopsInScope, uuidv7, type Audience, type Channel } from '@custock/core';
+import { followsShop, formatMoney, shopsInScope, uuidv7, type Audience, type Channel } from '@custock/core';
 import { translator, pickLocale } from '@custock/i18n';
 import type { Db } from '@custock/db';
 import type { Config, OrgRow } from './types';
@@ -15,6 +15,8 @@ import { setWebBase } from './lib/webpush';
 import { unsubKey, unsubToken } from './lib/unsub';
 import { canEmail, canPush, resolveAudience } from './services/audience';
 import { fileUrl, variantLabel } from './services/catalog';
+import { loadPosts } from './services/posts';
+import { backInStockEmail, postEmail } from './email/messages';
 
 const DAY = 86_400_000;
 
@@ -177,7 +179,9 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
     const tr = translator(locale, 'server');
     let title = '';
     let body = '';
+    let html: string | null = null;
     let payload: Record<string, unknown> = {};
+    const web = deps.cfg.publicWebUrl.replace(/\/$/, '');
     if (d.post_id) {
       const texts = t.all<{ locale: string; title: string; body: string }>(
         'SELECT tr.locale, tr.title, tr.body FROM post_translations tr JOIN posts p ON p.id = tr.post_id WHERE p.org_id = @org AND tr.post_id = @p',
@@ -194,8 +198,27 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
       payload = { type: 'post', postId: d.post_id, threadId: org.id, link: `custock://post/${d.post_id}`, image: fileUrl(cover?.storage_key), ...sender };
       if (d.channel === 'email') {
         const token = unsubToken({ customerId: c.id, scopeType: (scope?.scope_type as 'org' | 'group' | 'shop') ?? 'org', scopeId: scope?.scope_id ?? org.id }, unsubKey(deps.cfg));
-        const url = `${deps.cfg.publicWebUrl.replace(/\/$/, '')}/unsubscribe/${token}`;
-        body = `${body}\n\n${tr('email.footer', { scope: shopName ? `${org.name} ${shopName}` : org.name, unsubscribeUrl: url })}`;
+        const url = `${web}/unsubscribe/${token}`;
+        const post = loadPosts(t, [d.post_id], { withStats: false, showPrices: !!org.customer_prices, locale })[0];
+        const mail = postEmail(locale, {
+          sender: shopName ? `${org.name} ${shopName}` : org.name,
+          kind: post?.kind ?? 'news',
+          title: text?.title ?? org.name,
+          body: text?.body ?? '',
+          coverUrl: fileUrl(cover?.storage_key),
+          url: `${web}/s/${encodeURIComponent(org.slug)}?post=${encodeURIComponent(d.post_id)}`,
+          products: (post?.products ?? []).map((x) => ({
+            name: x.name, url: `${web}/s/${encodeURIComponent(org.slug)}/p/${encodeURIComponent(x.productId)}`, imageUrl: x.imageUrl,
+            priceMinor: x.priceMinor, offerPriceMinor: x.offerPriceMinor, wasMinor: x.wasMinor,
+          })),
+          currency: org.currency,
+          timezone: org.timezone,
+          validUntil: post?.validUntil ?? null,
+          unsubscribeUrl: url,
+        });
+        title = mail.subject;
+        body = mail.text;
+        html = mail.html;
         payload = { ...payload, listUnsubscribe: url, listUnsubscribePost: 'List-Unsubscribe=One-Click' };
       }
     } else if (d.alert_id) {
@@ -208,9 +231,27 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
       const product = a ? variantLabel(trName ?? a.name, a.options, locale) : '';
       const shop = a?.shop_id ? t.get<{ name: string }>('SELECT name FROM shops WHERE org_id = @org AND id = @id', { id: a.shop_id })?.name : null;
       const shopLabel = shop ? `${org.name} ${shop}` : org.name;
-      const key = d.channel === 'push' ? 'push.backInStock' : 'email.backInStock';
-      title = tr(d.channel === 'push' ? `${key}.title` : `${key}.subject`, { shop: shopLabel, product });
-      body = tr(`${key}.body`, { shop: shopLabel, product });
+      if (d.channel === 'push') {
+        title = tr('push.backInStock.title', { shop: shopLabel, product });
+        body = tr('push.backInStock.body', { shop: shopLabel, product });
+      } else {
+        const extra = a
+          ? t.get<{ price_minor: number | null; storage_key: string | null }>(
+              `SELECT v.price_minor, (SELECT f.storage_key FROM product_images i JOIN files f ON f.id = i.file_id WHERE i.product_id = v.product_id ORDER BY i.sort LIMIT 1) AS storage_key
+                 FROM product_variants v WHERE v.org_id = @org AND v.id = @v`,
+              { v: a.variant_id },
+            )
+          : undefined;
+        const mail = backInStockEmail(locale, {
+          shop: shopLabel, product,
+          url: a ? `${web}/s/${encodeURIComponent(org.slug)}/p/${encodeURIComponent(a.product_id)}` : null,
+          imageUrl: fileUrl(extra?.storage_key),
+          price: org.customer_prices && extra?.price_minor != null ? formatMoney(extra.price_minor, org.currency, locale) : null,
+        });
+        title = mail.subject;
+        body = mail.text;
+        html = mail.html;
+      }
       payload = {
         type: 'back_in_stock', variantId: a?.variant_id, productId: a?.product_id, shopId: a?.shop_id, threadId: org.id,
         link: a ? `custock://product/${a.product_id}` : null, ...senderOf(t, org, a?.shop_id ?? null),
@@ -218,7 +259,7 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
     }
     const sent = transport.send({
       channel: d.channel, orgId: org.id, customerId: c.id, userId: c.user_id, to: d.channel === 'email' ? c.email : null,
-      locale, title, body, payload,
+      locale, title, body, html, payload,
     });
     t.run("UPDATE deliveries SET status = 'sent', provider_id = @pid, updated_at = @now WHERE org_id = @org AND id = @id", { pid: sent.id, now, id: d.id });
   }

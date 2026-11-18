@@ -23,6 +23,7 @@ export interface OutboxRow {
   locale: string | null;
   title: string | null;
   body: string | null;
+  html?: string | null;
   payload: string | null;
   created_at: number;
 }
@@ -97,6 +98,7 @@ export function buildEmail(row: OutboxRow, fromAddress: string): Mail.Options {
     ...(p.replyTo ? { replyTo: p.replyTo } : {}),
     subject: row.title ?? '',
     text: row.body ?? '',
+    ...(row.html ? { html: row.html } : {}),
     headers,
   };
 }
@@ -224,7 +226,7 @@ export async function drainOutbox(db: Db, sender: LiveSender, now: number, limit
   const channels = [sender.email ? 'email' : null, sender.push || sender.webpush ? 'push' : null].filter(Boolean);
   if (!channels.length) return { sent: 0, failed: 0 };
   const rows = p.all<OutboxRow>(
-    `SELECT id, channel, org_id, user_id, customer_id, to_address, locale, title, body, payload, created_at
+    `SELECT id, channel, org_id, user_id, customer_id, to_address, locale, title, body, html, payload, created_at
        FROM dev_outbox WHERE sent_at IS NULL AND attempts < 5 AND channel IN (SELECT value FROM json_each(@ch)) ORDER BY created_at LIMIT @lim`,
     { lim: limit, ch: channels },
   );

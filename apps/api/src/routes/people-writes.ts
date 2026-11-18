@@ -20,8 +20,9 @@ import { ApiProblem, badRequest, forbidden, notFound } from '../lib/problem';
 import { clientIp, throttle } from '../lib/ratelimit';
 import { platform, Tenant } from '../lib/tenant';
 import { pushReachableSql, recomputePushOk } from '../lib/webpush';
+import { changeCodeEmail, emailChangedEmail, joinConfirmEmail } from '../email/messages';
 import { dayKey } from '../lib/time';
-import { devOutboxTransport } from '../lib/transport';
+import { devOutboxTransport, emailMessage } from '../lib/transport';
 import { readUnsubToken, unsubKey } from '../lib/unsub';
 import { shopNameOf } from '../services/ledger';
 import { canSee, customerVisibility, loadSubscriptions, loadTags, reachedShops, toCustomer, CUSTOMER_COLUMNS, type CustomerRow } from '../services/customers';
@@ -163,12 +164,9 @@ function sendConfirmation(cfg: Config, t: Tenant, org: OrgRow, req: ConfirmReque
     },
   );
   const url = `${cfg.publicWebUrl.replace(/\/$/, '')}/confirm/${token}`;
-  const tr = translator(pickLocale(req.locale), 'server');
-  devOutboxTransport(cfg.db).send({
-    channel: 'email', orgId: org.id, customerId: req.customerId, to: email, locale: req.locale,
-    title: tr('email.joinConfirm.subject', { scope: scopeName }), body: tr('email.joinConfirm.body', { name, scope: scopeName, url }),
-    payload: { type: 'join_confirm' },
-  });
+  devOutboxTransport(cfg.db).send(
+    emailMessage(joinConfirmEmail(req.locale, { name, scope: scopeName, url }), { orgId: org.id, customerId: req.customerId, to: email, locale: req.locale, payload: { type: 'join_confirm' } }),
+  );
   return url;
 }
 
@@ -393,7 +391,7 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
       if (row.push) consent(t, row.customer_id, 'push', true, locale, row.source ?? 'join_page', now, row.ip, row.user_agent);
       bumpStat(t, row.join_link_id, 'confirmed', org.timezone, now);
     })();
-    return c.json({ orgName: org.name, scopeName });
+    return c.json({ orgName: org.name, scopeName, orgSlug: org.slug });
   });
 
   function unsubTarget(c: Context<AppEnv>) {
@@ -625,8 +623,7 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
       'INSERT INTO email_changes (id, user_id, new_email, code_hash, created_at, expires_at) VALUES (@id, @u, @e, @h, @now, @exp)',
       { id: uuidv7(now), u: user.id, e: email, h: sha256(`${email}:${code}`), now, exp: now + CODE_TTL },
     );
-    const tr = translator(user.locale, 'server');
-    devOutboxTransport(cfg.db).send({ channel: 'email', userId: user.id, to: email, locale: user.locale, title: tr('email.changeCode.subject', { code }), body: tr('email.changeCode.body', { code }), payload: { type: 'email_change' } });
+    devOutboxTransport(cfg.db).send(emailMessage(changeCodeEmail(user.locale, { code }), { userId: user.id, to: email, locale: user.locale, payload: { type: 'email_change' } }));
     return c.json(cfg.dev ? { sent: true, devCode: code } : { sent: true });
   });
 
@@ -660,8 +657,7 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
       }
     })();
     if (old) {
-      const tr = translator(user.locale, 'server');
-      devOutboxTransport(cfg.db).send({ channel: 'email', userId: user.id, to: old, locale: user.locale, title: tr('email.emailChanged.subject'), body: tr('email.emailChanged.body', { email: maskEmail(email) }), payload: { type: 'email_changed' } });
+      devOutboxTransport(cfg.db).send(emailMessage(emailChangedEmail(user.locale, { email: maskEmail(email) ?? email }), { userId: user.id, to: old, locale: user.locale, payload: { type: 'email_changed' } }));
     }
     return c.body(null, 204);
   });

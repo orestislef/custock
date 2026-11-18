@@ -3,7 +3,7 @@ import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 import { LoginInput, OtpRequestInput, OtpVerifyInput, uuidv7 } from '@custock/core';
 import { burnPasswordCheck, sha256, verifyPassword } from '@custock/db';
-import { translator, pickLocale } from '@custock/i18n';
+import { pickLocale } from '@custock/i18n';
 import type { AppEnv } from '../types';
 import { issueTokens, revokeFamily, rotate } from '../lib/auth';
 import { cfgOf, nowOf, requireAuth } from '../lib/context';
@@ -11,6 +11,8 @@ import { ApiProblem, unauthorized } from '../lib/problem';
 import { clearThrottle, isThrottled, rateLimit, throttle } from '../lib/ratelimit';
 import { platform } from '../lib/tenant';
 import { devOutboxTransport } from '../lib/transport';
+import { emailMessage } from '../lib/transport';
+import { otpEmail } from '../email/messages';
 
 const OTP_TTL = 10 * 60_000;
 const MIN = 60_000;
@@ -75,11 +77,7 @@ export function authRoutes(app: Hono<AppEnv>) {
       { id: uuidv7(now), e: email, h: sha256(`${email}:${code}`), now, exp: now + OTP_TTL },
     );
     const locale = pickLocale(input.locale, c.get('locale'));
-    const t = translator(locale, 'server');
-    devOutboxTransport(cfg.db).send({
-      channel: 'email', to: email, locale,
-      title: t('email.otp.subject', { code }), body: t('email.otp.body', { code }),
-    });
+    devOutboxTransport(cfg.db).send(emailMessage(otpEmail(locale, { code }), { to: email, locale, payload: { type: 'otp' } }));
     return c.json(cfg.dev ? { sent: true, devCode: code } : { sent: true });
   });
 

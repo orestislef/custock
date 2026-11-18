@@ -1,29 +1,73 @@
 {
   "email": {
-    "footer": "You get this because you follow {{scope}} on Custock. Stop these emails: {{unsubscribeUrl}}",
+    "layout": {
+      "markAlt": "Custock",
+      "tagline": "Custock. Stock and customers in one place.",
+      "sentWith": "Sent with Custock",
+      "linkFallback": "If the button does not work, copy this link into your browser:",
+      "followReason": "You get this because you follow {{scope}}.",
+      "unsubscribe": "Stop these emails",
+      "accountReason": "You get this email because of your Custock account.",
+      "lowest30": "Lowest price in the last 30 days: {{price}}",
+      "offerUntil": "Offer until {{date}}",
+      "inThisPost": "In this post"
+    },
     "otp": {
       "subject": "Your Custock code: {{code}}",
-      "body": "Your sign in code is {{code}}. It works for 10 minutes. If you did not ask for it, you can ignore this email."
+      "preheader": "It works for 10 minutes.",
+      "heading": "Your sign in code",
+      "lead": "Enter this code to sign in to Custock. It works for 10 minutes.",
+      "note": "If you did not ask for it, you can ignore this email. Nobody can sign in without the code."
     },
     "joinConfirm": {
       "subject": "Confirm you want news from {{scope}}",
-      "body": "Hi {{name}}, tap the link to confirm you want news and offers from {{scope}}: {{url}}. If it was not you, ignore this email and nothing will be sent."
+      "preheader": "One tap and you will hear about new arrivals and offers.",
+      "heading": "Confirm your email",
+      "lead": "Hi {{name}}, tap the button to get news and offers from {{scope}}.",
+      "button": "Yes, keep me posted",
+      "note": "If it was not you, ignore this email and nothing will be sent."
     },
     "invite": {
       "subject": "{{inviter}} invited you to {{org}} on Custock",
-      "body": "{{inviter}} invited you to join {{org}} as {{role}} at {{scope}}. Accept the invite: {{url}}. The link works for 7 days."
+      "preheader": "Join as {{role}} at {{scope}}.",
+      "heading": "Join {{org}}",
+      "lead": "{{inviter}} invited you to join {{org}} as {{role}} at {{scope}}. Accept to set your password and start.",
+      "button": "Accept the invite",
+      "note": "The link works for 7 days. If you did not expect it, you can ignore this email."
     },
-    "backInStock": {
-      "subject": "{{product}} is back at {{shop}}",
-      "body": "Good news, {{product}} is back in stock at {{shop}}. You asked us to tell you."
+    "ownerInvite": {
+      "subject": "Your Custock is ready",
+      "preheader": "Set your password and open {{org}}.",
+      "heading": "{{org}} is ready",
+      "lead": "Your business is set up on Custock. Set your name and password to sign in as the owner, then invite your team.",
+      "button": "Set your password",
+      "note": "The link works for 14 days and only once. If you did not expect it, you can ignore this email."
     },
     "changeCode": {
       "subject": "Your code to change your email: {{code}}",
-      "body": "Enter {{code}} in the app to confirm this is your new email. It works for 15 minutes."
+      "preheader": "It works for 15 minutes.",
+      "heading": "Confirm your new email",
+      "lead": "Enter this code in Custock to confirm this is your new email. It works for 15 minutes.",
+      "note": "If you did not ask for it, ignore this email. Your email stays as it is."
     },
     "emailChanged": {
       "subject": "Your Custock email was changed",
-      "body": "The email on your account is now {{email}}. If this was not you, write to us right away."
+      "preheader": "Your account now uses {{email}}.",
+      "heading": "Your email was changed",
+      "lead": "The email on your Custock account is now {{email}}. From now on we write to that address.",
+      "note": "If this was not you, reply to this email right away and we will lock the account."
+    },
+    "post": {
+      "buttonNews": "Read more",
+      "buttonOffer": "See the offer"
+    },
+    "backInStock": {
+      "subject": "{{product}} is back at {{shop}}",
+      "preheader": "You asked us to tell you.",
+      "heading": "{{product}} is back",
+      "lead": "Good news, {{product}} is back in stock at {{shop}}.",
+      "button": "See the product",
+      "note": "You get this once, because you asked to hear when it is back."
     }
   },
   "push": {
