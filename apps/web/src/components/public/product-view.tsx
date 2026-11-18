@@ -5,6 +5,7 @@ import type { TFunction } from '@custock/i18n';
 import { money, date } from '@/lib/format';
 import { Group, Row, StockBadge } from '@/components/ui/kit';
 import { Photo } from '@/components/ui/client-kit';
+import { CategoryPlaceholder } from '@/components/ui/category-picture';
 import { IconBell, IconShop } from '@/components/ui/icons';
 
 // the product as a customer sees it: what the merchant allows, and nothing else
@@ -15,7 +16,7 @@ export function ProductView({ p, t, locale, joinHref, notifyHref, actions }: { p
   return (
     <article>
       <div className="card mb-5" style={{ aspectRatio: '4 / 3' }}>
-        <Photo src={p.images[0]?.url} alt={p.name} className="w-full h-full" rounded={0} />
+        <Photo src={p.images[0]?.url} alt={p.name} className="w-full h-full" rounded={0} fallback={p.categoryIconKey ? <CategoryPlaceholder iconKey={p.categoryIconKey} className="w-full h-full" /> : undefined} />
       </div>
       {p.categoryName ? <p className="t-sub t-2 m-0">{p.categoryName}</p> : null}
       <h1 className="t-title1 t-display m-0 mt-1">{p.name}</h1>

@@ -69,6 +69,8 @@ export function storefrontProducts(
         description: p.description,
         images: p.images,
         categoryName: p.categoryName,
+        categoryId: p.categoryId,
+        categoryIconKey: p.categoryIconKey ?? null,
         priceMinor: prices ? v.priceMinor : null,
         currency: org.currency,
         offer: offerRow

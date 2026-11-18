@@ -14,6 +14,7 @@ export * from './platform';
 export * from './errors';
 export * from './server-info';
 export * from './icons';
+export * from './category-icons';
 export * from './barcode-draw';
 export * from './policies';
 export * from './validate';

@@ -73,14 +73,15 @@ const shops: Shop[] = [
 const groups: ShopGroup[] = [{ id: 'grp-north', name: 'North Athens', shopIds: ['shop-kifisia', 'shop-marousi'] }];
 
 const categories: Category[] = [
-  { id: 'cat-pantry', parentId: null, name: 'Κελάρι' },
-  { id: 'cat-oil', parentId: 'cat-pantry', name: 'Λάδι και ξίδι' },
-  { id: 'cat-sweet', parentId: 'cat-pantry', name: 'Γλυκά και μέλι' },
-  { id: 'cat-drinks', parentId: 'cat-pantry', name: 'Καφές και τσάι' },
-  { id: 'cat-deli', parentId: null, name: 'Αλλαντικά και τυριά' },
-  { id: 'cat-home', parentId: null, name: 'Σπίτι' },
+  { id: 'cat-pantry', parentId: null, name: 'Κελάρι', iconKey: 'jar' },
+  { id: 'cat-oil', parentId: 'cat-pantry', name: 'Λάδι και ξίδι', iconKey: 'bottle' },
+  { id: 'cat-sweet', parentId: 'cat-pantry', name: 'Γλυκά και μέλι', iconKey: 'sweets' },
+  { id: 'cat-drinks', parentId: 'cat-pantry', name: 'Καφές και τσάι', iconKey: 'coffee' },
+  { id: 'cat-deli', parentId: null, name: 'Αλλαντικά και τυριά', iconKey: 'cheese' },
+  { id: 'cat-home', parentId: null, name: 'Σπίτι', iconKey: 'box' },
 ];
 const catName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? null;
+const catIcon = (id: string | null) => categories.find((c) => c.id === id)?.iconKey ?? null;
 
 // ---------------------------------------------------------------- roles and people
 
@@ -200,7 +201,7 @@ const products: ProductRow[] = seeds.map((s, i) => {
     };
   });
   return {
-    id: `p-${s.id}`, orgId: ORG, categoryId: s.cat, categoryName: catName(s.cat), name: s.name,
+    id: `p-${s.id}`, orgId: ORG, categoryId: s.cat, categoryName: catName(s.cat), categoryIconKey: catIcon(s.cat), name: s.name,
     description: s.desc ?? null, brand: s.brand ?? null, uom: s.uom ?? 'piece', taxRateBp: 1300,
     trackStock: true, customerVisible: true, customerStockHidden: false,
     images: [{ id: `img-${s.id}`, url: s.img, width: 500, height: 375 }],
@@ -553,7 +554,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async categories() { return categories.map((c) => ({ ...c, names: { el: c.name } })); },
     async createCategory(_org, input) {
       if (categories.some((c) => c.name.toLowerCase() === input.name.toLowerCase())) throw new FixtureError(409, 'conflict');
-      const c: Category = { id: `cat-${Date.now().toString(36)}`, parentId: null, name: input.name };
+      const c: Category = { id: `cat-${Date.now().toString(36)}`, parentId: null, name: input.name, iconKey: input.imageFileId ? null : input.iconKey ?? null, imageUrl: null };
       categories.push(c);
       return { ...c, names: { el: c.name } };
     },
@@ -561,6 +562,8 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       const c = categories.find((x) => x.id === id);
       if (!c) throw new FixtureError(404, 'not_found');
       if (p.name) c.name = p.name;
+      // sample data keeps icons only, a photo picked here is not kept
+      if (p.imageFileId !== undefined || p.iconKey !== undefined) { c.iconKey = p.imageFileId ? null : p.iconKey ?? null; c.imageUrl = null; }
       return { ...c, names: { el: c.name } };
     },
     async deleteCategory(_org, id) {

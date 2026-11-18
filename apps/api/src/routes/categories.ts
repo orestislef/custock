@@ -1,27 +1,43 @@
 // categories of a business: create, rename and delete. names in the business language live in
 // categories.name, the other languages in category_translations. a deleted category is archived
-// and its products are left without one, nothing else changes.
+// and its products are left without one, nothing else changes. a category may have one picture:
+// a built in icon (icon_key) or its own photo (image_file_id), never both.
 
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';
-import { uuidv7, type Category, normalize } from '@custock/core';
+import { CATEGORY_ICON_KEYS, uuidv7, type Category, type CategoryIconKey, normalize } from '@custock/core';
 import type { AppEnv } from '../types';
 import { audit } from '../lib/audit';
-import { categoryNameSql, need, nowOf, orgOf, readerLocale } from '../lib/context';
+import { categoryNameSql, cfgOf, need, nowOf, orgOf, readerLocale } from '../lib/context';
+import { confirmFiles } from '../lib/files';
+import { fileUrl } from '../services/catalog';
+import { retireFile } from './uploads';
 import { ApiProblem, notFound } from '../lib/problem';
 import type { Tenant } from '../lib/tenant';
 
 const Name = z.string().trim().min(1).max(80);
 const Translations = z.object({ en: Name.nullable().optional(), el: Name.nullable().optional(), ru: Name.nullable().optional() }).partial();
 
-const CategoryInput = z.object({ name: Name, translations: Translations.optional() });
-const CategoryPatch = z.object({ name: Name.optional(), translations: Translations.optional() });
+const Icon = z.enum(CATEGORY_ICON_KEYS as [CategoryIconKey, ...CategoryIconKey[]]);
+const Picture = { iconKey: Icon.nullable().optional(), imageFileId: z.string().max(64).nullable().optional() };
+const CategoryInput = z.object({ name: Name, translations: Translations.optional(), ...Picture });
+const CategoryPatch = z.object({ name: Name.optional(), translations: Translations.optional(), ...Picture });
 
-type Row = { id: string; parent_id: string | null; name: string };
+type Row = { id: string; parent_id: string | null; name: string; icon_key: string | null; image_file_id: string | null; image_key: string | null };
+
+// the picture columns of a category, for every list that shows one
+export const CATEGORY_PICTURE_SQL = (alias: string) =>
+  `${alias}.icon_key AS icon_key, ${alias}.image_file_id AS image_file_id,
+   (SELECT f.storage_key FROM files f WHERE f.id = ${alias}.image_file_id AND f.deleted_at IS NULL) AS image_key`;
+
+export function pictureOf(r: { icon_key: string | null; image_key: string | null }): { iconKey: string | null; imageUrl: string | null } {
+  const imageUrl = fileUrl(r.image_key);
+  return { iconKey: imageUrl ? null : r.icon_key, imageUrl };
+}
 
 function view(c: Context<AppEnv>, t: Tenant, id: string): Category & { names: Record<string, string> } {
   const row = t.get<Row>(
-    `SELECT c.id, c.parent_id, ${categoryNameSql('c')} AS name FROM categories c WHERE c.org_id = @org AND c.id = @id AND c.archived_at IS NULL`,
+    `SELECT c.id, c.parent_id, ${categoryNameSql('c')} AS name, ${CATEGORY_PICTURE_SQL('c')} FROM categories c WHERE c.org_id = @org AND c.id = @id AND c.archived_at IS NULL`,
     { id, loc: readerLocale(c, orgOf(c).org.default_locale) },
   );
   if (!row) throw notFound('category');
@@ -31,7 +47,7 @@ function view(c: Context<AppEnv>, t: Tenant, id: string): Category & { names: Re
     'SELECT tr.locale, tr.name FROM category_translations tr JOIN categories c ON c.id = tr.category_id WHERE c.org_id = @org AND tr.category_id = @id',
     { id },
   )) names[tr.locale] = tr.name;
-  return { id: row.id, parentId: row.parent_id, name: row.name, names };
+  return { id: row.id, parentId: row.parent_id, name: row.name, names, ...pictureOf(row) };
 }
 
 // the same name twice in one business is confusing in every picker. compared after the shared
@@ -67,6 +83,21 @@ function writeTranslations(t: Tenant, id: string, defaultLocale: string, transla
   }
 }
 
+// the picture of a category: an icon or a photo of this business (purpose category, not deleted).
+// a new photo replaces the icon and the old photo, which leaves the bucket; null on both removes it.
+// returns the photo that is no longer used, for the caller to retire after the write.
+function writePicture(t: Tenant, id: string, input: { iconKey?: CategoryIconKey | null; imageFileId?: string | null }, current: { image_file_id: string | null }): string | null {
+  if (input.iconKey === undefined && input.imageFileId === undefined) return null;
+  if (input.imageFileId) {
+    const own = t.get("SELECT 1 FROM files WHERE org_id = @org AND id = @f AND purpose = 'category' AND deleted_at IS NULL", { f: input.imageFileId });
+    if (!own) throw new ApiProblem(404, 'not_found', 'photo not found', { imageFileId: 'not_found' });
+  }
+  const image = input.imageFileId !== undefined ? input.imageFileId : input.iconKey ? null : current.image_file_id;
+  const icon = image ? null : input.iconKey !== undefined ? input.iconKey : null;
+  t.run('UPDATE categories SET icon_key = @icon, image_file_id = @image WHERE org_id = @org AND id = @id', { icon, image, id });
+  return current.image_file_id && current.image_file_id !== image ? current.image_file_id : null;
+}
+
 export function categoryRoutes(app: Hono<AppEnv>) {
   app.post('/v1/orgs/:org/categories', async (c) => {
     need(c, 'categories.manage');
@@ -78,8 +109,10 @@ export function categoryRoutes(app: Hono<AppEnv>) {
     const sort = (t.get<{ n: number }>('SELECT coalesce(max(sort), 0) + 1 AS n FROM categories WHERE org_id = @org')?.n ?? 1);
     t.run('INSERT INTO categories (id, org_id, parent_id, name, sort) VALUES (@id, @org, NULL, @n, @s)', { id, n: input.name, s: sort });
     writeTranslations(t, id, org.default_locale, input.translations);
+    writePicture(t, id, input, { image_file_id: null });
+    if (input.imageFileId) confirmFiles(cfgOf(c).db, [input.imageFileId], now);
     const after = view(c, t, id);
-    audit(t, { id: c.get('user').id }, 'category.created', { type: 'category', id }, null, { name: after.names }, now);
+    audit(t, { id: c.get('user').id }, 'category.created', { type: 'category', id }, null, { name: after.names, iconKey: after.iconKey ?? null, photo: !!after.imageUrl }, now);
     return c.json(after, 201);
   });
 
@@ -93,8 +126,15 @@ export function categoryRoutes(app: Hono<AppEnv>) {
       t.run('UPDATE categories SET name = @n WHERE org_id = @org AND id = @id', { n: patch.name, id: before.id });
     }
     writeTranslations(t, before.id, org.default_locale, patch.translations);
+    const now = nowOf(c);
+    const current = t.get<{ image_file_id: string | null }>('SELECT image_file_id FROM categories WHERE org_id = @org AND id = @id', { id: before.id })!;
+    const unused = writePicture(t, before.id, patch, current);
+    if (patch.imageFileId) confirmFiles(cfgOf(c).db, [patch.imageFileId], now);
+    if (unused) retireFile(cfgOf(c), unused, now);
     const after = view(c, t, before.id);
-    audit(t, { id: c.get('user').id }, 'category.updated', { type: 'category', id: before.id }, { name: before.names }, { name: after.names }, nowOf(c));
+    audit(t, { id: c.get('user').id }, 'category.updated', { type: 'category', id: before.id },
+      { name: before.names, iconKey: before.iconKey ?? null, photo: !!before.imageUrl },
+      { name: after.names, iconKey: after.iconKey ?? null, photo: !!after.imageUrl }, now);
     return c.json(after);
   });
 
@@ -106,7 +146,9 @@ export function categoryRoutes(app: Hono<AppEnv>) {
     const moved = t.run('UPDATE products SET category_id = NULL, updated_at = @now WHERE org_id = @org AND category_id = @id', { id: before.id, now }).changes;
     t.run('UPDATE categories SET parent_id = NULL WHERE org_id = @org AND parent_id = @id', { id: before.id });
     t.run('DELETE FROM customer_interests WHERE org_id = @org AND category_id = @id', { id: before.id });
-    t.run('UPDATE categories SET archived_at = @now WHERE org_id = @org AND id = @id', { id: before.id, now });
+    const photo = t.get<{ image_file_id: string | null }>('SELECT image_file_id FROM categories WHERE org_id = @org AND id = @id', { id: before.id })?.image_file_id ?? null;
+    t.run('UPDATE categories SET archived_at = @now, image_file_id = NULL, icon_key = NULL WHERE org_id = @org AND id = @id', { id: before.id, now });
+    if (photo) retireFile(cfgOf(c), photo, now);
     audit(t, { id: c.get('user').id }, 'category.deleted', { type: 'category', id: before.id }, { name: before.names, products: moved }, null, now);
     return c.body(null, 204);
   });

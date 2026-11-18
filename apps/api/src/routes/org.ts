@@ -9,6 +9,7 @@ import { ApiProblem } from '../lib/problem';
 import { platform, Tenant } from '../lib/tenant';
 import { isSuperadmin, platformSettings, storageUse } from '../lib/platform-access';
 import { avatarUrlOf, fileUrl } from '../services/catalog';
+import { CATEGORY_PICTURE_SQL, pictureOf } from './categories';
 
 export function orgSettings(db: Db, org: OrgRow): OrgSettings {
   const logo = org.logo_file_id ? platform(db).get<{ storage_key: string }>('SELECT storage_key FROM files WHERE id = @id', { id: org.logo_file_id }) : undefined;
@@ -138,8 +139,8 @@ export function orgRoutes(app: Hono<AppEnv>) {
 
   app.get('/v1/orgs/:org/categories', (c) => {
     const { t, org, access } = orgOf(c);
-    const rows = t.all<{ id: string; parent_id: string | null; name: string; base: string }>(
-      `SELECT c.id, c.parent_id, ${categoryNameSql('c')} AS name, c.name AS base FROM categories c WHERE c.org_id = @org AND c.archived_at IS NULL ORDER BY c.sort, c.name`,
+    const rows = t.all<{ id: string; parent_id: string | null; name: string; base: string; icon_key: string | null; image_key: string | null }>(
+      `SELECT c.id, c.parent_id, ${categoryNameSql('c')} AS name, c.name AS base, ${CATEGORY_PICTURE_SQL('c')} FROM categories c WHERE c.org_id = @org AND c.archived_at IS NULL ORDER BY c.sort, c.name`,
       { loc: readerLocale(c, org.default_locale) },
     );
     // people who manage categories also get every language, for renaming
@@ -155,6 +156,7 @@ export function orgRoutes(app: Hono<AppEnv>) {
         id: r.id,
         parentId: r.parent_id,
         name: r.name,
+        ...pictureOf(r),
         ...(manage ? { names: { [org.default_locale]: r.base, ...Object.fromEntries(tr.filter((x) => x.category_id === r.id).map((x) => [x.locale, x.name])) } } : {}),
       })),
     );

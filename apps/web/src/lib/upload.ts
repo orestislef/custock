@@ -106,3 +106,14 @@ export async function uploadLogo(api: CustockApi, orgId: string, file: File): Pr
   await put(slot, blob, 'logo');
   return { fileId: slot.fileId, url: slot.publicUrl };
 }
+
+// a category photo: a 512 px square that fills the frame, like a profile photo. returns the file id
+// for createCategory / updateCategory({ imageFileId })
+export async function uploadCategoryPhoto(api: CustockApi, orgId: string, file: File): Promise<{ fileId: string; url: string }> {
+  const blob = await square(file, 'cover');
+  if (apiMode === 'fixtures') return { fileId: 'local-category', url: URL.createObjectURL(blob) };
+  const mime = blob.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+  const slot = await api.presignUpload(orgId, { purpose: 'category', mime, bytes: blob.size });
+  await put(slot, blob, 'category');
+  return { fileId: slot.fileId, url: slot.publicUrl };
+}

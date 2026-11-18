@@ -9,9 +9,10 @@ import { Page } from '@/components/admin/shell';
 import { StockTabs } from '@/components/admin/stock-tabs';
 import { ProductPicker } from '@/components/admin/product-picker';
 import { Chips, Empty, Group, Row, StockBadge, stockState, IconTile, type StockState } from '@/components/ui/kit';
-import { Photo, Tip, isMac, useShortcuts, useToast } from '@/components/ui/client-kit';
+import { Photo, Picker, Tip, isMac, useShortcuts, useToast } from '@/components/ui/client-kit';
+import { CategoryPicture } from '@/components/ui/category-picture';
 import { Tally } from '@/components/ui/tally';
-import { IconBarcode, IconBell, IconPlus, IconSearch, IconChevronDown } from '@/components/ui/icons';
+import { IconBarcode, IconBell, IconPlus, IconSearch, IconChevronDown, IconTag } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { useMedia } from '@/lib/use-media';
 import { productName } from '@/lib/names';
@@ -35,6 +36,8 @@ function StockList() {
   const [q, setQ] = useState('');
   const [debounced, setDebounced] = useState('');
   const [filter, setFilter] = useState<Filter>((params.get('filter') as Filter) ?? 'all');
+  const [category, setCategory] = useState(params.get('category') ?? '');
+  const cats = useAsync(() => api.categories(org.orgId), []);
   const [resolving, setResolving] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: 'name' | 'total' | string; dir: 1 | -1 }>({ key: 'name', dir: 1 });
 
@@ -46,8 +49,8 @@ function StockList() {
   });
 
   const list = useAsync(
-    () => api.products(org.orgId, { q: debounced || undefined, shopId, filter: filter === 'all' || filter === 'unknown' ? undefined : filter, limit: 200 }),
-    [debounced, shopId, filter],
+    () => api.products(org.orgId, { q: debounced || undefined, shopId, filter: filter === 'all' || filter === 'unknown' ? undefined : filter, categoryId: category || undefined, limit: 200 }),
+    [debounced, shopId, filter, category],
   );
   const unknown = useAsync(() => (can('products.create', null) || can('products.edit', null) ? api.unknownScans(org.orgId, shopId) : Promise.resolve([])), [shopId]);
 
@@ -106,6 +109,13 @@ function StockList() {
             { value: 'waiting', label: t('stock.f.waiting') },
             ...(filter === 'unknown' ? [{ value: 'unknown' as Filter, label: t('stock.f.unknown') }] : []),
           ]} />
+        {cats.data?.length ? (
+          <div className="flex">
+            <Picker variant="filled" label={t('stock.categoryFilter')} value={category} onChange={setCategory}
+              icon={(() => { const c = cats.data!.find((x) => x.id === category); return c ? <CategoryPicture iconKey={c.iconKey} imageUrl={c.imageUrl} size={20} rounded={5} /> : <IconTag size={16} />; })()}
+              options={[{ value: '', label: t('stock.allCategories') }, ...cats.data.map((c) => ({ value: c.id, label: c.name }))]} />
+          </div>
+        ) : null}
       </div>
 
       {filter === 'unknown' ? (
@@ -135,7 +145,7 @@ function StockList() {
                 <tr key={p.id} onClick={() => router.push(`/admin/stock/${p.id}`)}>
                   <td>
                     <Link href={`/admin/stock/${p.id}`} className="flex items-center gap-3 hover:no-underline" style={{ color: 'var(--c-ink)' }} onClick={(e) => e.stopPropagation()}>
-                      <Photo src={p.images[0]?.url} alt={productName(p, locale)} size={36} rounded={7} />
+                      <Photo src={p.images[0]?.url} alt={productName(p, locale)} size={36} rounded={7} fallback={p.categoryIconKey ? <CategoryPicture iconKey={p.categoryIconKey} size={36} rounded={7} /> : undefined} />
                       <span>{productName(p, locale)}</span>
                     </Link>
                   </td>
@@ -164,7 +174,7 @@ function StockList() {
               return (
                 <li key={p.id}>
                   <Link href={`/admin/stock/${p.id}`} className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties}>
-                    <Photo src={p.images[0]?.url} alt={productName(p, locale)} size={44} />
+                    <Photo src={p.images[0]?.url} alt={productName(p, locale)} size={44} fallback={p.categoryIconKey ? <CategoryPicture iconKey={p.categoryIconKey} size={44} /> : undefined} />
                     <span className="row-main">
                       <span className="row-title block">{productName(p, locale)}</span>
                       <span className="row-sub flex items-center gap-2 flex-wrap mt-0.5">

@@ -32,9 +32,10 @@ const PERM: Record<Exclude<UploadPurpose, 'avatar'>, string> = {
   post: 'posts.create',
   logo: 'org.settings.manage',
   shop: 'shop.settings.manage',
+  category: 'categories.manage',
 };
 
-// a profile photo and a logo are small squares made in the browser (512 px), so they get a smaller
+// a profile photo, a category photo and a logo are small squares made in the browser (512 px), so they get a smaller
 // cap than product and post photos. a logo keeps its transparency, so png is allowed too.
 const LIMIT: Record<UploadPurpose, { bytes: number; mimes: string[] }> = {
   product: { bytes: MAX_UPLOAD_BYTES, mimes: ['image/jpeg', 'image/png', 'image/webp'] },
@@ -42,6 +43,8 @@ const LIMIT: Record<UploadPurpose, { bytes: number; mimes: string[] }> = {
   shop: { bytes: MAX_UPLOAD_BYTES, mimes: ['image/jpeg', 'image/png', 'image/webp'] },
   logo: { bytes: 1_000_000, mimes: ['image/png', 'image/webp'] },
   avatar: { bytes: 1_000_000, mimes: ['image/webp', 'image/jpeg', 'image/png'] },
+  // a category photo is a 512 px square made in the browser, like a profile photo
+  category: { bytes: 1_000_000, mimes: ['image/webp', 'image/jpeg', 'image/png'] },
 };
 
 // product, post and shop photos follow the platform policy, logos and profile photos stay small

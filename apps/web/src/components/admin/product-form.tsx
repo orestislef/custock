@@ -19,6 +19,7 @@ import { apiMode } from '@/lib/api-client';
 import { intlLocale, money } from '@/lib/format';
 import { categoryName, forgetCatalog } from '@/lib/use-names';
 import { CategorySheet } from './category-sheet';
+import { CategoryPicture } from '@/components/ui/category-picture';
 import { useBarcodeOwner } from '@/lib/use-barcode-owner';
 import { variantLabel } from '@/lib/names';
 import { uploadPhoto } from '@/lib/upload';
@@ -193,6 +194,7 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
             <li className="row row-sep">
               <span className="row-main row-title">{t('stock.form.category')}</span>
               <Picker variant="plain" label={t('stock.form.category')} value={cat}
+                icon={(() => { const c = (cats.data ?? []).find((x) => x.id === cat); return c ? <CategoryPicture iconKey={c.iconKey} imageUrl={c.imageUrl} size={24} rounded={6} /> : undefined; })()}
                 onChange={(v) => (v === NEW_CATEGORY ? setNewCat(true) : setCat(v))}
                 options={[
                   { value: '', label: t('productForm.noCategory') },

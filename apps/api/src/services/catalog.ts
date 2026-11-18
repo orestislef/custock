@@ -44,6 +44,7 @@ interface ProductRow {
   id: string;
   category_id: string | null;
   category_name: string | null;
+  category_icon: string | null;
   name: string;
   description: string | null;
   brand: string | null;
@@ -83,7 +84,7 @@ export function loadProducts(t: Tenant, ids: string[], opts: LoadOpts): ProductW
   if (!ids.length) return [];
   const products = t.all<ProductRow>(
     `SELECT p.id, p.category_id,
-            coalesce((SELECT ctr.name FROM category_translations ctr WHERE ctr.category_id = c.id AND ctr.locale = @loc), c.name) AS category_name, p.name, p.description, p.brand, p.uom, p.tax_rate_bp,
+            coalesce((SELECT ctr.name FROM category_translations ctr WHERE ctr.category_id = c.id AND ctr.locale = @loc), c.name) AS category_name, c.icon_key AS category_icon, p.name, p.description, p.brand, p.uom, p.tax_rate_bp,
             p.track_stock, p.customer_visible, p.customer_stock_hidden, p.archived_at
        FROM products p LEFT JOIN categories c ON c.id = p.category_id AND c.org_id = p.org_id
       WHERE p.org_id = @org AND p.id IN (SELECT value FROM json_each(@ids))`,
@@ -137,6 +138,7 @@ export function loadProducts(t: Tenant, ids: string[], opts: LoadOpts): ProductW
         orgId: t.orgId,
         categoryId: p.category_id,
         categoryName: p.category_name,
+        categoryIconKey: p.category_icon,
         name: opts.localizeName ? localized?.name ?? p.name : p.name,
         displayName: localized?.name ?? p.name,
         description: opts.localizeName ? localized?.description ?? p.description : p.description,

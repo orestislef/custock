@@ -8,6 +8,7 @@ import { z } from 'zod';
 // Function('') once to see if it may compile schemas, which the policy refuses (and reports), so the
 // browser parses without compiling. the server keeps the faster compiled parsers.
 if (typeof (globalThis as { window?: unknown }).window !== 'undefined') z.config({ jitless: true });
+import { CATEGORY_ICON_KEYS, type CategoryIconKey } from './category-icons';
 import {
   LIMITS, MAX_MONEY_MINOR, MAX_QTY_BASE, cleanLine, cleanText, emailProblem, httpsUrlProblem, isAllowedVat,
   normalizeEmail, normalizeOtp, parseBarcodeInput, parsePhone, passwordProblem,
@@ -264,6 +265,8 @@ export const Product = z.object({
   orgId: z.string(),
   categoryId: z.string().nullable(),
   categoryName: z.string().nullable(),
+  // the category's built in picture, used where the product has no photo
+  categoryIconKey: z.string().nullable().optional(),
   name: z.string(), // the org default language, the one to edit
   // the name in the reader's language (Accept-Language, else the user's language, else the org default)
   displayName: z.string().optional(),
@@ -282,8 +285,20 @@ export const Product = z.object({
 export type Product = z.infer<typeof Product>;
 
 // names: every language that has one, only for people who manage categories
-export const Category = z.object({ id: z.string(), parentId: z.string().nullable(), name: z.string(), names: z.record(z.string(), z.string()).optional() });
-export const CategoryInput = z.object({ name: zLine(LIMITS.categoryName), translations: z.partialRecord(z.enum(['en', 'el', 'ru']), zLine(LIMITS.categoryName, 0).nullable()).optional() });
+// a category's picture is one of two: a built in icon (iconKey) or its own photo (imageUrl)
+export const CategoryIcon = z.enum(CATEGORY_ICON_KEYS as [CategoryIconKey, ...CategoryIconKey[]]);
+export const Category = z.object({
+  id: z.string(), parentId: z.string().nullable(), name: z.string(), names: z.record(z.string(), z.string()).optional(),
+  iconKey: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
+});
+// iconKey and imageFileId replace each other: setting one clears the other, null on both removes the picture
+export const CategoryInput = z.object({
+  name: zLine(LIMITS.categoryName),
+  translations: z.partialRecord(z.enum(['en', 'el', 'ru']), zLine(LIMITS.categoryName, 0).nullable()).optional(),
+  iconKey: CategoryIcon.nullable().optional(),
+  imageFileId: z.string().max(64).nullable().optional(),
+});
 export type CategoryInput = z.infer<typeof CategoryInput>;
 export type Category = z.infer<typeof Category>;
 
@@ -569,6 +584,8 @@ export const PublicProduct = z.object({
   description: z.string().nullable(),
   images: z.array(ProductImage),
   categoryName: z.string().nullable(),
+  categoryId: z.string().nullable().optional(),
+  categoryIconKey: z.string().nullable().optional(),
   priceMinor: z.number().nullable(), // null when prices are hidden
   currency: z.string(),
   offer: z.object({ postId: z.string(), priceMinor: z.number(), wasMinor: z.number().nullable(), validUntil: z.number().nullable() }).nullable(),
@@ -812,7 +829,7 @@ export type UnsubscribePage = z.infer<typeof UnsubscribePage>;
 // ---------------------------------------------------------------- uploads
 
 // avatar is the person's own photo (POST /v1/me/uploads/presign), the rest belong to a business
-export const UploadPurpose = z.enum(['product', 'post', 'logo', 'shop', 'avatar']);
+export const UploadPurpose = z.enum(['product', 'post', 'logo', 'shop', 'avatar', 'category']);
 export type UploadPurpose = z.infer<typeof UploadPurpose>;
 
 export const PresignInput = z.object({

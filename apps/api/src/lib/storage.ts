@@ -23,7 +23,7 @@ export interface S3Config {
 
 export type StorageSetting = { kind: 'local' } | { kind: 's3'; s3: S3Config } | { kind: 'off' };
 
-const FOLDER: Record<UploadPurpose, string> = { product: 'products', post: 'posts', logo: 'logo', shop: 'shops', avatar: 'avatar' };
+const FOLDER: Record<UploadPurpose, string> = { product: 'products', post: 'posts', logo: 'logo', shop: 'shops', avatar: 'avatar', category: 'categories' };
 
 // orgs/<org>/products/<uuid>.webp, as in thinking/13. a profile photo belongs to the person, not
 // to a business: users/<user>/avatar/<uuid>.webp, with the user id where the org id would be
@@ -32,7 +32,7 @@ export function objectKey(ownerId: string, purpose: UploadPurpose, fileId: strin
   return `orgs/${ownerId}/${FOLDER[purpose]}/${fileId}.${ext}`;
 }
 
-export const OBJECT_KEY = /^(orgs\/[0-9a-f-]{36}\/(products|posts|logo|logos|shops)|users\/[0-9a-f-]{36}\/avatar)\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+export const OBJECT_KEY = /^(orgs\/[0-9a-f-]{36}\/(products|posts|logo|logos|shops|categories)|users\/[0-9a-f-]{36}\/avatar)\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
 
 // ---------------------------------------------------------------- SigV4 query signing
 

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { PublicProduct } from '@custock/core';
 import type { TFunction } from '@custock/i18n';
 import { Photo } from '@/components/ui/client-kit';
+import { CategoryPlaceholder } from '@/components/ui/category-picture';
 import { PriceLine } from './product-view';
 
 export function CatalogGrid({ items, t, locale, hrefFor }: { items: PublicProduct[]; t: TFunction; locale: string; hrefFor: (p: PublicProduct) => string }) {
@@ -14,7 +15,7 @@ export function CatalogGrid({ items, t, locale, hrefFor }: { items: PublicProduc
           <li key={p.id}>
             <Link href={hrefFor(p)} className="card block h-full hover:no-underline" style={{ color: 'var(--c-ink)' }}>
               <div style={{ aspectRatio: '1 / 1' }}>
-                <Photo src={p.images[0]?.url} alt={p.name} className="w-full h-full" rounded={0} />
+                <Photo src={p.images[0]?.url} alt={p.name} className="w-full h-full" rounded={0} fallback={p.categoryIconKey ? <CategoryPlaceholder iconKey={p.categoryIconKey} className="w-full h-full" /> : undefined} />
               </div>
               <div className="p-3">
                 <p className="t-sub m-0 line-clamp-2" style={{ minHeight: 40 }}>{p.name}</p>

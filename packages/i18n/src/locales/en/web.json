@@ -116,7 +116,9 @@
     "followersTitle": "{{org}} shows its products to followers",
     "followersBody": "Join to browse them. It takes a few seconds and you choose what you hear about.",
     "joinToBrowse": "Join {{org}}",
-    "followersBodyNoLink": "Ask {{org}} for its QR code to join. It takes a few seconds and you choose what you hear about."
+    "followersBodyNoLink": "Ask {{org}} for its QR code to join. It takes a few seconds and you choose what you hear about.",
+    "categories": "Categories",
+    "allCategories": "All"
   },
   "offers": {
     "title": "Offers",
@@ -260,7 +262,9 @@
       "category": "Category",
       "total": "Total",
       "state": "State"
-    }
+    },
+    "categoryFilter": "Category",
+    "allCategories": "All categories"
   },
   "stockSheet": {
     "receiveTitle": "Receive stock",
@@ -1174,7 +1178,7 @@
     "name": "Your name",
     "namePlaceholder": "First and last name",
     "password": "Password",
-    "passwordHint": "At least 10 characters. A few words are easier to remember.",
+    "passwordHint": "At least 10 characters, no spaces. Longer is stronger, a number or symbol helps.",
     "passwordShort": "Use at least 10 characters.",
     "join": "Join {{org}}",
     "signInLead": "You already have an account with this email. Sign in to accept.",
@@ -1717,7 +1721,34 @@
     "deleteBody": "Its products stay, they just have no category until you choose one.",
     "emptyTitle": "No categories yet",
     "emptyBody": "Group products like Oils, Honey or Gifts, so they are easy to find in the shop page and in Stock.",
-    "listFoot": "Tap a category to rename it."
+    "listFoot": "Tap a category to rename it.",
+    "picture": "Picture",
+    "pictureFoot": "An icon or a photo, shown on your shop page and in Stock.",
+    "chooseIcon": "Choose icon",
+    "hideIcons": "Hide icons",
+    "addPhoto": "Add photo",
+    "changePhoto": "Change photo",
+    "uploading": "Adding photo…",
+    "removePicture": "Remove",
+    "iconsLabel": "Icons",
+    "icon": {
+      "bottle": "Bottle",
+      "jar": "Jar",
+      "cheese": "Cheese",
+      "bread": "Bread",
+      "fruit": "Fruit",
+      "vegetable": "Vegetables",
+      "coffee": "Coffee",
+      "wine": "Wine",
+      "milk": "Milk",
+      "fish": "Fish",
+      "meat": "Meat",
+      "sweets": "Sweets",
+      "leaf": "Leaf",
+      "gift": "Gift",
+      "box": "Box",
+      "tag": "Tag"
+    }
   },
   "picker": {
     "choose": "Choose a date and time",

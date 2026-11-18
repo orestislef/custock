@@ -9,6 +9,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { policyNumber } from '../lib/policy';
 import { platform, Tenant } from '../lib/tenant';
 import { fileUrl } from '../services/catalog';
+import { CATEGORY_PICTURE_SQL, pictureOf } from './categories';
 import { storefrontProducts } from '../services/storefront';
 import { catalogIds, followingOf } from './customer';
 import { dayKey } from './reports';
@@ -71,11 +72,11 @@ export function publicRoutes(app: Hono<AppEnv>) {
       imageUrl: fileUrl(imageKey),
       disabled,
       interests: t
-        .all<{ id: string; parent_id: string | null; name: string }>(
-          `SELECT c.id, c.parent_id, ${categoryNameSql('c')} AS name FROM categories c WHERE c.org_id = @org AND c.parent_id IS NULL AND c.archived_at IS NULL ORDER BY c.sort`,
+        .all<{ id: string; parent_id: string | null; name: string; icon_key: string | null; image_key: string | null }>(
+          `SELECT c.id, c.parent_id, ${categoryNameSql('c')} AS name, ${CATEGORY_PICTURE_SQL('c')} FROM categories c WHERE c.org_id = @org AND c.parent_id IS NULL AND c.archived_at IS NULL ORDER BY c.sort`,
           { loc: readerLocale(c, org.default_locale) },
         )
-        .map((x) => ({ id: x.id, parentId: x.parent_id, name: x.name })),
+        .map((x) => ({ id: x.id, parentId: x.parent_id, name: x.name, ...pictureOf(x) })),
     };
     return c.json(body);
   });
@@ -129,6 +130,17 @@ export function publicRoutes(app: Hono<AppEnv>) {
       { now: nowOf(c) },
     );
     const logo = org.logo_file_id ? platform(db).get<{ storage_key: string }>('SELECT storage_key FROM files WHERE id = @id AND deleted_at IS NULL', { id: org.logo_file_id }) : undefined;
-    return c.json({ slug: org.slug, name: org.name, catalog: org.customer_catalog, joinCode: link?.code ?? null, logoUrl: fileUrl(logo?.storage_key), timezone: org.timezone });
+    const categories = org.customer_catalog === 'off'
+      ? []
+      : new Tenant(db, org.id)
+          .all<{ id: string; name: string; icon_key: string | null; image_key: string | null }>(
+            `SELECT c.id, ${categoryNameSql('c')} AS name, ${CATEGORY_PICTURE_SQL('c')} FROM categories c
+              WHERE c.org_id = @org AND c.archived_at IS NULL
+                AND EXISTS (SELECT 1 FROM products p WHERE p.org_id = c.org_id AND p.category_id = c.id AND p.archived_at IS NULL AND p.customer_visible = 1)
+              ORDER BY c.sort, c.name`,
+            { loc: readerLocale(c, org.default_locale) },
+          )
+          .map((x) => ({ id: x.id, name: x.name, ...pictureOf(x) }));
+    return c.json({ slug: org.slug, name: org.name, catalog: org.customer_catalog, joinCode: link?.code ?? null, logoUrl: fileUrl(logo?.storage_key), timezone: org.timezone, categories });
   });
 }

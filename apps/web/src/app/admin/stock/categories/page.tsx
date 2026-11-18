@@ -6,6 +6,7 @@ import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { StockTabs } from '@/components/admin/stock-tabs';
 import { CategorySheet } from '@/components/admin/category-sheet';
+import { CategoryPicture } from '@/components/ui/category-picture';
 import { RedirectHome } from '@/components/admin/redirect-home';
 import { Empty, Group } from '@/components/ui/kit';
 import { Sheet, useToast } from '@/components/ui/client-kit';
@@ -60,7 +61,12 @@ export default function CategoriesPage() {
       ) : (
         <Group footer={t('categories.listFoot')}>
           {cats.map((c) => (
-            <div key={c.id} className="row">
+            <div key={c.id} className="row has-icon">
+              {c.imageUrl || c.iconKey ? (
+                <CategoryPicture iconKey={c.iconKey} imageUrl={c.imageUrl} size={36} rounded={9} />
+              ) : (
+                <span className="icon-tile" aria-hidden="true"><IconTag size={18} /></span>
+              )}
               <button type="button" className="row-main text-left min-w-0" onClick={() => setEditing(c)}>
                 <span className="row-title block truncate">{c.name}</span>
                 {Object.keys(c.names ?? {}).length > 1 ? (

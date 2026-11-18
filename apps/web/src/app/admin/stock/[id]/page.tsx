@@ -9,6 +9,7 @@ import { ShopSettingsSheet } from '@/components/admin/shop-settings-sheet';
 import { useRouter } from 'next/navigation';
 import { Group, Row, StockBadge, signed, stockState } from '@/components/ui/kit';
 import { Photo, useToast } from '@/components/ui/client-kit';
+import { CategoryPlaceholder } from '@/components/ui/category-picture';
 import { Tally } from '@/components/ui/tally';
 import { IconBell, IconChevronLeft, IconPlus, IconEdit, IconTruck, IconGear, IconPrint } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
@@ -71,7 +72,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
       <div className="grid grid-cols-[minmax(0,1fr)] md:grid-cols-[minmax(0,360px)_minmax(0,1fr)] gap-6 mt-2">
         <div>
           <div className="card" style={{ aspectRatio: '4 / 3' }}>
-            <Photo src={p.images[0]?.url} alt={productName(p, locale)} className="w-full h-full" rounded={0} />
+            <Photo src={p.images[0]?.url} alt={productName(p, locale)} className="w-full h-full" rounded={0} fallback={p.categoryIconKey ? <CategoryPlaceholder iconKey={p.categoryIconKey} className="w-full h-full" /> : undefined} />
           </div>
         </div>
         <div className="min-w-0">

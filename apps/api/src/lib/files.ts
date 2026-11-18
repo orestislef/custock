@@ -1,6 +1,6 @@
 // upload slots and the files they become. presign writes a row for the bucket before any byte is
 // sent, so a row only counts toward storage once it is confirmed: the bytes arrived (local
-// storage) or the file was put on a product, post, logo or profile. a slot never used is purged
+// storage) or the file was put on a product, post, logo, category or profile. a slot never used is purged
 // after an hour, so asking for slots cannot fill the storage meter.
 
 import type { Db } from '@custock/db';
@@ -16,6 +16,7 @@ export const FILE_IN_USE = `(EXISTS (SELECT 1 FROM product_images i WHERE i.file
   OR EXISTS (SELECT 1 FROM post_media m WHERE m.file_id = f.id)
   OR EXISTS (SELECT 1 FROM shops s WHERE s.image_file_id = f.id)
   OR EXISTS (SELECT 1 FROM organizations o WHERE o.logo_file_id = f.id)
+  OR EXISTS (SELECT 1 FROM categories c WHERE c.image_file_id = f.id)
   OR EXISTS (SELECT 1 FROM users u WHERE u.avatar_file_id = f.id))`;
 
 export function confirmFiles(db: Db, ids: readonly (string | null | undefined)[], now: number) {

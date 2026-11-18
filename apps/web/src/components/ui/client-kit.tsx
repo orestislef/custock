@@ -297,9 +297,11 @@ export const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/
 
 // ---------------------------------------------------------------- product images with a fallback tile
 
-export function Photo({ src, alt, className, size, rounded = 9 }: { src: string | null | undefined; alt: string; className?: string; size?: number; rounded?: number }) {
+// fallback replaces the letter, for example with the product's category icon
+export function Photo({ src, alt, className, size, rounded = 9, fallback }: { src: string | null | undefined; alt: string; className?: string; size?: number; rounded?: number; fallback?: ReactNode }) {
   const [failed, setFailed] = useState(false);
   const letter = alt.trim()[0]?.toUpperCase() ?? '';
+  if ((!src || failed) && fallback) return <>{fallback}</>;
   if (!src || failed) {
     return (
       <span
