@@ -53,9 +53,25 @@ export function proxy(request: NextRequest) {
   const headers = new Headers(request.headers);
   headers.set('x-nonce', nonce);
   headers.set('Content-Security-Policy', csp);
-  const response = NextResponse.next({ request: { headers } });
+  // someone typing or following an address that the web hands to the api (/files, /email and
+  // their /api twins) gets the app's own not found page, not a json answer. photos and the email
+  // assets themselves (a name with an extension, or an image request) still go through.
+  const response = wantsPageForApiPath(request)
+    ? NextResponse.rewrite(new URL(`${request.nextUrl.basePath}/__not-found`, request.url), { request: { headers } })
+    : NextResponse.next({ request: { headers } });
   response.headers.set('Content-Security-Policy', csp);
   return response;
+}
+
+const API_PATHS = /^\/(?:api\/)?(?:files|email|v1)(?:\/|$)/;
+
+function wantsPageForApiPath(request: NextRequest): boolean {
+  const path = request.nextUrl.pathname.slice(request.nextUrl.basePath.length) || '/';
+  if (!API_PATHS.test(path)) return false;
+  const navigation = request.headers.get('sec-fetch-mode') === 'navigate' || (request.headers.get('accept') ?? '').startsWith('text/html');
+  if (!navigation) return false;
+  const last = path.split('/').filter(Boolean).pop() ?? '';
+  return !last.includes('.');
 }
 
 export const config = {
