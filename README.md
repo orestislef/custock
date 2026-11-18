@@ -27,7 +27,8 @@ English, Greek and Russian from the first screen.
 
 A clickable demo of how the finished app should behave, with made up data. Switch roles to see what
 each person can and cannot do, switch language, change what customers are allowed to see, scan,
-receive, post an offer and watch the push land on a customer's phone. Works on a phone too.
+receive, post an offer and watch the push land on a customer's phone. Works on a phone too, and
+can be added to the home screen.
 
 ## Status
 
@@ -39,8 +40,7 @@ a pnpm monorepo:
 
 ```
 apps/api        hono api on sqlite, dev logins, tests
-apps/web        next.js: customer pages (join, shelf product, catalog) and /admin
-apps/mobile     expo app: staff side with scanning, customer side with feed and offers
+apps/web        next.js: the app for staff and customers, installs to the home screen
 packages/core   api contract, permissions and delegation rules, search, barcodes, money
 packages/db     migrations, seed data, database helpers
 packages/i18n   english, greek and russian for every app and the server
@@ -54,7 +54,6 @@ pnpm install
 pnpm db:reset
 pnpm dev:api      # http://localhost:8787
 pnpm dev:web      # http://localhost:3000
-pnpm dev:mobile   # expo
 pnpm check        # typecheck, tests and missing translations
 ```
 
@@ -80,12 +79,14 @@ prices and stock.
 **Both together**: the most wanted out of stock products, which QR poster brings people in,
 what sells after an offer goes out. Reports and dashboards per role.
 
-## Planned stack
+## Stack
 
-TypeScript everywhere: Expo (React Native) for the phone app, Next.js for the customer pages and
-the admin dashboard, Node with Hono, Drizzle and SQLite on my own server, which already handles
-logins, FCM and mail. Cloudflare R2 for images. One monorepo with shared permissions,
-translations and design tokens. Why not Flutter is in [thinking/08](thinking/08-platform-choice.md).
+TypeScript everywhere. The website is also the phone app: staff and customers add it to the home
+screen, with camera scanning, offline stock work and web push. Next.js for the app, Node with Hono
+and SQLite for the api, Cloudflare R2 for photos. One monorepo with shared permissions,
+translations and design tokens. Why a web app and not a native one is in
+[thinking/08](thinking/08-platform-choice.md). An earlier Expo version lives on the `expo-app`
+branch.
 
 No CI/CD. Builds and deploys are done by hand.
 

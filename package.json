@@ -12,7 +12,6 @@
   "scripts": {
     "dev:api": "pnpm --filter @custock/api dev",
     "dev:web": "pnpm --filter @custock/web dev",
-    "dev:mobile": "pnpm --filter @custock/mobile start",
     "db:reset": "pnpm --filter @custock/db reset",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",

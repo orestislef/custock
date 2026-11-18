@@ -6,7 +6,6 @@
 //   common  shared words: roles, permissions, stock states, units, errors, kinds
 //   server  push, email and join page texts built on the server
 //   web     the next.js app
-//   mobile  the phone app
 
 import i18next, { type i18n as I18n, type TFunction } from 'i18next';
 
@@ -19,19 +18,16 @@ import ruServer from './locales/ru/server.json';
 import enWeb from './locales/en/web.json';
 import elWeb from './locales/el/web.json';
 import ruWeb from './locales/ru/web.json';
-import enMobile from './locales/en/mobile.json';
-import elMobile from './locales/el/mobile.json';
-import ruMobile from './locales/ru/mobile.json';
 
 export const LOCALES = ['en', 'el', 'ru'] as const;
 export type AppLocale = (typeof LOCALES)[number];
-export const NAMESPACES = ['common', 'server', 'web', 'mobile'] as const;
+export const NAMESPACES = ['common', 'server', 'web'] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 
 export const resources = {
-  en: { common: enCommon, server: enServer, web: enWeb, mobile: enMobile },
-  el: { common: elCommon, server: elServer, web: elWeb, mobile: elMobile },
-  ru: { common: ruCommon, server: ruServer, web: ruWeb, mobile: ruMobile },
+  en: { common: enCommon, server: enServer, web: enWeb },
+  el: { common: elCommon, server: elServer, web: elWeb },
+  ru: { common: ruCommon, server: ruServer, web: ruWeb },
 } as const;
 
 export const LOCALE_NAMES: Record<AppLocale, string> = { en: 'English', el: 'Ελληνικά', ru: 'Русский' };
