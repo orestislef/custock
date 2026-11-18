@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-18T16:30:00+02:00",
-  "overall": 95,
+  "updated": "2026-11-18T18:00:00+02:00",
+  "overall": 97,
   "areas": [
     {
       "key": "thinking",
@@ -32,15 +32,15 @@
     },
     {
       "name": "Backend (permissions engine, database, API)",
-      "percent": 97,
+      "percent": 98,
       "state": "building",
-      "note": "316 api tests. Security review fixed before launch, every limit configurable from the level above, error log, complete API docs, field rules shared with the web."
+      "note": "334 api tests. Reports skip undone sales, shop and offer prices on sales, the super admin views load in a few queries (overview 561 ms to 104 ms, business list 310 ms to 26 ms)."
     },
     {
       "name": "Web app for phone and desktop",
-      "percent": 96,
+      "percent": 97,
       "state": "building",
-      "note": "Installs to the home screen. Business in the address, back links to the parent, sheets above the iPhone keyboard, landscape safe areas, own date picker and menus, light, dark or automatic, category icons and photos, shelf labels."
+      "note": "Bug hunt fixes across stock, scanning, customers, settings and navigation. Every screen checked in Greek and Russian at 320 px and up, light and dark."
     },
     {
       "name": "Production server",
@@ -56,9 +56,9 @@
     },
     {
       "name": "Testing",
-      "percent": 85,
+      "percent": 92,
       "state": "building",
-      "note": "About 150 end to end tests on desktop and phone sizes, iPhone engine included, plus live checks in the browser and on an iPhone. Bug hunting continues."
+      "note": "195 end to end tests passing on desktop and phone sizes with the iPhone engine, plus a quality check for leftover English, cut text and contrast. A second round of bug hunting is running."
     }
   ],
   "log": [
@@ -157,6 +157,10 @@
     {
       "at": "2026-11-18T16:30:00+02:00",
       "text": "iPhone fixes from real device tests: sheets and the keyboard, landscape, focus rings. Navigation with the business in the address. Production cleaned for testers."
+    },
+    {
+      "at": "2026-11-18T18:00:00+02:00",
+      "text": "First bug hunt: 37 bugs fixed across stock, customers, super admin, languages and accessibility, security and speed. 195 end to end tests green."
     }
   ],
   "screens": [
