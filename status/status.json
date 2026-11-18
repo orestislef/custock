@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-18T19:30:00+02:00",
-  "overall": 90,
+  "updated": "2026-11-18T16:30:00+02:00",
+  "overall": 95,
   "areas": [
     {
       "key": "thinking",
@@ -32,33 +32,33 @@
     },
     {
       "name": "Backend (permissions engine, database, API)",
-      "percent": 95,
+      "percent": 97,
       "state": "building",
-      "note": "Web push, email in the app look, photos in a bucket, invites, forgot password, error log, complete API docs, 262 tests. Now: security fixes before launch."
+      "note": "316 api tests. Security review fixed before launch, every limit configurable from the level above, error log, complete API docs, field rules shared with the web."
     },
     {
       "name": "Web app for phone and desktop",
-      "percent": 93,
+      "percent": 96,
       "state": "building",
-      "note": "Home screen app, camera scanning, offline stock, push with photos and buttons, own date picker and menus, shelf labels, profile photos and logos, only what each person can do is shown. Now: checking every field and keyboard."
+      "note": "Installs to the home screen. Business in the address, back links to the parent, sheets above the iPhone keyboard, landscape safe areas, own date picker and menus, light, dark or automatic, category icons and photos, shelf labels."
     },
     {
       "name": "Production server",
-      "percent": 88,
+      "percent": 95,
       "state": "building",
-      "note": "Own subdomain with its own certificate, one container, real email and push, photos in Cloudflare R2. Next: final deploy and a full live test."
+      "note": "Live on its own subdomain with its own certificate, security headers, real email and push, photos in a bucket. Clean database with only the super admin, ready for testers."
     },
     {
       "name": "Super admin and settings",
-      "percent": 90,
+      "percent": 96,
       "state": "building",
-      "note": "All businesses in one place, owners invited by email, feature switches, pausing a business, emergency switches, free tier meter, errors, server info. Every limit configurable from the platform down to a single person, always only by the level above."
+      "note": "Every business in one place, feature switches, pausing, emergency switches, the free storage meter, errors, server info, every limit from the platform down to one person."
     },
     {
       "name": "Testing",
-      "percent": 60,
+      "percent": 85,
       "state": "building",
-      "note": "Full end to end run on desktop and phone sizes for every role, plus a security review before launch. Live checks so far: invite email, push, logo and photo upload, barcode and QR scanning, stock numbers."
+      "note": "About 150 end to end tests on desktop and phone sizes, iPhone engine included, plus live checks in the browser and on an iPhone. Bug hunting continues."
     }
   ],
   "log": [
@@ -149,6 +149,14 @@
     {
       "at": "2026-11-18T19:30:00+02:00",
       "text": "Every limit and option configurable by the level above, own date picker, shelf labels, security review and fixes, moving to its own subdomain."
+    },
+    {
+      "at": "2026-11-18T14:30:00+02:00",
+      "text": "Moved to its own subdomain. Security review fixed: uploads, email change, join limits, headers, lockouts."
+    },
+    {
+      "at": "2026-11-18T16:30:00+02:00",
+      "text": "iPhone fixes from real device tests: sheets and the keyboard, landscape, focus rings. Navigation with the business in the address. Production cleaned for testers."
     }
   ],
   "screens": [
