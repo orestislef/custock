@@ -12,3 +12,4 @@ thinking
 **/*.db-shm
 **/.env
 **/.env.*
+deploy/server

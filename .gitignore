@@ -12,6 +12,8 @@ Thumbs.db
 *.keystore
 key.properties
 service-account*.json
+# a local copy of the production server's settings and keys
+deploy/server/
 
 # flutter and dart (for when the app starts)
 .dart_tool/
