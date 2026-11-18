@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { AudiencePreview, Channel, Locale, PostKind, PostInput, Product, ScopeType } from '@custock/core';
+import { cleanLine, cleanText, formatMoneyInput, futureProblem, LIMITS, parseMoneyInput, type AudiencePreview, type Channel, type FieldError, type Locale, type PostKind, type PostInput, type Product, type ScopeType } from '@custock/core';
 import { LOCALES, LOCALE_NAMES } from '@custock/i18n';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
@@ -14,6 +14,9 @@ import { useAsync } from '@/lib/use-async';
 import { productName } from '@/lib/names';
 import { money, number } from '@/lib/format';
 import { RedirectHome } from '@/components/admin/redirect-home';
+import { DatePicker, DateTimePicker } from '@/components/ui/date-time-picker';
+import { decimalExample } from '@/lib/fields';
+import { Counter, FieldMessage } from '@/components/ui/field-kit';
 
 const KINDS: PostKind[] = ['news', 'offer', 'new_arrival', 'back_in_stock', 'event'];
 
@@ -29,6 +32,7 @@ export default function ComposerPage() {
   const [tab, setTab] = useState<Locale>(org.defaultLocale);
   const [texts, setTexts] = useState<Partial<Record<Locale, { title: string; body: string }>>>({});
   const [lines, setLines] = useState<Line[]>([]);
+  const [offerErrors, setOfferErrors] = useState<Record<string, FieldError>>({});
   const [scopes, setScopes] = useState<{ scopeType: ScopeType; scopeId: string }[]>(() => {
     const first = shops.find((s) => can('posts.create', s.id));
     return first ? [{ scopeType: 'shop', scopeId: first.id }] : [];
@@ -36,8 +40,10 @@ export default function ComposerPage() {
   const [push, setPush] = useState(can('posts.channel.push', null));
   const [email, setEmail] = useState(false);
   const [when, setWhen] = useState<'now' | 'later'>('now');
-  const [at, setAt] = useState('');
-  const [until, setUntil] = useState('');
+  // both as moments in time, picked in the business's time zone
+  const [at, setAt] = useState<number | null>(null);
+  const [until, setUntil] = useState<number | null>(null);
+  const zone = settings?.timezone ?? org.timezone;
   const [picker, setPicker] = useState(false);
   const [preview, setPreview] = useState<AudiencePreview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -58,23 +64,39 @@ export default function ComposerPage() {
   const selectedShopIds = scopes.flatMap((s) => s.scopeType === 'org' ? shops.map((x) => x.id) : s.scopeType === 'group' ? groups.data?.find((g) => g.id === s.scopeId)?.shopIds ?? [] : [s.scopeId]);
   const mayPublish = !settings?.postsNeedApproval && selectedShopIds.length > 0 && selectedShopIds.every((id) => can('posts.publish', id));
   const def = texts[org.defaultLocale];
-  const valid = Boolean(def?.title?.trim()) && scopes.length > 0 && (when === 'now' || Boolean(at));
+  const valid = Boolean(def?.title?.trim()) && scopes.length > 0 && (when === 'now' || at != null);
 
   const toggleScope = (scopeType: ScopeType, scopeId: string) =>
     setScopes((x) => (x.some((s) => s.scopeType === scopeType && s.scopeId === scopeId) ? x.filter((s) => !(s.scopeType === scopeType && s.scopeId === scopeId)) : [...x, { scopeType, scopeId }]));
   const has = (scopeType: ScopeType, scopeId: string) => scopes.some((s) => s.scopeType === scopeType && s.scopeId === scopeId);
 
   async function save(publish: boolean) {
+    // offer prices with the shared money rules, a wrong one is marked on its line
+    const offers: Record<string, number | null> = {};
+    const bad: Record<string, FieldError> = {};
+    for (const l of lines) {
+      if (kind !== 'offer' || !l.offer.trim()) { offers[l.variantId] = null; continue; }
+      const r = parseMoneyInput(l.offer);
+      if (r.ok) offers[l.variantId] = r.value;
+      else bad[l.variantId] = r.error;
+    }
+    setOfferErrors(bad);
+    if (Object.keys(bad).length) return;
+    const late = when === 'later' ? futureProblem(at ?? null) : null;
+    if (late) { setError(t(`common:field.${late}`)); return; }
     setBusy(true);
     try {
-      const translations = Object.fromEntries(Object.entries(texts).filter(([, v]) => v?.title?.trim())) as PostInput['translations'];
+      // titles are one line, bodies keep their inside, both trimmed at the edges
+      const translations = Object.fromEntries(Object.entries(texts)
+        .map(([k, v]) => [k, v ? { title: cleanLine(v.title ?? ''), body: cleanText(v.body ?? '') } : v])
+        .filter(([, v]) => (v as { title?: string } | undefined)?.title)) as PostInput['translations'];
       const input: PostInput = {
         kind, defaultLocale: org.defaultLocale, translations, channels, audience,
-        products: lines.map((l) => ({ variantId: l.variantId, offerPriceMinor: kind === 'offer' && l.offer ? Math.round(Number(l.offer.replace(',', '.')) * 100) : null })),
+        products: lines.map((l) => ({ variantId: l.variantId, offerPriceMinor: offers[l.variantId] ?? null })),
         coverUrl: lines[0]?.product.images[0]?.url ?? null,
-        scheduledAt: when === 'later' && at ? new Date(at).getTime() : null,
+        scheduledAt: when === 'later' && at != null ? at : null,
         validFrom: kind === 'offer' ? Date.now() : null,
-        validUntil: kind === 'offer' && until ? new Date(until).getTime() : null,
+        validUntil: kind === 'offer' && until != null ? until : null,
       };
       const post = await api.createPost(org.orgId, input);
       if (publish) {
@@ -110,10 +132,17 @@ export default function ComposerPage() {
             </div>
             <div className="list">
               <input className="field t-headline" placeholder={t('composer.titlePh')} aria-label={t('composer.titlePh')} value={cur.title}
+                maxLength={LIMITS.postTitle} autoCapitalize="sentences" autoComplete="off" enterKeyHint="next"
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); (e.currentTarget.parentElement?.querySelector('textarea') as HTMLTextAreaElement | null)?.focus(); } }}
+                onBlur={() => setTexts((x) => ({ ...x, [tab]: { ...cur, title: cleanLine(cur.title) } }))}
                 onChange={(e) => setTexts((x) => ({ ...x, [tab]: { ...cur, title: e.target.value } }))} />
+              <Counter value={cur.title} max={LIMITS.postTitle} />
               <div className="row-sep relative">
                 <textarea className="field" rows={5} placeholder={t('composer.bodyPh')} aria-label={t('composer.bodyPh')} value={cur.body}
+                  maxLength={LIMITS.postBody} autoCapitalize="sentences"
+                  onBlur={() => setTexts((x) => ({ ...x, [tab]: { ...cur, body: cleanText(cur.body) } }))}
                   onChange={(e) => setTexts((x) => ({ ...x, [tab]: { ...cur, body: e.target.value } }))} />
+                <Counter value={cur.body} max={LIMITS.postBody} />
               </div>
             </div>
             <p className="inset-group-foot">{tab === org.defaultLocale ? t('composer.defaultLangFoot') : t('composer.otherLangFoot')}</p>
@@ -125,7 +154,8 @@ export default function ComposerPage() {
               {lines.map((l, i) => {
                 const v = l.product.variants.find((x) => x.id === l.variantId);
                 return (
-                  <div key={l.variantId} className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties}>
+                  <Fragment key={l.variantId}>
+                  <div className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties}>
                     <Photo src={l.product.images[0]?.url} alt={productName(l.product, locale)} size={44} />
                     <span className="row-main">
                       <span className="row-title block">{productName(l.product, locale)}</span>
@@ -135,11 +165,21 @@ export default function ComposerPage() {
                       can('offers.price.set', null) ? (
                         <input className="t-body tnum text-right bg-transparent border-0 outline-none w-24 rounded-[8px] px-2 py-1" style={{ background: 'var(--c-fill)' }} inputMode="decimal"
                           placeholder={t('composer.offerPrice')} aria-label={t('composer.offerPrice')} value={l.offer}
+                          autoComplete="off" autoCorrect="off" spellCheck={false} enterKeyHint="done"
+                          aria-invalid={offerErrors[l.variantId] ? true : undefined} aria-describedby={offerErrors[l.variantId] ? `offer-${l.variantId}` : undefined}
+                          onBlur={() => {
+                            if (!l.offer.trim()) return;
+                            const r = parseMoneyInput(l.offer);
+                            setOfferErrors((x) => { const n = { ...x }; if (r.ok) delete n[l.variantId]; else n[l.variantId] = r.error; return n; });
+                            if (r.ok) setLines((x) => x.map((y, j) => (j === i ? { ...y, offer: formatMoneyInput(r.value, locale) } : y)));
+                          }}
                           onChange={(e) => setLines((x) => x.map((y, j) => (j === i ? { ...y, offer: e.target.value } : y)))} />
                       ) : null
                     ) : null}
                     <button type="button" className="icon-btn" aria-label={t('common:action.remove')} onClick={() => setLines((x) => x.filter((_, j) => j !== i))}><IconClose size={18} /></button>
                   </div>
+                  <FieldMessage id={`offer-${l.variantId}`} kind="money" error={offerErrors[l.variantId]} params={{ example: decimalExample(locale) }} />
+                  </Fragment>
                 );
               })}
               <button type="button" className="row" onClick={() => setPicker(true)} style={{ color: 'var(--c-accent)' }}>
@@ -152,10 +192,7 @@ export default function ComposerPage() {
           {kind === 'offer' ? (
             <section className="inset-group">
               <div className="list">
-                <label className="row">
-                  <span className="row-main row-title">{t('composer.until')}</span>
-                  <input type="date" className="t-body bg-transparent border-0 outline-none" style={{ color: 'var(--c-ink-2)' }} value={until} onChange={(e) => setUntil(e.target.value)} />
-                </label>
+                <DatePicker variant="row" label={t('composer.until')} value={until} onChange={setUntil} timeZone={zone} dayEdge="end" future optional placeholder={t('composer.untilNone')} />
               </div>
             </section>
           ) : null}
@@ -182,7 +219,7 @@ export default function ComposerPage() {
             <h2 className="inset-group-head">{t('composer.when')}</h2>
             <div className="px-1 mb-2"><Segmented label={t('composer.when')} value={when} onChange={setWhen} options={[{ value: 'now', label: t('composer.now') }, { value: 'later', label: t('composer.later') }]} /></div>
             {when === 'later' ? (
-              <div className="list"><input type="datetime-local" className="field" value={at} onChange={(e) => setAt(e.target.value)} aria-label={t('composer.later')} /></div>
+              <div className="list"><DateTimePicker label={t('composer.later')} value={at} onChange={setAt} timeZone={zone} future quickPicks /></div>
             ) : null}
           </section>
 

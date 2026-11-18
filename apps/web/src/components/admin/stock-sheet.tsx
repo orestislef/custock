@@ -4,7 +4,7 @@
 // for corrections, big deliveries and the counter. every change is a movement with undo, see thinking/05.
 
 import { useState } from 'react';
-import { uuidv7, type AdjustReason, type MovementBatchResult, type Product, type StockLevel } from '@custock/core';
+import { cleanText, formatQtyInput, LIMITS, parseQtyInput, uuidv7, type AdjustReason, type FieldError, type MovementBatchResult, type Product, type StockLevel } from '@custock/core';
 import { useAdmin } from './admin-context';
 import { Picker, Sheet, useToast } from '@/components/ui/client-kit';
 import { Chips } from '@/components/ui/kit';
@@ -12,6 +12,9 @@ import { IconMinus, IconPlus } from '@/components/ui/icons';
 import { productName, variantLabel } from '@/lib/names';
 import { qtyNumber } from '@/lib/format';
 import { submitMovements } from '@/lib/outbox';
+import { useAsync } from '@/lib/use-async';
+import { decimalExample } from '@/lib/fields';
+import { FieldMessage } from '@/components/ui/field-kit';
 
 export type StockMode = 'receive' | 'adjust' | 'sell';
 
@@ -41,11 +44,32 @@ export function StockSheet({ open, onClose, product, mode, onDone, variantId }: 
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scale = product.uom === 'piece' ? 1 : 1000;
-  const changeQty = (next: number | ((q: number) => number)) => { setQty(next); setConfirming(false); setError(null); };
+  // the largest single correction for this person at this shop (policy stock.adjustLimit, in base
+  // units, 0 means none). the stepper simply stops there
+  const limitQ = useAsync(() => (mode === 'adjust' && shop ? api.orgPolicies(org.orgId, shop).then((r) => Number(r.mine['stock.adjustLimit'] ?? 0)).catch(() => 0) : Promise.resolve(0)), [shop]);
+  const most = (limitQ.data ?? 0) > 0 ? (limitQ.data as number) / scale : 0;
+  const held = (q: number) => (most ? Math.max(-most, Math.min(most, q)) : q);
+  const changeQty = (next: number | ((q: number) => number)) => { setQty((q) => held(typeof next === 'function' ? next(q) : next)); setConfirming(false); setError(null); setQtyText(null); setQtyError(null); };
+  // what the person is typing in the quantity box, checked with the shared rules (kilo, litre and metre take decimals)
+  const [qtyText, setQtyText] = useState<string | null>(null);
+  const [qtyError, setQtyError] = useState<FieldError | null>(null);
+  const typeQty = (text: string) => {
+    setQtyText(text);
+    const r = parseQtyInput(text, product.uom, { allowNegative: mode === 'adjust' });
+    if (!r.ok) { if (text.trim()) setQtyError(r.error); return; }
+    setQtyError(null);
+    if (r.value === 0) return;
+    let units = r.value / scale;
+    // on a phone keypad there is no minus key: a typed number keeps the sign the stepper set
+    if (mode === 'adjust' && qty < 0 && units > 0 && !/[-\u2212]/.test(text)) units = -units;
+    setQty(held(mode !== 'adjust' ? Math.abs(units) : units));
+    setConfirming(false);
+    setError(null);
+  };
 
   const current = product.levels.find((l) => l.shopId === shop && l.variantId === variant)?.onHand ?? 0;
   const delta = mode === 'sell' ? -Math.abs(qty) : qty;
-  const after = current + delta * scale;
+  const after = current + Math.round(delta * scale);
   const big = Math.abs(qty) > 50;
   const negative = after < 0;
   const v = product.variants.find((x) => x.id === variant);
@@ -61,7 +85,7 @@ export function StockSheet({ open, onClose, product, mode, onDone, variantId }: 
       const kind = mode === 'receive' ? 'receive' : mode === 'sell' ? 'sale' : reason === 'damaged' || reason === 'expired' || reason === 'theft' ? 'damage' : 'adjust';
       // without signal the change waits on this device and syncs later (src/lib/outbox.ts)
       const sent = await submitMovements(api, org.orgId, [{
-        id, shopId: shop, variantId: variant, qtyDelta: delta * scale, kind, occurredAt: Date.now(),
+        id, shopId: shop, variantId: variant, qtyDelta: Math.round(delta * scale), kind, occurredAt: Date.now(),
         ...(mode === 'adjust' ? { reason } : {}), ...(mode === 'sell' && v?.priceMinor != null ? { unitPriceMinor: v.priceMinor } : {}), ...(note ? { note } : {}),
       }]);
       const res = sent.result;
@@ -79,7 +103,7 @@ export function StockSheet({ open, onClose, product, mode, onDone, variantId }: 
         toast(text, {
           label: t('common:action.undo'),
           run: () => {
-            void submitMovements(api, org.orgId, [{ id: uuidv7(), shopId: shop, variantId: variant, qtyDelta: -delta * scale, kind: 'reversal', refType: 'reversal', refId: id, occurredAt: Date.now() }])
+            void submitMovements(api, org.orgId, [{ id: uuidv7(), shopId: shop, variantId: variant, qtyDelta: -Math.round(delta * scale), kind: 'reversal', refType: 'reversal', refId: id, occurredAt: Date.now() }])
               .then((r) => { if (r.result) onDone(r.result); toast(t('stockSheet.undone')); });
           },
         });
@@ -134,14 +158,21 @@ export function StockSheet({ open, onClose, product, mode, onDone, variantId }: 
             <input
               aria-label={t('stockSheet.qty')}
               className="t-title3 tnum text-center bg-transparent border-0 outline-none w-16"
-              inputMode="numeric"
-              value={qty}
-              onChange={(e) => { const n = Number(e.target.value.replace(/[^\d-]/g, '')); if (!Number.isNaN(n)) changeQty(mode !== 'adjust' ? Math.abs(n) : n); }}
+              inputMode={product.uom === 'piece' ? 'numeric' : 'decimal'}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              aria-invalid={qtyError ? true : undefined}
+              aria-describedby={qtyError ? 'stock-qty-error' : undefined}
+              value={qtyText ?? formatQtyInput(Math.round(qty * scale), product.uom, locale)}
+              onChange={(e) => typeQty(e.target.value)}
+              onBlur={() => { if (!qtyError) setQtyText(null); }}
             />
             <button type="button" className="icon-btn" style={{ background: 'var(--c-fill)' }} aria-label={t('stockSheet.more')} onClick={() => changeQty((q) => (q + 1 === 0 ? 1 : q + 1))}><IconPlus size={18} /></button>
           </span>
         </li>
       </ul>
+      <FieldMessage id="stock-qty-error" kind="qty" error={qtyError} params={{ example: decimalExample(locale, product.uom === 'piece' ? 0 : 3) }} />
 
       {mode === 'adjust' ? (
         <section className="inset-group">
@@ -152,7 +183,8 @@ export function StockSheet({ open, onClose, product, mode, onDone, variantId }: 
       ) : null}
 
       <div className="list mb-2">
-        <input className="field" placeholder={t('stockSheet.note')} aria-label={t('stockSheet.note')} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
+        <input className="field" placeholder={t('stockSheet.note')} aria-label={t('stockSheet.note')} value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => setNote((n) => cleanText(n))}
+          maxLength={LIMITS.note} autoCapitalize="sentences" enterKeyHint="done" />
       </div>
       {confirming ? <p className="t-sub mt-3 mb-0" role="alert" style={{ color: negative ? 'var(--c-neg-text)' : 'var(--c-ink)' }}>{t(negative ? 'stockSheet.confirmNegative' : 'stockSheet.confirmBig', { count: Math.abs(qty) })}</p> : negative ? <p className="t-foot mt-2 mb-0" style={{ color: 'var(--c-neg-text)' }}>{t('stockSheet.negativeHint')}</p> : null}
     </Sheet>

@@ -37,7 +37,7 @@ export default async function CatalogPage({ params, searchParams }: PageProps<'/
         <>
           <form className="search mt-4 mb-3" role="search" action="">
             <IconSearch size={18} />
-            <input name="q" type="search" defaultValue={q} placeholder={t('catalog.search')} aria-label={t('catalog.search')} enterKeyHint="search" />
+            <input name="q" type="search" inputMode="search" autoComplete="off" autoCorrect="off" spellCheck={false} maxLength={200} defaultValue={q} placeholder={t('catalog.search')} aria-label={t('catalog.search')} enterKeyHint="search" />
           </form>
           {offers ? (
             <Link href={`/s/${org}/offers`} className="row card mb-5" style={{ color: 'var(--c-ink)' }}>

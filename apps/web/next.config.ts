@@ -13,8 +13,28 @@ const nextConfig: NextConfig = {
   cacheComponents: false,
   // the docker image (deploy/web.Dockerfile) runs the standalone server
   output: 'standalone',
+  // a separate build folder for side by side local builds (checks), the default otherwise
+  distDir: process.env.CUSTOCK_NEXT_DIST || '.next',
   transpilePackages: ['@custock/core', '@custock/i18n', '@custock/tokens'],
   basePath,
+  poweredByHeader: false,
+  // fixed security headers for every page. the Content-Security-Policy, with its nonce, comes from
+  // src/proxy.ts. the HSTS header is set by the reverse proxy in front (deploy/README.md).
+  async headers() {
+    const always = [
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'same-origin' },
+      // the camera for scanning, nothing else
+      { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), browsing-topics=()' },
+    ];
+    // pages whose address carries a one time token send no referrer at all
+    const tokenPages = ['/admin/reset/:path*', '/invite/:path*', '/platform-invite/:path*', '/confirm/:path*', '/unsubscribe/:path*', '/account/:path*'];
+    return [
+      { source: '/:path*', headers: always },
+      ...tokenPages.map((source) => ({ source, headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }] })),
+    ];
+  },
   env: {
     NEXT_PUBLIC_API_MODE: apiUrl || process.env.NODE_ENV === 'production' ? 'real' : 'fixtures',
     NEXT_PUBLIC_BASE_PATH: basePath ?? '',

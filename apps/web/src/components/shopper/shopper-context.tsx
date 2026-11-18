@@ -10,6 +10,7 @@ import { createBrowserApi, loadTokens, saveTokens } from '@/lib/api-client';
 import { useLocale } from '@/lib/i18n-client';
 import { wipeLocal } from '@/lib/outbox';
 import { disablePush, refreshSubscription } from '@/lib/push';
+import { setDisplayTimeZone } from '@/lib/format';
 
 type Follow = MeContext['following'][number];
 
@@ -17,6 +18,8 @@ interface ShopperState {
   api: CustockApi;
   slug: string;
   orgName: string;
+  // the version of the business icon, part of its url (logo or monogram)
+  iconVersion: string;
   joinCode: string | null;
   status: 'loading' | 'signedOut' | 'signedIn';
   me: MeContext | null;
@@ -45,7 +48,9 @@ function getApi(): CustockApi {
   return api;
 }
 
-export function ShopperProvider({ slug, orgName, joinCode, children }: { slug: string; orgName: string; joinCode: string | null; children: ReactNode }) {
+export function ShopperProvider({ slug, orgName, joinCode, iconVersion = '', timeZone, children }: { slug: string; orgName: string; joinCode: string | null; iconVersion?: string; timeZone?: string; children: ReactNode }) {
+  // dates on this business's pages show in its time zone
+  setDisplayTimeZone(timeZone);
   const locale = useLocale() as Locale;
   const [me, setMe] = useState<MeContext | null>(null);
   const [status, setStatus] = useState<ShopperState['status']>('loading');
@@ -94,8 +99,8 @@ export function ShopperProvider({ slug, orgName, joinCode, children }: { slug: s
   }, []);
 
   const value = useMemo<ShopperState>(() => ({
-    api: getApi(), slug, orgName, joinCode, status, me, follow, requestCode, verifyCode, signOut, reload: () => setVersion((v) => v + 1),
-  }), [slug, orgName, joinCode, status, me, follow, requestCode, verifyCode, signOut]);
+    api: getApi(), slug, orgName, joinCode, iconVersion, status, me, follow, requestCode, verifyCode, signOut, reload: () => setVersion((v) => v + 1),
+  }), [slug, orgName, joinCode, iconVersion, status, me, follow, requestCode, verifyCode, signOut]);
 
   return <Ctx.Provider value={value}><div className="has-tabbar">{children}</div></Ctx.Provider>;
 }

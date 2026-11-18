@@ -7,6 +7,7 @@ import type { PublicProduct } from '@custock/core';
 import { cache } from 'react';
 import { forwarded, serverApi } from './api-server';
 import { defaultJoinCode, devBuild } from './env';
+import { DEFAULT_TIME_ZONE } from './format';
 
 const apiUrl = () => (process.env.CUSTOCK_API_URL?.replace(/\/$/, '') || (process.env.NODE_ENV === 'production' ? 'http://127.0.0.1:8787' : null));
 
@@ -40,9 +41,9 @@ export async function publicProductById(slug: string, id: string, locale?: strin
   return all?.find((p) => p.id === id) ?? null;
 }
 
-export interface OrgInfo { slug: string; name: string; joinCode: string | null; catalogShared: boolean; logoUrl: string | null; unavailable?: boolean }
+export interface OrgInfo { slug: string; name: string; joinCode: string | null; catalogShared: boolean; logoUrl: string | null; timeZone: string; unavailable?: boolean }
 
-interface PublicOrg { slug: string; name: string; catalog: string; joinCode: string | null; logoUrl?: string | null; unavailable?: boolean }
+interface PublicOrg { slug: string; name: string; catalog: string; joinCode: string | null; logoUrl?: string | null; timezone?: string; unavailable?: boolean }
 
 // the business's name and its join link for the whole business, from the api. one fetch per request
 const publicOrgOnce = cache(async (slug: string, locale: string): Promise<PublicOrg | null> => {
@@ -74,5 +75,5 @@ export async function orgInfo(slug: string, locale?: string): Promise<OrgInfo> {
     const { api } = await serverApi(locale);
     name = (await api.joinPage(joinCode).catch(() => null))?.orgName ?? null;
   }
-  return { slug, name: name ?? slug.charAt(0).toUpperCase() + slug.slice(1), joinCode, catalogShared: items != null, logoUrl: pub?.logoUrl ?? null, ...(pub?.unavailable ? { unavailable: true } : {}) };
+  return { slug, name: name ?? slug.charAt(0).toUpperCase() + slug.slice(1), joinCode, catalogShared: items != null, logoUrl: pub?.logoUrl ?? null, timeZone: pub?.timezone || DEFAULT_TIME_ZONE, ...(pub?.unavailable ? { unavailable: true } : {}) };
 }

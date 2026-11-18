@@ -136,7 +136,8 @@
     "platform_paused": "This is paused for now. Try again later.",
     "last_superadmin": "The last super admin cannot be removed.",
     "storage_full": "Photos cannot be added right now. Everything already uploaded stays.",
-    "reset_expired": "This link no longer works. Ask for a new one."
+    "reset_expired": "This link no longer works. Ask for a new one.",
+    "upload_failed": "The photo could not be added. Try again."
   },
   "permGroup": {
     "org": "Business",
@@ -150,6 +151,7 @@
   },
   "perm": {
     "org.settings.manage": "Change business settings",
+    "settings.push": "Change push limits",
     "org.billing.manage": "Manage billing",
     "org.audit.view": "See the audit log",
     "org.support_access.manage": "Let support in",
@@ -204,5 +206,207 @@
   "why": {
     "rankBelow": "You can give roles below {{role}}",
     "askName": "Ask {{name}}"
+  },
+  "policy": {
+    "push.dailyCap": {
+      "title": "Notifications per customer a day",
+      "foot": "The most push notifications one customer gets from this business in a day."
+    },
+    "push.quietHours": {
+      "title": "Quiet hours",
+      "foot": "Notifications wait until the morning. The window can be longer, never shorter than the platform one."
+    },
+    "posts.needApproval": {
+      "title": "Posts need approval",
+      "foot": "Posts wait for someone who can approve them."
+    },
+    "posts.dailyLimit": {
+      "title": "Posts a day",
+      "foot": "How many posts one person sends in 24 hours."
+    },
+    "stock.allowNegative": {
+      "title": "Sell below zero",
+      "foot": "Sales go through even when the count says none are left."
+    },
+    "stock.fewLeft": {
+      "title": "\"Only a few left\" from",
+      "foot": "Customers see it at or below this number."
+    },
+    "stock.adjustLimit": {
+      "title": "Largest correction",
+      "foot": "The biggest change one correction makes. Bigger differences go through a count."
+    },
+    "catalog.mode": {
+      "title": "Catalog",
+      "foot": "Who can browse the products."
+    },
+    "catalog.prices": {
+      "title": "Show prices",
+      "foot": "Prices on the shop page."
+    },
+    "catalog.stock": {
+      "title": "Stock customers see",
+      "foot": "What customers see about quantities."
+    },
+    "alerts.lowStock": {
+      "title": "Running low",
+      "foot": "When a product drops to its low stock level."
+    },
+    "alerts.transfers": {
+      "title": "Deliveries on the way",
+      "foot": "When a transfer is sent to your shop."
+    },
+    "alerts.approvals": {
+      "title": "Posts to approve",
+      "foot": "When a post waits for approval."
+    },
+    "alerts.counts": {
+      "title": "Counts to review",
+      "foot": "When a stock count is sent for review."
+    },
+    "auth.accessMinutes": {
+      "title": "Sign in check",
+      "foot": "How often the app checks the sign in in the background."
+    },
+    "auth.sessionDays": {
+      "title": "Stay signed in",
+      "foot": "Days without use before someone signs in again."
+    },
+    "auth.loginAttempts": {
+      "title": "Wrong passwords before a pause"
+    },
+    "auth.lockMinutes": {
+      "title": "Pause after wrong passwords"
+    },
+    "auth.otpMinutes": {
+      "title": "Email codes work for"
+    },
+    "auth.resetMinutes": {
+      "title": "Password reset links work for"
+    },
+    "rate.publicPerMinute": {
+      "title": "Shop page requests a minute",
+      "foot": "Per visitor."
+    },
+    "rate.authPerMinute": {
+      "title": "Sign in requests a minute",
+      "foot": "Per visitor."
+    },
+    "invites.staffDays": {
+      "title": "Staff invites work for"
+    },
+    "invites.ownerDays": {
+      "title": "Owner invites work for"
+    },
+    "invites.superAdminDays": {
+      "title": "Super admin invites work for"
+    },
+    "join.confirmDays": {
+      "title": "Join confirmation links work for"
+    },
+    "email.changeCodeMinutes": {
+      "title": "Email change codes work for"
+    },
+    "uploads.maxMegabytes": {
+      "title": "Largest photo"
+    },
+    "retention.outboxDays": {
+      "title": "Keep sent messages for"
+    },
+    "retention.errorDays": {
+      "title": "Keep errors for"
+    },
+    "retention.unconfirmedDays": {
+      "title": "Remove unconfirmed signups after"
+    }
+  },
+  "policyGroup": {
+    "messages": "Messages to customers",
+    "posts": "Posts",
+    "stock": "Stock",
+    "customers": "What customers see",
+    "alerts": "Alerts",
+    "security": "Sign in and safety",
+    "lifetimes": "How long links and codes work",
+    "uploads": "Photos",
+    "retention": "What the server keeps"
+  },
+  "policyValue": {
+    "on": "On",
+    "off": "Off",
+    "none": "No limit",
+    "window": "{{from}} to {{to}}",
+    "less": "Less: {{name}}",
+    "more": "More: {{name}}",
+    "from": "{{name}}, from",
+    "to": "{{name}}, to"
+  },
+  "policyUnit": {
+    "count_one": "{{count}}",
+    "count_other": "{{count}}",
+    "minutes_one": "{{count}} minute",
+    "minutes_other": "{{count}} minutes",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "megabytes_one": "{{count}} MB",
+    "megabytes_other": "{{count}} MB"
+  },
+  "policyOption": {
+    "catalog.mode": {
+      "off": "Off",
+      "subscribers": "Followers",
+      "public": "Everyone"
+    },
+    "catalog.stock": {
+      "off": "Hidden",
+      "availability": "In stock or not",
+      "exact": "Exact number"
+    }
+  },
+  "field": {
+    "empty": "Fill this in.",
+    "invalid": "This does not look right.",
+    "tooManyDecimals": "At most {{count}} decimals.",
+    "wholeNumber": "Whole numbers only.",
+    "negative": "It cannot be below zero.",
+    "tooLarge": "That is more than allowed.",
+    "tooSmall": "That is less than allowed.",
+    "tooLong": "At most {{max}} characters.",
+    "tooShort": "At least {{min}} characters.",
+    "spaces": "No spaces, please.",
+    "sameAsEmail": "Use something other than your email.",
+    "checkDigit": "The last digit does not match. Check the code.",
+    "notHttps": "The link must start with https://",
+    "past": "Pick a time that is not in the past.",
+    "beforeStart": "The end must be after the start.",
+    "counter": "{{used}} of {{max}}",
+    "money": {
+      "invalid": "Type a price like {{example}}.",
+      "tooManyDecimals": "Prices have two decimals at most."
+    },
+    "qty": {
+      "invalid": "Type a number like {{example}}."
+    },
+    "email": {
+      "invalid": "Check the email, for example name@example.com.",
+      "spaces": "An email has no spaces."
+    },
+    "phone": {
+      "invalid": "Check the number, for example 69 1234 5678."
+    },
+    "password": {
+      "tooShort": "At least 10 characters.",
+      "tooLong": "At most 128 characters.",
+      "spaces": "A password has no spaces."
+    },
+    "otp": {
+      "invalid": "The code has 6 digits."
+    },
+    "slug": {
+      "invalid": "Small Latin letters, numbers and dashes only."
+    },
+    "barcode": {
+      "invalid": "Letters, numbers and simple symbols only."
+    }
   }
 }

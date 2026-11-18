@@ -12,6 +12,8 @@ import { money, qtyNumber } from '@/lib/format';
 import { uploadLogo } from '@/lib/upload';
 import { useRef, useState } from 'react';
 import { RedirectHome } from '@/components/admin/redirect-home';
+import { PolicyGroups, policyText, usePolicySaver } from '@/components/policy/policy-list';
+import { policyDef, type PolicyEntry } from '@custock/core';
 
 export default function SettingsPage() {
   const { api, org, t, can, refresh } = useAdmin();
@@ -26,6 +28,27 @@ export default function SettingsPage() {
   const shops = shopsQ.data ?? [];
   const setShops = shopsQ.setData;
   const canOrg = can('org.settings.manage', null);
+  // limits and options from the policy engine: what this person may change, inside the super
+  // admin's ceilings. the older switches below follow it too
+  const policiesQ = useAsync(() => api.orgPolicies(org.orgId).catch(() => null), []);
+  const saver = usePolicySaver(async (p) => {
+    const r = await api.setOrgPolicies(org.orgId, p);
+    setS(await api.orgSettings(org.orgId));
+    toast(t('settings.saved'));
+    void refresh();
+    return r;
+  }, policiesQ.data?.entries ?? null);
+  const entries: PolicyEntry[] = saver.entries ?? policiesQ.data?.entries ?? [];
+  const entryOf = (key: string) => entries.find((e) => e.key === key);
+  // the engine says who may change what. before it answers, the person's own permission decides
+  const editable = (key: string) => entryOf(key)?.editable ?? canOrg;
+  const valueRow = (key: string, title: string) => {
+    const e = entryOf(key);
+    const def = policyDef(key);
+    return e && def ? <Row title={title} value={policyText(t, def, e.effective)} /> : null;
+  };
+  // shown in their own places on this page, the rest of the engine's keys get the list below
+  const OWN_PLACE = new Set(['catalog.mode', 'catalog.prices', 'catalog.stock', 'stock.allowNegative', 'posts.needApproval']);
 
   async function patch(p: Partial<OrgSettings>) {
     if (!s) return;
@@ -70,8 +93,10 @@ export default function SettingsPage() {
           <section className="inset-group">
             <h3 className="inset-group-head">{t('settings.catalog')}</h3>
             <div className="mb-2 overflow-x-auto">
-              <Segmented label={t('settings.catalog')} value={s.customerCatalog} onChange={(v: CustomerCatalogMode) => canOrg && void patch({ customerCatalog: v })}
-                options={(['off', 'subscribers', 'public'] as const).map((v) => ({ value: v, label: t(`settings.catalogMode.${v}`) }))} />
+              {editable('catalog.mode') ? (
+                <Segmented label={t('settings.catalog')} value={s.customerCatalog} onChange={(v: CustomerCatalogMode) => canOrg && void patch({ customerCatalog: v })}
+                  options={(['off', 'subscribers', 'public'] as const).map((v) => ({ value: v, label: t(`settings.catalogMode.${v}`) }))} />
+              ) : <p className="t-body m-0">{t(`settings.catalogMode.${s.customerCatalog}`)}</p>}
             </div>
             <p className="inset-group-foot">{t(`settings.catalogFoot.${s.customerCatalog}`)}</p>
           </section>
@@ -86,14 +111,18 @@ export default function SettingsPage() {
           {canOrg ? (
           <>
           <Group footer={t('settings.pricesFoot')}>
-            <Row title={t('settings.prices')} trailing={<Switch checked={s.customerPrices} label={t('settings.prices')} onChange={(v) => void patch({ customerPrices: v })} />} />
+            {editable('catalog.prices')
+              ? <Row title={t('settings.prices')} trailing={<Switch checked={s.customerPrices} label={t('settings.prices')} onChange={(v) => void patch({ customerPrices: v })} />} />
+              : valueRow('catalog.prices', t('settings.prices'))}
           </Group>
 
           <section className="inset-group">
             <h3 className="inset-group-head">{t('settings.stock')}</h3>
             <div className="mb-2 overflow-x-auto">
-              <Segmented label={t('settings.stock')} value={s.customerStock} onChange={(v: CustomerStockMode) => canOrg && void patch({ customerStock: v })}
-                options={(['off', 'availability', 'exact'] as const).map((v) => ({ value: v, label: t(`settings.stockMode.${v}`) }))} />
+              {editable('catalog.stock') ? (
+                <Segmented label={t('settings.stock')} value={s.customerStock} onChange={(v: CustomerStockMode) => canOrg && void patch({ customerStock: v })}
+                  options={(['off', 'availability', 'exact'] as const).map((v) => ({ value: v, label: t(`settings.stockMode.${v}`) }))} />
+              ) : <p className="t-body m-0">{t(`settings.stockMode.${s.customerStock}`)}</p>}
             </div>
             <p className="inset-group-foot">{t(`settings.stockFoot.${s.customerStock}`)}</p>
             {s.customerStock === 'exact' ? <div className="tip mt-3"><IconInfo size={18} /><span className="t-sub">{t('settings.competitors')}</span></div> : null}
@@ -126,15 +155,24 @@ export default function SettingsPage() {
             <>
               <h2 className="t-title3 m-0 mb-4 mt-10">{t('settings.policies')}</h2>
               <Group footer={t('settings.negativeFoot')}>
-                <Row title={t('settings.negative')} trailing={<Switch checked={s.allowNegativeStock} label={t('settings.negative')} onChange={(v) => void patch({ allowNegativeStock: v })} />} />
+                {editable('stock.allowNegative')
+                  ? <Row title={t('settings.negative')} trailing={<Switch checked={s.allowNegativeStock} label={t('settings.negative')} onChange={(v) => void patch({ allowNegativeStock: v })} />} />
+                  : valueRow('stock.allowNegative', t('settings.negative'))}
               </Group>
               <Group footer={t('settings.approvalFoot')}>
-                <Row title={t('settings.approval')} trailing={<Switch checked={s.postsNeedApproval} label={t('settings.approval')} onChange={(v) => void patch({ postsNeedApproval: v })} />} />
+                {editable('posts.needApproval') && entryOf('posts.needApproval')?.inherited !== true
+                  ? <Row title={t('settings.approval')} trailing={<Switch checked={s.postsNeedApproval} label={t('settings.approval')} onChange={(v) => void patch({ postsNeedApproval: v })} />} />
+                  : valueRow('posts.needApproval', t('settings.approval'))}
               </Group>
-              <Group title={t('settings.push')} footer={t('settings.pushFoot')}>
-                <Row title={t('settings.cap')} value={t('settings.capValue', { count: s.pushDailyCap })} />
-                <Row title={t('settings.quiet')} value={t('settings.quietValue', { from: s.quietHours.split('-')[0], to: s.quietHours.split('-')[1] })} />
-              </Group>
+              {entries.length ? (
+                <PolicyGroups entries={entries.filter((e) => !OWN_PLACE.has(e.key))} busyKey={saver.busyKey} onChange={(k, v) => void saver.change(k, v)} />
+              ) : (
+                <Group title={t('settings.push')} footer={t('settings.pushFoot')}>
+                  <Row title={t('settings.cap')} value={t('settings.capValue', { count: s.pushDailyCap })} />
+                  <Row title={t('settings.quiet')} value={t('settings.quietValue', { from: s.quietHours.split('-')[0], to: s.quietHours.split('-')[1] })} />
+                </Group>
+              )}
+              {saver.error ? <p className="sheet-error" role="alert">{t(`common:error.${saver.error}`, { defaultValue: t('common:error.internal') })}</p> : null}
             </>
           ) : null}
         </div>
@@ -199,11 +237,14 @@ function LogoCard({ logoUrl, canOrg, onSaved }: { logoUrl: string | null; canOrg
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-  const fail = (e: unknown) => toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
+  // a failed upload says so in the card, and the old logo stays
+  const [err, setErr] = useState<string | null>(null);
+  const fail = (e: unknown) => setErr(t(`common:error.${(e as { code?: string }).code ?? 'upload_failed'}`));
 
   async function choose(file: File | undefined) {
     if (!file) return;
     setBusy(true);
+    setErr(null);
     try {
       const r = await uploadLogo(api, org.orgId, file);
       onSaved(await api.updateOrgSettings(org.orgId, { logoFileId: r.fileId }));
@@ -218,6 +259,7 @@ function LogoCard({ logoUrl, canOrg, onSaved }: { logoUrl: string | null; canOrg
 
   async function remove() {
     setBusy(true);
+    setErr(null);
     try {
       onSaved(await api.updateOrgSettings(org.orgId, { logoFileId: null }));
       toast(t('settings.logo.removed'));
@@ -245,6 +287,7 @@ function LogoCard({ logoUrl, canOrg, onSaved }: { logoUrl: string | null; canOrg
               {logoUrl ? <button type="button" className="btn btn-plain" style={{ minHeight: 36, padding: 0, color: 'var(--c-error)' }} disabled={busy} onClick={() => void remove()}>{t('settings.logo.remove')}</button> : null}
             </div>
           ) : null}
+          {err ? <p className="t-foot m-0" role="alert" style={{ color: 'var(--c-error)' }}>{err}</p> : null}
         </div>
       </div>
       <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => void choose(e.target.files?.[0])} />

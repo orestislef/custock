@@ -8,6 +8,8 @@ import { useState } from 'react';
 import { IconMail } from '@/components/ui/icons';
 import { useT } from '@/lib/i18n-client';
 import { useShopper } from './shopper-context';
+import { emailProblem, normalizeEmail, normalizeOtp } from '@custock/core';
+import { fieldMessage } from '@/lib/fields';
 
 export function SignInCard({ title, lead }: { title?: string; lead?: string }) {
   const t = useT();
@@ -21,11 +23,14 @@ export function SignInCard({ title, lead }: { title?: string; lead?: string }) {
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) { setError(t('join.emailInvalid')); return; }
+    const address = normalizeEmail(email);
+    const problem = emailProblem(address);
+    if (problem) { setError(fieldMessage(t as unknown as (k: string, o: Record<string, unknown>) => string, 'email', problem)); return; }
+    setEmail(address);
     setBusy(true);
     setError(null);
     try {
-      const r = await requestCode(email);
+      const r = await requestCode(address);
       setDevCode(r.devCode ?? null);
       setStep('code');
     } catch (err) {
@@ -40,7 +45,7 @@ export function SignInCard({ title, lead }: { title?: string; lead?: string }) {
     setBusy(true);
     setError(null);
     try {
-      await verifyCode(email, code);
+      await verifyCode(normalizeEmail(email), normalizeOtp(code));
     } catch (err) {
       const c = (err as { code?: string }).code;
       setError(c === 'unauthorized' || c === 'validation' ? t('shopper.signIn.wrongCode') : t(`common:error.${c ?? 'internal'}`));
@@ -59,8 +64,8 @@ export function SignInCard({ title, lead }: { title?: string; lead?: string }) {
           <p className="t-sub t-2 mt-1 mb-4">{lead ?? t('shopper.signIn.lead', { org: orgName })}</p>
           <label className="block list mb-3">
             <span className="sr-only">{t('shopper.signIn.email')}</span>
-            <input className="field" type="email" inputMode="email" autoComplete="email" placeholder={t('shopper.signIn.email')} value={email}
-              onChange={(e) => setEmail(e.target.value)} aria-invalid={!!error} enterKeyHint="send" />
+            <input className="field" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={254} placeholder={t('shopper.signIn.email')} value={email}
+              onChange={(e) => setEmail(e.target.value)} onBlur={() => setEmail((v) => normalizeEmail(v))} aria-invalid={!!error} enterKeyHint="send" />
           </label>
           {error ? <p className="t-sub m-0 mb-3" role="alert" style={{ color: 'var(--c-error)' }}>{error}</p> : null}
           <button className="btn btn-primary btn-large" type="submit" disabled={busy || !email.trim()}>{t('shopper.signIn.send')}</button>
@@ -72,7 +77,7 @@ export function SignInCard({ title, lead }: { title?: string; lead?: string }) {
           <label className="block list mb-3">
             <span className="sr-only">{t('shopper.signIn.code')}</span>
             <input className="field tnum" style={{ letterSpacing: '0.3em', fontSize: 22 }} inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]*"
-              placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} autoFocus aria-invalid={!!error} enterKeyHint="go" />
+              placeholder="000000" value={code} onChange={(e) => setCode(normalizeOtp(e.target.value))} autoCorrect="off" spellCheck={false} autoFocus aria-invalid={!!error} enterKeyHint="go" />
           </label>
           {devCode ? <p className="t-foot t-2 m-0 mb-3">{t('shopper.signIn.devCode', { code: devCode })}</p> : null}
           {error ? <p className="t-sub m-0 mb-3" role="alert" style={{ color: 'var(--c-error)' }}>{error}</p> : null}

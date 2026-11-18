@@ -5,10 +5,13 @@ import { useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LoginApi } from '@/components/admin/admin-context';
 import { saveTokens } from '@/lib/api-client';
+import { safeReturnPath } from '@custock/core';
 import { useT } from '@/lib/i18n-client';
 import { devBuild } from '@/lib/env';
 import { LocaleSwitch, PasswordField } from '@/components/ui/client-kit';
 import { Avatar } from '@/components/ui/kit';
+import { emailProblem, normalizeEmail, type FieldError } from '@custock/core';
+import { FieldMessage } from '@/components/ui/field-kit';
 
 export default function LoginPage() {
   const t = useT();
@@ -18,6 +21,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [emailError, setEmailError] = useState<FieldError | null>(null);
   // quick logins for the made up accounts, only while developing
   const [devLogins, setDevLogins] = useState<{ email: string; name: string; role: string }[]>([]);
   useEffect(() => {
@@ -30,10 +34,16 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const tokens = await ctx.api.login(as ?? email, as ? 'custock' : password);
+      const address = normalizeEmail(as ?? email);
+      if (!as) {
+        const problem = emailProblem(address);
+        if (problem) { setEmailError(problem); setBusy(false); document.getElementById('login-email')?.focus(); return; }
+      }
+      const tokens = await ctx.api.login(address, as ? 'custock' : password);
       saveTokens(tokens);
       ctx.onSignedIn();
-      router.replace('/admin');
+      // back to the page a notification or an email link asked for, only ever inside the app
+      router.replace(safeReturnPath(new URLSearchParams(window.location.search).get('next')) ?? '/admin');
     } catch (err) {
       const code = (err as { code?: string }).code;
       setError(code === 'unauthorized' ? t('login.wrong') : t(`common:error.${code ?? 'internal'}`));
@@ -52,11 +62,17 @@ export default function LoginPage() {
           <div className="list mb-3">
             <label className="block">
               <span className="sr-only">{t('login.email')}</span>
-              <input className="field" type="email" autoComplete="username" inputMode="email" placeholder={t('login.email')} value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input id="login-email" className="field" type="email" autoComplete="username" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="next" maxLength={254}
+                placeholder={t('login.email')} value={email} aria-invalid={emailError ? true : undefined} aria-describedby={emailError ? 'login-email-error' : undefined}
+                onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(null); }}
+                onBlur={() => { setEmail((v) => normalizeEmail(v)); if (email.trim()) setEmailError(emailProblem(email)); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); document.getElementById('login-password')?.focus(); } }}
+                required />
             </label>
+            <FieldMessage id="login-email-error" kind="email" error={emailError} />
             <label className="block row-sep relative">
               <span className="sr-only">{t('login.password')}</span>
-              <PasswordField autoComplete="current-password" placeholder={t('login.password')} value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <PasswordField id="login-password" autoComplete="current-password" enterKeyHint="go" maxLength={200} placeholder={t('login.password')} value={password} onChange={(e) => setPassword(e.target.value)} required />
             </label>
           </div>
           {error ? <p className="t-sub mb-3" role="alert" style={{ color: 'var(--c-error)' }}>{error}</p> : null}

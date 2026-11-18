@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: PageProps<'/j/[code]'>): Prom
     const page = await api.joinPage(code);
     // adding this page to the home screen installs the business's app, when we know its address
     const slug = (page as { orgSlug?: string }).orgSlug;
-    return { ...(slug ? orgAppMetadata(slug, page.orgName) : {}), title: t('join.metaTitle', { scope: page.scopeName }), robots: { index: false } };
+    return { ...(slug ? orgAppMetadata(slug, page.orgName, page.logoUrl) : {}), title: t('join.metaTitle', { scope: page.scopeName }), robots: { index: false } };
   } catch {
     return { title: { absolute: 'Custock' } };
   }

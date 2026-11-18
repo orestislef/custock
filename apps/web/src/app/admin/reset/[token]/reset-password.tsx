@@ -10,6 +10,8 @@ import { LocaleSwitch, PasswordField } from '@/components/ui/client-kit';
 import { IconLock, IconWarning } from '@/components/ui/icons';
 import { createBrowserApi, saveTokens } from '@/lib/api-client';
 import { useT } from '@/lib/i18n-client';
+import { passwordProblem, type FieldError } from '@custock/core';
+import { FieldMessage } from '@/components/ui/field-kit';
 
 const MIN_LENGTH = 10;
 
@@ -35,6 +37,7 @@ export function ResetPassword({ token }: { token: string }) {
   const api = useMemo(() => createBrowserApi({ getLocale: () => document.documentElement.lang || 'en' }), []);
   const [state, setState] = useState<'checking' | 'ready' | 'gone'>('checking');
   const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<FieldError | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +56,9 @@ export function ResetPassword({ token }: { token: string }) {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < MIN_LENGTH || busy) return;
+    if (busy) return;
+    const problem = passwordProblem(password);
+    if (problem) { setPasswordError(problem); return; }
     setBusy(true);
     setError(null);
     try {
@@ -94,9 +99,13 @@ export function ResetPassword({ token }: { token: string }) {
                   <label className="block relative">
                     <span className="sr-only">{t('reset.password')}</span>
                     <PasswordField autoComplete="new-password" placeholder={t('reset.password')} value={password}
-                      onChange={(e) => setPassword(e.target.value)} minLength={MIN_LENGTH} maxLength={200} required autoFocus aria-describedby="pw-strength" />
+                      onChange={(e) => { setPassword(e.target.value); if (passwordError) setPasswordError(passwordProblem(e.target.value) ? passwordError : null); }}
+                      onBlur={() => { if (password) setPasswordError(passwordProblem(password)); }}
+                      enterKeyHint="done" minLength={MIN_LENGTH} maxLength={128} required autoFocus
+                      aria-invalid={passwordError ? true : undefined} aria-describedby={passwordError ? 'pw-error pw-strength' : 'pw-strength'} />
                   </label>
                 </div>
+                <FieldMessage id="pw-error" kind="password" error={passwordError} />
                 <div id="pw-strength" className="mb-6" aria-live="polite">
                   <div className="flex gap-1.5 mb-2" role="meter" aria-label={t('reset.strength.label')} aria-valuemin={0} aria-valuemax={3} aria-valuenow={LEVEL[strength]}>
                     {[1, 2, 3].map((i) => (

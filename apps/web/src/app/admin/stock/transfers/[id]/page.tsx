@@ -8,6 +8,7 @@ import { Group, Row, StockBadge } from '@/components/ui/kit';
 import { useToast } from '@/components/ui/client-kit';
 import { IconChevronLeft } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
+import { StaffMissing, missingFrom } from '@/components/ui/gone';
 import { dateTime, number } from '@/lib/format';
 
 // send, on the way, receive. what did not arrive is lost in transit and shows in shrinkage.
@@ -20,9 +21,11 @@ export default function TransferPage({ params }: { params: Promise<{ id: string 
   const [got, setGot] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const x = tr.data;
+  const missing = missingFrom(tr.error);
+  if (!x && missing) return <StaffMissing kind={missing} title={t('gone.transfer.title')} body={t('gone.transfer.body')} href="/admin/stock/transfers" cta={t('gone.transfer.cta')} />;
   if (!x) return <div className="pt-6"><div className="h-40 skel" /></div>;
 
-  const name = (sid: string) => (allShops.data ?? shops).find((s) => s.id === sid)?.name ?? '';
+  const name = (sid: string) => (allShops.data ?? shops).find((s) => s.id === sid)?.name ?? (sid === x?.fromShopId ? x?.fromShopName : sid === x?.toShopId ? x?.toShopName : undefined) ?? '';
   const canSend = x.status === 'draft' && can('stock.transfer.send', x.fromShopId);
   const canReceive = x.status === 'sent' && can('stock.transfer.receive', x.toShopId);
   const received = (variantId: string, sent: number) => got[variantId] ?? sent;
@@ -52,7 +55,8 @@ export default function TransferPage({ params }: { params: Promise<{ id: string 
             trailing={canReceive ? (
               <input className="t-title3 tnum text-right bg-transparent border-0 outline-none w-20 rounded-[8px] px-2 py-1" style={{ background: 'var(--c-fill)' }} inputMode="numeric"
                 aria-label={t('transfers.gotFor', { name: l.name })} value={received(l.variantId, l.qtySent)}
-                onChange={(e) => { const n = Math.max(0, Math.min(l.qtySent, Number(e.target.value) || 0)); setGot((g) => ({ ...g, [l.variantId]: n })); }} />
+                pattern="[0-9]*" autoComplete="off" enterKeyHint="next"
+                onChange={(e) => { const digits = e.target.value.replace(/\D/g, '').slice(0, 9); const n = Math.max(0, Math.min(l.qtySent, Number(digits) || 0)); setGot((g) => ({ ...g, [l.variantId]: n })); }} />
             ) : <span className="t-title3 tnum">{number(x.status === 'received' ? l.qtyReceived ?? 0 : l.qtySent, locale)}</span>} />
         ))}
       </Group>

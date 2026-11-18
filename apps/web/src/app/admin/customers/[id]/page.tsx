@@ -10,6 +10,8 @@ import { IconBell, IconChevronLeft, IconHeart, IconMail, IconPhone, IconPlus } f
 import { useAsync } from '@/lib/use-async';
 import { date, dateTime, relative } from '@/lib/format';
 import { LOCALE_NAMES } from '@custock/i18n';
+import { cleanLine, cleanText, LIMITS } from '@custock/core';
+import { Counter } from '@/components/ui/field-kit';
 
 export default function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -31,14 +33,14 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
 
   async function addNote() {
     if (!note.trim()) return;
-    await api.addCustomerNote(org.orgId, id, note.trim());
+    await api.addCustomerNote(org.orgId, id, cleanText(note).slice(0, LIMITS.customerNote));
     setNote('');
     void c.reload();
     toast(t('customer.noteSaved'));
   }
 
   async function addTag() {
-    const v = tag.trim().toLowerCase();
+    const v = cleanLine(tag).toLowerCase().slice(0, LIMITS.tag);
     if (!v || !d) return;
     await api.setCustomerTags(org.orgId, id, [...new Set([...d.tags, v])]);
     setTag('');
@@ -95,7 +97,7 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
             </div>
             {editable ? (
               <form className="row-sep relative flex items-center" onSubmit={(e) => { e.preventDefault(); void addTag(); }}>
-                <input className="field" value={tag} onChange={(e) => setTag(e.target.value)} placeholder={t('customer.addTag')} aria-label={t('customer.addTag')} />
+                <input className="field" value={tag} onChange={(e) => setTag(e.target.value)} onBlur={() => setTag((v) => cleanLine(v))} maxLength={LIMITS.tag} autoComplete="off" autoCapitalize="none" enterKeyHint="done" placeholder={t('customer.addTag')} aria-label={t('customer.addTag')} />
                 <button type="submit" className="icon-btn mr-1" aria-label={t('common:action.add')} disabled={!tag.trim()}><IconPlus size={20} /></button>
               </form>
             ) : null}
@@ -119,7 +121,8 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
               {d.notes.map((n) => <Row key={n.id} title={n.body} subtitle={`${n.authorName ?? ''} · ${relative(n.createdAt, locale)}`} />)}
               {editable ? (
                 <form className={`${d.notes.length ? 'row-sep' : ''} relative`} onSubmit={(e) => { e.preventDefault(); void addNote(); }}>
-                  <textarea className="field" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('customer.addNote')} aria-label={t('customer.addNote')} rows={2} />
+                  <textarea className="field" value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => setNote((v) => cleanText(v))} maxLength={LIMITS.customerNote} autoCapitalize="sentences" placeholder={t('customer.addNote')} aria-label={t('customer.addNote')} rows={2} />
+                  <Counter value={note} max={LIMITS.customerNote} />
                   <div className="flex justify-end px-3 pb-3"><button className="btn btn-tinted" type="submit" disabled={!note.trim()}>{t('common:action.save')}</button></div>
                 </form>
               ) : null}

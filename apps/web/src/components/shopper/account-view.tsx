@@ -10,7 +10,8 @@ import { AppIcon, InstallRow, InstallSteps } from '@/components/pwa/install-coac
 import { PushRow } from '@/components/pwa/push-row';
 import { ProfilePhoto } from '@/components/ui/profile-photo';
 import { NameRow } from '@/components/ui/name-row';
-import { LocaleSwitch, Photo, Sheet, useToast } from '@/components/ui/client-kit';
+import { LocaleSwitch, PasswordField, Photo, Sheet, useToast } from '@/components/ui/client-kit';
+import { AppearanceRow } from '@/components/ui/appearance-switch';
 import { Empty, Switch } from '@/components/ui/kit';
 import { IconBell, IconChevronRight, IconDownload, IconHeart, IconLogout, IconMail, IconPeople, IconPhoneApp, IconTrash } from '@/components/ui/icons';
 import { useT } from '@/lib/i18n-client';
@@ -21,14 +22,18 @@ import { useShopper } from './shopper-context';
 export function AccountView() {
   const t = useT();
   const toast = useToast();
-  const { api, status, me, follow, slug, orgName, joinCode, signOut, reload } = useShopper();
+  const { api, status, me, follow, slug, orgName, joinCode, signOut, reload, iconVersion } = useShopper();
   const [alerts, setAlerts] = useState<StockAlertItem[] | null>(null);
   const [saved, setSaved] = useState<PublicProduct[] | null>(null);
   const [emailOn, setEmailOn] = useState(true);
   const [steps, setSteps] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // deleting asks for the password, or for a code sent by email when the account has none
+  const [confirmWith, setConfirmWith] = useState<null | 'password' | 'code'>(null);
+  const [secret, setSecret] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const icon = <AppIcon src={orgIconSrc(slug)} size={44} label={orgName} />;
+  const icon = <AppIcon src={orgIconSrc(slug, iconVersion)} size={44} label={orgName} />;
 
   useEffect(() => {
     if (!follow) return;
@@ -42,7 +47,7 @@ export function AccountView() {
       <>
         <SignInCard />
         <section className="inset-group mt-7">
-          <div className="list"><div className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></div></div>
+          <div className="list"><div className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></div><AppearanceRow as="div" /></div>
         </section>
       </>
     );
@@ -65,17 +70,43 @@ export function AccountView() {
     toast(t('shopper.me.exported'));
   };
 
-  const deleteAccount = async () => {
+  const closeDelete = () => {
+    setDeleting(false);
+    setConfirmWith(null);
+    setSecret('');
+    setDeleteError(null);
+  };
+
+  const askToConfirm = async () => {
     setBusy(true);
+    setDeleteError(null);
     try {
-      await api.deleteMyAccount();
-      await signOut();
-      toast(t('shopper.me.deleted'));
+      const r = await api.startAccountDelete();
+      setConfirmWith(r.method);
+      setSecret(r.method === 'code' && 'devCode' in r && r.devCode ? r.devCode : '');
     } catch (e) {
-      toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
+      setDeleteError(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
     } finally {
       setBusy(false);
-      setDeleting(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!confirmWith) return void askToConfirm();
+    setBusy(true);
+    setDeleteError(null);
+    try {
+      await api.deleteMyAccount(confirmWith === 'password' ? { password: secret } : { code: secret.trim() });
+      await signOut();
+      toast(t('shopper.me.deleted'));
+      closeDelete();
+    } catch (e) {
+      const err = e as { code?: string; status?: number; problem?: { fields?: Record<string, string> } | null };
+      if (err.status === 410) setDeleteError(t('shopper.me.deleteExpired'));
+      else if (err.problem?.fields?.password || err.problem?.fields?.code) setDeleteError(t(confirmWith === 'password' ? 'shopper.me.deleteWrongPassword' : 'shopper.me.deleteWrongCode'));
+      else setDeleteError(t(`common:error.${err.code ?? 'internal'}`));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -155,6 +186,7 @@ export function AccountView() {
       <section className="inset-group">
         <ul className="list" role="list">
           <li className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></li>
+          <AppearanceRow />
           <InstallRow appName={orgName} icon={icon} render={(open, label) => (
             <li>
               <button type="button" className="row has-icon" onClick={open}>
@@ -198,14 +230,33 @@ export function AccountView() {
       </section>
 
       <InstallSteps open={steps} onClose={() => setSteps(false)} appName={orgName} icon={icon} />
-      <Sheet open={deleting} onClose={() => setDeleting(false)} title={t('shopper.me.deleteTitle')}
+      <Sheet open={deleting} onClose={closeDelete} title={t('shopper.me.deleteTitle')} error={deleteError}
         footer={
           <div className="flex flex-col gap-2 pb-2">
-            <button type="button" className="btn btn-large" style={{ background: 'var(--c-error)', color: '#fff' }} disabled={busy} onClick={() => void deleteAccount()}>{t('shopper.me.deleteConfirm')}</button>
-            <button type="button" className="btn btn-gray btn-large" onClick={() => setDeleting(false)}>{t('common:action.cancel')}</button>
+            <button type="button" className="btn btn-large" style={{ background: 'var(--c-error)', color: '#fff' }} disabled={busy || (!!confirmWith && !secret.trim())} onClick={() => void deleteAccount()}>
+              {confirmWith ? t('shopper.me.deleteConfirm') : t('shopper.me.deleteContinue')}
+            </button>
+            <button type="button" className="btn btn-gray btn-large" onClick={closeDelete}>{t('common:action.cancel')}</button>
           </div>
         }>
         <p className="t-body m-0 mb-3">{t('shopper.me.deleteBody')}</p>
+        {confirmWith === 'code' ? (
+          <form onSubmit={(e) => { e.preventDefault(); void deleteAccount(); }}>
+            <p className="t-sub t-2 m-0 mb-2">{t('shopper.me.deleteCodeSent', { email: me?.user.email ?? '' })}</p>
+            <label className="block">
+              <span className="t-foot t-2 block mb-1">{t('shopper.me.deleteCodeLabel')}</span>
+              <input className="field tnum" inputMode="numeric" pattern="[0-9]*" autoComplete="one-time-code" autoCorrect="off" spellCheck={false} enterKeyHint="done" maxLength={6} value={secret} onChange={(e) => setSecret(e.target.value.replace(/\D/g, '').slice(0, 6))} autoFocus />
+            </label>
+            <button type="button" className="btn btn-plain mt-2" disabled={busy} onClick={() => void askToConfirm()}>{t('shopper.me.deleteResend')}</button>
+          </form>
+        ) : confirmWith === 'password' ? (
+          <form onSubmit={(e) => { e.preventDefault(); void deleteAccount(); }}>
+            <label className="block">
+              <span className="t-foot t-2 block mb-1">{t('shopper.me.deletePasswordLabel')}</span>
+              <PasswordField autoComplete="current-password" value={secret} onChange={(e) => setSecret(e.target.value)} autoFocus />
+            </label>
+          </form>
+        ) : null}
       </Sheet>
     </>
   );

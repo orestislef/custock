@@ -10,6 +10,8 @@ import { Picker, Sheet } from '@/components/ui/client-kit';
 import { IconCheck } from '@/components/ui/icons';
 import { basePath } from '@/lib/api-client';
 import { LinkActions } from './bits';
+import { cleanLine, isEmail, normalizeEmail, slugProblem } from '@custock/core';
+import { EmailInput } from '@/components/ui/field-kit';
 
 export function NewBusinessSheet({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const { api, t, locale } = usePlatform();
@@ -23,9 +25,11 @@ export function NewBusinessSheet({ open, onClose, onCreated }: { open: boolean; 
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<BusinessCreated | null>(null);
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (!open) { setName(''); setSlug(''); setSlugTouched(false); setShop(''); setEmail(''); setError(null); setDone(null); setBusy(false); }
-  }, [open]);
+  }
 
   // the web address follows the name until it is edited by hand
   useEffect(() => {
@@ -34,13 +38,13 @@ export function NewBusinessSheet({ open, onClose, onCreated }: { open: boolean; 
     return () => clearTimeout(id);
   }, [api, name, slugTouched]);
 
-  const valid = name.trim() && /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/.test(slug) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
+  const valid = cleanLine(name) && !slugProblem(slug) && isEmail(email);
 
   const create = async () => {
     setBusy(true);
     setError(null);
     try {
-      const r = await api.createBusiness({ name: name.trim(), slug, shopName: shop.trim() || undefined, ownerEmail: email.trim(), locale: lang });
+      const r = await api.createBusiness({ name: cleanLine(name), slug, shopName: cleanLine(shop) || undefined, ownerEmail: normalizeEmail(email), locale: lang });
       setDone(r);
       onCreated();
     } catch (e) {
@@ -75,7 +79,7 @@ export function NewBusinessSheet({ open, onClose, onCreated }: { open: boolean; 
           <div className="list mb-2">
             <label className="block">
               <span className="field-label">{t('platform.new.name')}</span>
-              <input className="field pt-1" autoComplete="organization" maxLength={80} placeholder={t('platform.new.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} />
+              <input className="field pt-1" autoComplete="organization" autoCapitalize="words" enterKeyHint="next" maxLength={80} placeholder={t('platform.new.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setName((v) => cleanLine(v))} />
             </label>
             <label className="block row-sep relative">
               <span className="field-label">{t('platform.new.slug')}</span>
@@ -84,14 +88,14 @@ export function NewBusinessSheet({ open, onClose, onCreated }: { open: boolean; 
             </label>
             <label className="block row-sep relative">
               <span className="field-label">{t('platform.new.shop')}</span>
-              <input className="field pt-1" maxLength={80} placeholder={name.trim() || t('platform.new.shopPlaceholder')} value={shop} onChange={(e) => setShop(e.target.value)} />
+              <input className="field pt-1" autoComplete="off" autoCapitalize="words" enterKeyHint="next" maxLength={80} placeholder={name.trim() || t('platform.new.shopPlaceholder')} value={shop} onChange={(e) => setShop(e.target.value)} onBlur={() => setShop((v) => cleanLine(v))} />
             </label>
           </div>
           <p className="t-foot t-2 m-0 mb-4 px-4 break-all">{t('platform.new.slugHint', { url: `${host}${slug || '...'}` })}</p>
           <div className="list mb-2">
             <label className="block">
               <span className="field-label">{t('platform.new.ownerEmail')}</span>
-              <input className="field pt-1" type="email" inputMode="email" autoCapitalize="none" autoComplete="off" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} />
+              <EmailInput value={email} onChange={setEmail} enterKeyHint="done" />
             </label>
             <div className="row row-sep">
               <span className="row-main row-title">{t('platform.new.language')}</span>

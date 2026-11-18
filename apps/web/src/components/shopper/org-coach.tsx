@@ -8,18 +8,19 @@ import { useShopper } from './shopper-context';
 // "add <business> to your home screen", on the customer pages
 export function OrgCoach({ className }: { className?: string }) {
   const t = useT();
-  const { slug, orgName } = useShopper();
+  const { slug, orgName, iconVersion } = useShopper();
   return (
     <InstallCoach
       place={`org.${slug}`}
       appName={orgName}
-      icon={<AppIcon src={`${basePath}/s/${encodeURIComponent(slug)}/icon/192`} size={48} label={orgName} />}
+      icon={<AppIcon src={orgIconSrc(slug, iconVersion)} size={48} label={orgName} />}
       body={t('pwa.orgCoachBody', { org: orgName })}
       className={className}
     />
   );
 }
 
-export function orgIconSrc(slug: string) {
-  return `${basePath}/s/${encodeURIComponent(slug)}/icon/192`;
+// the same versioned url the manifest uses, so the card shows what the home screen will
+export function orgIconSrc(slug: string, version = '') {
+  return `${basePath}/s/${encodeURIComponent(slug)}/icon/192${version ? `?v=${version}` : ''}`;
 }

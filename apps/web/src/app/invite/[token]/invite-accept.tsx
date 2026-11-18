@@ -10,6 +10,8 @@ import { LocaleSwitch, PasswordField } from '@/components/ui/client-kit';
 import { IconShield, IconWarning } from '@/components/ui/icons';
 import { createBrowserApi, loadTokens, saveTokens } from '@/lib/api-client';
 import { useLocale, useT } from '@/lib/i18n-client';
+import { checkText, cleanLine, LIMITS, passwordProblem, type FieldError } from '@custock/core';
+import { FieldMessage } from '@/components/ui/field-kit';
 
 type Mode = 'register' | 'signin';
 
@@ -23,6 +25,8 @@ export function InviteAccept({ token }: { token: string }) {
   const [mode, setMode] = useState<Mode>('register');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [nameError, setNameError] = useState<FieldError | null>(null);
+  const [passwordError, setPasswordError] = useState<FieldError | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,13 +45,21 @@ export function InviteAccept({ token }: { token: string }) {
 
   const register = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 10) { setError(t('invite.passwordShort')); return; }
+    // the shared rules: a name of one line, a password of 10 to 128 with no spaces that is not the email
+    const nameV = cleanLine(name);
+    const nameP = checkText(nameV, { max: LIMITS.personName, required: true });
+    const pwP = passwordProblem(password, preview?.email);
+    setName(nameV);
+    setNameError(nameP);
+    setPasswordError(pwP);
+    if (nameP || pwP) { document.getElementById(nameP ? 'invite-name' : 'invite-password')?.focus(); return; }
     setBusy(true);
     setError(null);
     try {
-      const r = await api.registerWithInvite({ token, displayName: name.trim(), password, locale });
+      const r = await api.registerWithInvite({ token, displayName: nameV, password, locale });
       saveTokens({ accessToken: r.accessToken, refreshToken: r.refreshToken, expiresAt: r.expiresAt });
-      router.replace('/admin');
+      // straight into the business they just joined
+      router.replace(`/admin?org=${encodeURIComponent(r.orgId)}`);
     } catch (err) {
       if ((err as { status?: number }).status === 409) { setMode('signin'); setError(t('invite.accountExists')); setBusy(false); return; }
       fail(err);
@@ -61,8 +73,8 @@ export function InviteAccept({ token }: { token: string }) {
     setError(null);
     try {
       if (!loadTokens()) saveTokens(await api.login(preview.email, password));
-      await api.acceptInvite(token);
-      router.replace('/admin');
+      const joined = await api.acceptInvite(token);
+      router.replace(`/admin?org=${encodeURIComponent(joined.orgId)}`);
     } catch (err) {
       fail(err);
     }
@@ -96,11 +108,20 @@ export function InviteAccept({ token }: { token: string }) {
                   </label>
                   <label className="block row-sep relative">
                     <span className="field-label">{t('invite.name')}</span>
-                    <input className="field pt-1" autoComplete="name" required maxLength={80} placeholder={t('invite.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} />
+                    <input id="invite-name" className="field pt-1" autoComplete="name" autoCapitalize="words" enterKeyHint="next" required maxLength={LIMITS.personName + 20} placeholder={t('invite.namePlaceholder')} value={name}
+                      aria-invalid={nameError ? true : undefined} aria-describedby={nameError ? 'invite-name-error' : undefined}
+                      onChange={(e) => { setName(e.target.value); if (nameError) setNameError(null); }}
+                      onBlur={() => setName((v) => cleanLine(v))}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); document.getElementById('invite-password')?.focus(); } }} />
+                    <FieldMessage id="invite-name-error" kind="line" error={nameError} params={{ max: LIMITS.personName }} />
                   </label>
                   <label className="block row-sep relative">
                     <span className="field-label">{t('invite.password')}</span>
-                    <PasswordField className="field pt-1" autoComplete="new-password" required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <PasswordField id="invite-password" className="field pt-1" autoComplete="new-password" enterKeyHint="go" required minLength={10} maxLength={128} value={password}
+                      aria-invalid={passwordError ? true : undefined} aria-describedby={passwordError ? 'invite-password-error' : undefined}
+                      onChange={(e) => { setPassword(e.target.value); if (passwordError) setPasswordError(null); }}
+                      onBlur={() => { if (password) setPasswordError(passwordProblem(password, preview?.email)); }} />
+                    <FieldMessage id="invite-password-error" kind="password" error={passwordError} />
                   </label>
                 </div>
                 <p className="t-foot t-2 m-0 mb-4 px-4">{t('invite.passwordHint')}</p>
@@ -118,7 +139,7 @@ export function InviteAccept({ token }: { token: string }) {
                   {!loadTokens() ? (
                     <label className="block row-sep relative">
                       <span className="sr-only">{t('login.password')}</span>
-                      <PasswordField autoComplete="current-password" placeholder={t('login.password')} value={password} onChange={(e) => setPassword(e.target.value)} required />
+                      <PasswordField autoComplete="current-password" enterKeyHint="go" maxLength={200} placeholder={t('login.password')} value={password} onChange={(e) => setPassword(e.target.value)} required />
                     </label>
                   ) : null}
                 </div>

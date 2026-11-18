@@ -8,7 +8,7 @@ import type { MeContext, MoneyByCurrency } from '@custock/core';
 import type { TFunction } from '@custock/i18n';
 import { useToast } from '@/components/ui/client-kit';
 import { IconCopy, IconShare, IconWarning } from '@/components/ui/icons';
-import { money, number } from '@/lib/format';
+import { money, number, intlLocale } from '@/lib/format';
 
 export function bytes(n: number, locale: string): string {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -16,7 +16,7 @@ export function bytes(n: number, locale: string): string {
   let i = 0;
   while (v >= 1000 && i < units.length - 1) { v /= 1000; i++; }
   const digits = v >= 100 || i === 0 ? 0 : 1;
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(v)} ${units[i]}`;
+  return `${new Intl.NumberFormat(intlLocale(locale), { maximumFractionDigits: digits }).format(v)} ${units[i]}`;
 }
 
 export function moneyList(list: MoneyByCurrency, locale: string): string {

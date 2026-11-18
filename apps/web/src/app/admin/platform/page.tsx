@@ -15,7 +15,11 @@ import { Empty, Group, Row, Switch } from '@/components/ui/kit';
 import { Sheet, useToast } from '@/components/ui/client-kit';
 import { IconGear, IconHistory, IconLink, IconPlus, IconSearch, IconShop } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
+import { useHashScroll } from '@/lib/use-hash-scroll';
 import { ErrorsNavRow } from './errors/nav-row';
+import { PushCard } from '@/components/pwa/push-card';
+import { AppIcon } from '@/components/pwa/install-coach';
+import { basePath } from '@/lib/api-client';
 import { number } from '@/lib/format';
 
 const SWITCHES: PlatformSwitch[] = ['pause_email', 'pause_push', 'pause_signups', 'pause_invites'];
@@ -34,6 +38,8 @@ function PlatformHome() {
   const overview = useAsync(() => api.platformOverview(), []);
   const businesses = useAsync(() => api.platformBusinesses(), []);
   const settings = useAsync(() => api.platformSettings(), []);
+  // a storage alert opens #storage
+  useHashScroll(!!overview.data);
   const [q, setQ] = useState('');
   const [creating, setCreating] = useState(false);
   const [confirm, setConfirm] = useState<{ key: keyof PlatformSettings; on: boolean } | null>(null);
@@ -63,6 +69,11 @@ function PlatformHome() {
     <Page title={t('platform.title')} subtitle={t('platform.subtitle')}
       actions={<button type="button" className="btn btn-primary" onClick={() => setCreating(true)}><IconPlus size={18} />{t('platform.newBusiness')}</button>}
       phoneAction={<button type="button" className="icon-btn" style={{ background: 'var(--c-accent-tint)' }} aria-label={t('platform.newBusiness')} onClick={() => setCreating(true)}><IconPlus size={22} /></button>}>
+
+      <PushCard api={api} orgId={null} place="platform-home" className="mb-6 max-w-[640px]"
+        title={t('push.card.platformTitle')} body={t('push.card.platformBody')} later={t('push.card.platformLater')}
+        onTitle={t('push.card.platformOnTitle')} onBody={t('push.card.platformOnBody')}
+        appName="Custock" appIcon={<AppIcon src={`${basePath}/icons/icon-192.png`} size={44} label="Custock" />} />
 
       {/* the numbers across every business */}
       <section aria-label={t('platform.overview')} className="mb-8">
@@ -169,6 +180,10 @@ function PlatformHome() {
           <Group>
             <Row href="/admin/platform/audit" leading={<span className="icon-tile"><IconHistory size={18} /></span>} title={t('platform.audit.title')} subtitle={t('platform.audit.sub')} />
             <ErrorsNavRow />
+          </Group>
+
+          <Group>
+            <Row href="/admin/platform/policies" leading={<span className="icon-tile"><IconGear size={18} /></span>} title={t('platform.policies.title')} subtitle={t('platform.policies.sub')} />
           </Group>
 
           <Group title={t('platform.dev.title')}>

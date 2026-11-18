@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { use, useState } from 'react';
-import type { StockCount, UncountedPolicy } from '@custock/core';
+import { parseIntInput, type StockCount, type UncountedPolicy } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Group, Row, Segmented, signed } from '@/components/ui/kit';
 import { useToast } from '@/components/ui/client-kit';
 import { IconBarcode, IconChevronLeft, IconPlus } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
+import { StaffMissing, missingFrom } from '@/components/ui/gone';
 import { ProductPicker } from '@/components/admin/product-picker';
 import { money, number, relative } from '@/lib/format';
 
@@ -23,6 +24,8 @@ export default function CountPage({ params }: { params: Promise<{ id: string }> 
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
   const c = count.data;
+  const missing = missingFrom(count.error);
+  if (!c && missing) return <StaffMissing kind={missing} title={t('gone.count.title')} body={t('gone.count.body')} href="/admin/stock/counts" cta={t('gone.count.cta')} />;
   if (!c) return <div className="pt-6"><div className="h-40 skel" /></div>;
 
   const shopName = shops.find((s) => s.id === c.shopId)?.name ?? '';
@@ -70,7 +73,8 @@ export default function CountPage({ params }: { params: Promise<{ id: string }> 
         <div className="flex gap-2 items-center mb-5">
           <form className="search flex-1" style={{ height: 44 }} onSubmit={(e) => { e.preventDefault(); void scan(); }}>
             <IconBarcode size={20} />
-            <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoFocus placeholder={t('counts.scanPh')} aria-label={t('counts.scanPh')} />
+            <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="text" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="go" maxLength={500}
+              autoFocus placeholder={t('counts.scanPh')} aria-label={t('counts.scanPh')} />
           </form>
           <button type="button" className="btn btn-tinted" onClick={() => setPicking(true)}><IconPlus size={18} />{t('counts.addProduct')}</button>
         </div>
@@ -94,9 +98,17 @@ export default function CountPage({ params }: { params: Promise<{ id: string }> 
                 className="t-title3 tnum text-right bg-transparent border-0 outline-none w-20 rounded-[8px] px-2 py-1"
                 style={{ background: 'var(--c-fill)' }}
                 inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
+                enterKeyHint="done"
                 aria-label={t('counts.setQty', { name: l.name })}
                 defaultValue={l.countedQty}
-                onBlur={(e) => { const n = Number(e.target.value); if (!Number.isNaN(n) && n !== l.countedQty) void run(() => api.setCountLine(org.orgId, id, l.variantId, n, 'set')); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                onBlur={(e) => {
+                  const r = parseIntInput(e.target.value, { min: 0, max: 100_000_000 });
+                  if (!r.ok) { e.target.value = String(l.countedQty); return; }
+                  if (r.value !== l.countedQty) void run(() => api.setCountLine(org.orgId, id, l.variantId, r.value, 'set'));
+                }}
               />
             ) : c.status === 'open' ? (
               <span className="t-title3 tnum">{number(l.countedQty, locale)}</span>

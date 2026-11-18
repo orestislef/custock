@@ -550,7 +550,25 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       return { ...s };
     },
 
-    async categories() { return categories; },
+    async categories() { return categories.map((c) => ({ ...c, names: { el: c.name } })); },
+    async createCategory(_org, input) {
+      if (categories.some((c) => c.name.toLowerCase() === input.name.toLowerCase())) throw new FixtureError(409, 'conflict');
+      const c: Category = { id: `cat-${Date.now().toString(36)}`, parentId: null, name: input.name };
+      categories.push(c);
+      return { ...c, names: { el: c.name } };
+    },
+    async updateCategory(_org, id, p) {
+      const c = categories.find((x) => x.id === id);
+      if (!c) throw new FixtureError(404, 'not_found');
+      if (p.name) c.name = p.name;
+      return { ...c, names: { el: c.name } };
+    },
+    async deleteCategory(_org, id) {
+      const i = categories.findIndex((x) => x.id === id);
+      if (i < 0) throw new FixtureError(404, 'not_found');
+      categories.splice(i, 1);
+      for (const pr of products) if (pr.categoryId === id) pr.categoryId = null;
+    },
     async products(_org, q = {}) {
       let list = products.filter((p) => !p.archivedAt);
       if (q.q) list = list.filter((p) => matches(p.key, q.q!) || p.variants.some((v) => v.barcodes.some((b) => b.code.includes(q.q!.trim()))));
@@ -906,7 +924,9 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async unfollow() { /* kept on the real api */ },
     async setChannel() { /* kept on the real api */ },
     async exportMyData() { return { customer: customers[0] }; },
+    async startAccountDelete() { return { method: 'code' as const, sent: true as const, devCode: '000000' }; },
     async deleteMyAccount() { /* kept on the real api */ },
+    async revertEmailChange() { return { email: 'an***@example.com' }; },
 
     async joinPage(code): Promise<JoinPage> {
       const link = joinLinks.find((j) => j.code === code);
@@ -1179,6 +1199,21 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async reportClientError() {},
     async openApi() { throw new FixtureError(403, 'forbidden'); },
     async platformServer() { throw new FixtureError(403, 'forbidden'); },
+    // the policy engine in sample data mode: the built in values, nothing to change
+    async orgPolicies() { return { entries: [], mine: {} }; },
+    async setOrgPolicies() { return { entries: [] }; },
+    async shopPolicies() { return { entries: [] }; },
+    async setShopPolicies() { return { entries: [] }; },
+    async rolePolicies() { return { entries: [] }; },
+    async setRolePolicies() { return { entries: [] }; },
+    async memberPolicies() { return { entries: [] }; },
+    async setMemberPolicies() { return { entries: [] }; },
+    async myPolicies() { return { entries: [] }; },
+    async setMyPolicies() { return { entries: [] }; },
+    async platformPolicies() { throw new FixtureError(403, 'forbidden'); },
+    async setPlatformPolicies() { throw new FixtureError(403, 'forbidden'); },
+    async businessPolicies() { throw new FixtureError(403, 'forbidden'); },
+    async setBusinessPolicies() { throw new FixtureError(403, 'forbidden'); },
   };
   // anything the sample data does not cover answers like a missing endpoint
   return new Proxy(api, {

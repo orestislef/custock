@@ -4,12 +4,17 @@
 // into the business that was open, and the account sheet. one centered column, phone and desktop.
 
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { usePlatform } from '@/components/admin/admin-context';
 import { Avatar } from '@/components/ui/kit';
 import { LocaleSwitch, Sheet } from '@/components/ui/client-kit';
+import { AppearanceRow } from '@/components/ui/appearance-switch';
 import { IconChevronLeft, IconLogout, IconShield } from '@/components/ui/icons';
 import { PlatformBanners } from './bits';
+import { PushRow } from '@/components/pwa/push-row';
+import { AppIcon, InstallSteps } from '@/components/pwa/install-coach';
+import { basePath } from '@/lib/api-client';
+import { refreshSubscription } from '@/lib/push';
 
 export function SuperAdminPill({ label }: { label: string }) {
   return (
@@ -20,7 +25,10 @@ export function SuperAdminPill({ label }: { label: string }) {
 }
 
 export function PlatformShell({ children }: { children: ReactNode }) {
-  const { t, me, currentOrgId, logout } = usePlatform();
+  const { t, me, currentOrgId, logout, api, locale } = usePlatform();
+  const [installSteps, setInstallSteps] = useState(false);
+  // a browser that rotated its subscription, or the same super admin signing in again
+  useEffect(() => { void refreshSubscription(api, { orgId: null, locale: locale as 'en' }); }, [api, locale]);
   const [userOpen, setUserOpen] = useState(false);
   const current = currentOrgId ? me.orgs.find((o) => o.orgId === currentOrgId) : null;
   return (
@@ -54,8 +62,14 @@ export function PlatformShell({ children }: { children: ReactNode }) {
             <p className="t-sub t-2 m-0 truncate">{me.user.email}</p>
           </div>
         </div>
+        <section className="inset-group" style={{ marginBottom: 16 }}>
+          <div className="list">
+            <PushRow api={api} orgId={null} title={t('push.staffTitle')} sub={t('push.platformSub')} onInstall={() => setInstallSteps(true)} />
+          </div>
+        </section>
         <ul className="list mb-2" role="list">
           <li className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></li>
+          <AppearanceRow />
           <li>
             <button type="button" className="row" onClick={() => void logout()} style={{ color: 'var(--c-error)' }}>
               <IconLogout size={20} />
@@ -64,6 +78,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
           </li>
         </ul>
       </Sheet>
+      <InstallSteps open={installSteps} onClose={() => setInstallSteps(false)} appName="Custock" icon={<AppIcon src={`${basePath}/icons/icon-192.png`} size={56} label="Custock" />} />
     </div>
   );
 }

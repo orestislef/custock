@@ -1,12 +1,14 @@
 'use client';
 
+import Link from 'next/link';
+
 // create or edit a product. scan or type the barcode, or let us make a shop barcode.
 // vat rates come from the business country. variants and photos by url are sent when the api
 // contract has them (it does now), and always with the sample data.
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useId, cloneElement } from 'react';
 import { useRouter } from 'next/navigation';
-import { featureOn, ProductInput as ProductInputSchema, type Product, type ProductInput, type StockLevel, type Uom } from '@custock/core';
+import { cleanLine, featureOn, httpsUrlProblem, LIMITS, ProductInput as ProductInputSchema, type Product, type ProductInput, type StockLevel, type Uom } from '@custock/core';
 import { useAdmin } from './admin-context';
 import { ScanButton } from './scan-button';
 import { Chips, Segmented, Switch } from '@/components/ui/kit';
@@ -16,8 +18,12 @@ import { useAsync } from '@/lib/use-async';
 import { apiMode } from '@/lib/api-client';
 import { intlLocale, money } from '@/lib/format';
 import { categoryName, forgetCatalog } from '@/lib/use-names';
+import { CategorySheet } from './category-sheet';
+import { useBarcodeOwner } from '@/lib/use-barcode-owner';
 import { variantLabel } from '@/lib/names';
 import { uploadPhoto } from '@/lib/upload';
+import { checkAll, decimalExample, useBarcodeField, useLineField, useMoneyField, useTextField } from '@/lib/fields';
+import { Counter, FieldMessage, FormNav } from '@/components/ui/field-kit';
 
 const VAT: Record<string, number[]> = { GR: [2400, 1300, 600], CY: [1900, 900, 500], DE: [1900, 700], BG: [2000, 900], RO: [1900, 900, 500] };
 const shape = ProductInputSchema.shape as Record<string, unknown>;
@@ -26,19 +32,21 @@ const supportsImages = apiMode === 'fixtures' || 'imageUrls' in shape;
 
 interface Option { name: string; values: string }
 
-function parseMoney(v: string): number | null {
-  const n = Number(v.replace(/\s/g, '').replace(',', '.'));
-  return v.trim() && !Number.isNaN(n) ? Math.round(n * 100) : null;
-}
-
 // one field pattern for every text input: a small label above, the value below
-function Field({ label, children, sep }: { label: string; children: React.ReactNode; sep?: boolean }) {
+// the picker entry that opens the new category sheet instead of choosing
+const NEW_CATEGORY = '__new_category__';
+
+// the label is tied to its field by id as well, so every screen reader reads the name
+function Field({ label, children, sep, after }: { label: string; children: React.ReactElement<{ id?: string }>; sep?: boolean; after?: React.ReactNode }) {
+  const auto = useId();
+  const id = children.props.id ?? auto;
   return (
     <li>
-      <label className={`block ${sep ? 'row-sep relative' : ''}`}>
+      <label htmlFor={id} className={`block ${sep ? 'row-sep relative' : ''}`}>
         <span className="field-label">{label}</span>
-        {children}
+        {cloneElement(children, { id })}
       </label>
+      {after}
     </li>
   );
 }
@@ -55,57 +63,82 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
   const canPrice = can('products.price.edit', null);
   const canCost = can('products.cost.edit', null);
 
-  const [name, setName] = useState(product?.name ?? '');
-  const [brand, setBrand] = useState(product?.brand ?? '');
-  const [desc, setDesc] = useState(product?.description ?? '');
+  const nameF = useLineField(product?.name, { max: LIMITS.productName, required: true });
+  const brandF = useLineField(product?.brand, { max: LIMITS.brand, capitalize: 'words' });
+  const descF = useTextField(product?.description, { max: LIMITS.description });
+  const name = nameF.text;
   const [cat, setCat] = useState(product?.categoryId ?? '');
+  const [newCat, setNewCat] = useState(false);
   const [uom, setUom] = useState<Uom>(product?.uom ?? 'piece');
   const [vat, setVat] = useState(String(product?.taxRateBp ?? rates[0]));
   const [track, setTrack] = useState(product?.trackStock ?? true);
-  const [price, setPrice] = useState(v0?.priceMinor != null ? (v0.priceMinor / 100).toFixed(2) : '');
-  const [cost, setCost] = useState(v0?.costMinor != null ? (v0.costMinor / 100).toFixed(2) : '');
-  const [barcode, setBarcode] = useState(initialBarcode ?? '');
+  const priceF = useMoneyField(v0?.priceMinor, locale);
+  const costF = useMoneyField(v0?.costMinor, locale);
+  const barcodeF = useBarcodeField(initialBarcode ?? '');
+  const setBarcode = barcodeF.setText;
+  const owner = useBarcodeOwner(api, org.orgId, barcodeF.text, product?.id ?? null, locale);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [options, setOptions] = useState<Option[]>([]);
   const [images, setImages] = useState<string[]>(product?.images.map((i) => i.url) ?? []);
   const [imageUrl, setImageUrl] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // the last code made with "Make a shop barcode", so each variant can get its own one on save
+  const [ownMade, setOwnMade] = useState<string | null>(null);
   const zero = money(0, org.currency, locale);
 
   // every combination of the option values: size S, M x color black, white = 4 variants
   const combos = useMemo(() => {
-    const lists = options.map((o) => o.values.split(',').map((v) => v.trim()).filter(Boolean).map((v) => ({ [o.name.trim() || '?']: v })));
+    const lists = options.map((o) => o.values.split(',').map((v) => cleanLine(v).slice(0, LIMITS.optionValue)).filter(Boolean).map((v) => ({ [cleanLine(o.name).slice(0, LIMITS.optionName) || '?']: v })));
     return lists.filter((l) => l.length).reduce<Record<string, string>[]>((acc, list) => acc.flatMap((a) => list.map((b) => ({ ...a, ...b }))), [{}]).filter((c) => Object.keys(c).length);
   }, [options]);
   const imagesChanged = product ? images.join('|') !== product.images.map((i) => i.url).join('|') : images.length > 0;
 
   async function save() {
+    // every field checked first, the first one that is not right gets the focus
+    const checks = [nameF, brandF, descF, barcodeF, ...(canPrice ? [priceF] : []), ...(canCost ? [costF] : [])];
+    if (!checkAll(checks)) return;
+    const nameV = nameF.check()!;
+    const brandV = brandF.check() ?? '';
+    const descV = descF.check() ?? '';
+    const barcodeV = barcodeF.check() ?? null;
     setBusy(true);
     setError(null);
     try {
-      const priceMinor = canPrice ? parseMoney(price) : null;
-      const costMinor = canCost ? parseMoney(cost) : null;
+      const priceMinor = canPrice ? priceF.check() ?? null : null;
+      const costMinor = canCost ? costF.check() ?? null : null;
       if (!product) {
         const input: ProductInput = {
-          name: name.trim(), brand: brand.trim() || null, description: desc.trim() || null, categoryId: cat || null,
+          name: nameV, brand: brandV || null, description: descV || null, categoryId: cat || null,
           uom, taxRateBp: Number(vat), trackStock: track,
           ...(priceMinor != null ? { priceMinor } : {}), ...(costMinor != null ? { costMinor } : {}),
-          ...(barcode.trim() ? { barcode: barcode.trim() } : {}),
-          ...(supportsVariants && combos.length > 1 ? { variants: combos.map((o) => ({ options: o, priceMinor, ...(costMinor != null ? { costMinor } : {}) })) } : {}),
+          ...(barcodeV && !(supportsVariants && combos.length > 1) ? { barcode: barcodeV } : {}),
+          // with variants the code goes on the first one; a made shop code gets a fresh one for each other variant below
+          ...(supportsVariants && combos.length > 1 ? { variants: combos.map((o, i) => ({
+            options: o, priceMinor, ...(costMinor != null ? { costMinor } : {}),
+            ...(i === 0 && barcodeV ? { barcodes: [{ code: barcodeV, packQty: 1 }] } : {}),
+          })) } : {}),
           ...(supportsImages && images.length ? { imageUrls: images } : {}),
         };
         const p = await api.createProduct(org.orgId, input);
+        if (supportsVariants && combos.length > 1 && barcodeV && barcodeV === ownMade) {
+          for (const v of p.variants.slice(1)) {
+            const next = await api.nextInternalBarcode(org.orgId);
+            await api.attachBarcode(org.orgId, v.id, next.code);
+          }
+        }
         forgetCatalog(org.orgId);
         toast(t('stock.created', { name: p.name }));
         router.push(`/admin/stock/${p.id}`);
       } else {
         const patch: Partial<ProductInput> = {
-          name: name.trim(), brand: brand.trim() || null, description: desc.trim() || null, categoryId: cat || null,
+          name: nameV, brand: brandV || null, description: descV || null, categoryId: cat || null,
           uom, taxRateBp: Number(vat), trackStock: track,
           ...(canPrice && priceMinor != null && priceMinor !== v0?.priceMinor ? { priceMinor } : {}),
           ...(canCost && costMinor != null && costMinor !== v0?.costMinor ? { costMinor } : {}),
-          ...(barcode.trim() ? { barcode: barcode.trim() } : {}),
+          ...(barcodeV ? { barcode: barcodeV } : {}),
           ...(supportsImages && imagesChanged ? { imageUrls: images } : {}),
         };
         await api.updateProduct(org.orgId, product.id, patch);
@@ -114,6 +147,10 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
         router.push(`/admin/stock/${product.id}`);
       }
     } catch (e) {
+      // the api's field errors go under their fields too
+      const fields = (e as { problem?: { fields?: Record<string, string> } }).problem?.fields ?? {};
+      const show: [string, { setError: (x: never) => void }][] = [['name', nameF], ['brand', brandF], ['description', descF], ['barcode', barcodeF], ['priceMinor', priceF], ['costMinor', costF]];
+      for (const [k, f] of show) if (fields[k]) f.setError(fields[k] as never);
       setError(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
       setBusy(false);
     }
@@ -122,36 +159,46 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
   async function addFiles(files: FileList | null) {
     if (!files?.length) return;
     setUploading(true);
-    setError(null);
+    setPhotoError(null);
     try {
       for (const f of [...files].slice(0, 10 - images.length)) {
         const url = await uploadPhoto(api, org.orgId, f);
         setImages((x) => [...x, url]);
       }
     } catch (e) {
-      // a paused bucket gets its own plain line, anything else the usual retry text
-      setError((e as { code?: string }).code === 'storage_full' ? t('common:error.storage_full') : t('productForm.uploadFailed'));
+      // the photos already there stay. a paused bucket gets its own plain line, anything else the retry text
+      setPhotoError((e as { code?: string }).code === 'storage_full' ? t('common:error.storage_full') : t('common:error.upload_failed'));
     } finally {
       setUploading(false);
     }
   }
 
   async function ownCode() {
-    try { setBarcode((await api.nextInternalBarcode(org.orgId)).code); } catch (e) { setError(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`)); }
+    try {
+      const code = (await api.nextInternalBarcode(org.orgId)).code;
+      setBarcode(code);
+      setOwnMade(code);
+    } catch (e) { setError(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`)); }
   }
 
   return (
+    <FormNav onDone={() => void save()} last="done">
     <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_340px] gap-x-8 items-start">
       <div>
         <section className="inset-group">
           <ul className="list" role="list">
-            <Field label={t('stock.form.name')}><input className="field pt-1" value={name} onChange={(e) => setName(e.target.value)} required /></Field>
-            <Field label={t('productForm.brand')} sep><input className="field pt-1" value={brand} onChange={(e) => setBrand(e.target.value)} /></Field>
-            <Field label={t('productForm.description')} sep><textarea className="field pt-1" rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} /></Field>
+            <Field label={t('stock.form.name')} after={<><FieldMessage id={nameF.errorId} kind="line" error={nameF.error} params={{ max: LIMITS.productName }} /><Counter value={nameF.text} max={LIMITS.productName} /></>}><input className="field pt-1" {...nameF.inputProps} autoComplete="off" required /></Field>
+            <Field label={t('productForm.brand')} sep after={<FieldMessage id={brandF.errorId} kind="line" error={brandF.error} params={{ max: LIMITS.brand }} />}><input className="field pt-1" {...brandF.inputProps} autoComplete="off" /></Field>
+            <Field label={t('productForm.description')} sep after={<><FieldMessage id={descF.errorId} kind="text" error={descF.error} params={{ max: LIMITS.description }} /><Counter value={descF.text} max={LIMITS.description} /></>}><textarea className="field pt-1" rows={3} {...descF.inputProps} /></Field>
             <li className="row row-sep">
               <span className="row-main row-title">{t('stock.form.category')}</span>
-              <Picker variant="plain" label={t('stock.form.category')} value={cat} onChange={setCat}
-                options={[{ value: '', label: t('productForm.noCategory') }, ...(cats.data ?? []).map((c) => ({ value: c.id, label: categoryName(c, locale) }))]} />
+              <Picker variant="plain" label={t('stock.form.category')} value={cat}
+                onChange={(v) => (v === NEW_CATEGORY ? setNewCat(true) : setCat(v))}
+                options={[
+                  { value: '', label: t('productForm.noCategory') },
+                  ...(cats.data ?? []).map((c) => ({ value: c.id, label: categoryName(c, locale) })),
+                  ...(can('categories.manage', null) ? [{ value: NEW_CATEGORY, label: t('categories.newInPicker') }] : []),
+                ]} />
             </li>
           </ul>
         </section>
@@ -162,10 +209,19 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
             <li className="flex items-center pr-1">
               <label className="block flex-1">
                 <span className="sr-only">{t('productForm.barcode')}</span>
-                <input className="field tnum" inputMode="numeric" placeholder={t('productForm.barcodePh')} value={barcode} onChange={(e) => setBarcode(e.target.value)} />
+                <input className="field tnum" aria-label={t('productForm.barcode')} placeholder={t('productForm.barcodePh')} {...barcodeF.inputProps} />
               </label>
               <ScanButton onCode={(c) => setBarcode(c)} />
             </li>
+            {barcodeF.error ? <li><FieldMessage id={barcodeF.errorId} kind="barcode" error={barcodeF.error} /></li> : null}
+            {owner ? (
+              <li className="row row-sep" role="status">
+                <span className="row-main min-w-0 t-sub" style={{ color: 'var(--c-error)' }}>
+                  {t('productForm.barcodeOn', { name: owner.name })}{' '}
+                  <Link href={`/admin/stock/${owner.productId}`} className="link">{t('productForm.barcodeOpen')}</Link>
+                </span>
+              </li>
+            ) : null}
             <li>
               <button type="button" className="row row-sep" style={{ color: 'var(--c-accent)' }} onClick={() => void ownCode()}>
                 <span className="row-main row-title">{t('productForm.ownCode')}</span>
@@ -187,9 +243,9 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
             <ul className="list" role="list">
               {options.map((o, i) => (
                 <li key={i} className="row gap-2">
-                  <input className="t-body bg-transparent border-0 outline-none w-32 min-w-0" placeholder={t('productForm.optionName')} aria-label={t('productForm.optionName')} value={o.name}
+                  <input className="t-body bg-transparent border-0 outline-none w-32 min-w-0" placeholder={t('productForm.optionName')} aria-label={t('productForm.optionName')} value={o.name} maxLength={LIMITS.optionName} autoComplete="off" autoCapitalize="words"
                     onChange={(e) => setOptions((x) => x.map((y, j) => (j === i ? { ...y, name: e.target.value } : y)))} />
-                  <input className="t-body bg-transparent border-0 outline-none flex-1 min-w-0" placeholder={t('productForm.optionValues')} aria-label={t('productForm.optionValues')} value={o.values}
+                  <input className="t-body bg-transparent border-0 outline-none flex-1 min-w-0" placeholder={t('productForm.optionValues')} aria-label={t('productForm.optionValues')} value={o.values} maxLength={400} autoComplete="off"
                     onChange={(e) => setOptions((x) => x.map((y, j) => (j === i ? { ...y, values: e.target.value } : y)))} />
                   <button type="button" className="icon-btn" aria-label={t('common:action.remove')} onClick={() => setOptions((x) => x.filter((_, j) => j !== i))}><IconClose size={18} /></button>
                 </li>
@@ -224,8 +280,11 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
             <ul className="list" role="list">
               {images.map((u, i) => (
                 <li key={u} className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties}>
-                  <Photo src={u} alt="" size={44} />
-                  <span className="row-main row-sub truncate">{u.startsWith('data:') ? t('productForm.newPhoto') : u.replace(/^https?:\/\//, '')}</span>
+                  <Photo src={u} alt={t('productForm.photoN', { n: i + 1 })} size={44} />
+                  <span className="row-main min-w-0">
+                    <span className="row-title block truncate">{t('productForm.photoN', { n: i + 1 })}</span>
+                    {i === 0 ? <span className="row-sub block">{t('productForm.coverPhoto')}</span> : null}
+                  </span>
                   <button type="button" className="icon-btn" aria-label={t('common:action.remove')} onClick={() => setImages((x) => x.filter((_, j) => j !== i))}><IconClose size={18} /></button>
                 </li>
               ))}
@@ -239,13 +298,26 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
                 </li>
               ) : null}
               <li>
-                <form className="flex items-center pr-1 row-sep relative" onSubmit={(e) => { e.preventDefault(); if (/^https:\/\//.test(imageUrl)) { setImages((x) => [...x, imageUrl]); setImageUrl(''); } }}>
+                <form className="flex items-center pr-1 row-sep relative" onSubmit={(e) => {
+                  e.preventDefault();
+                  const link = imageUrl.trim();
+                  const problem = httpsUrlProblem(link, { required: true });
+                  if (problem) { setImageError(problem); return; }
+                  setImageError(null);
+                  setImages((x) => [...x, link]);
+                  setImageUrl('');
+                }}>
                   <label className="block flex-1"><span className="sr-only">{t('productForm.photoPh')}</span>
-                    <input className="field" type="url" placeholder={t('productForm.photoPh')} value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} /></label>
-                  <button type="submit" className="icon-btn" aria-label={t('common:action.add')} disabled={!/^https:\/\//.test(imageUrl)}><IconPlus size={20} /></button>
+                    <input className="field" type="url" inputMode="url" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="done" data-enter-hint="own"
+                      maxLength={LIMITS.url} placeholder={t('productForm.photoPh')} value={imageUrl} aria-invalid={imageError ? true : undefined}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onChange={(e) => { setImageUrl(e.target.value); if (imageError) setImageError(null); }} /></label>
+                  <button type="submit" className="icon-btn" aria-label={t('common:action.add')} disabled={!imageUrl.trim()}><IconPlus size={20} /></button>
                 </form>
+                {imageError ? <FieldMessage id="photo-link-error" kind="url" error={imageError} /> : null}
               </li>
             </ul>
+            {photoError ? <p className="why-line" role="alert" style={{ color: 'var(--c-error)' }}>{photoError}</p> : null}
             <p className="inset-group-foot">{t('productForm.photoFoot')}</p>
           </section>
         ) : null}
@@ -258,14 +330,16 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
           <ul className="list" role="list">
             {canPrice ? (
               <Field label={t('stock.form.price')}>
-                <input className="field pt-1 tnum" inputMode="decimal" placeholder={t('productForm.pricePh', { zero })} value={price} onChange={(e) => setPrice(e.target.value)} />
+                <input className="field pt-1 tnum" placeholder={t('productForm.pricePh', { zero })} {...priceF.inputProps} />
               </Field>
             ) : null}
+            {canPrice && priceF.error ? <li><FieldMessage id={priceF.errorId} kind="money" error={priceF.error} params={{ example: decimalExample(locale) }} /></li> : null}
             {canCost ? (
               <Field label={t('product.cost')} sep={canPrice}>
-                <input className="field pt-1 tnum" inputMode="decimal" placeholder={t('productForm.costPh', { zero })} value={cost} onChange={(e) => setCost(e.target.value)} />
+                <input className="field pt-1 tnum" placeholder={t('productForm.costPh', { zero })} {...costF.inputProps} />
               </Field>
             ) : null}
+            {canCost && costF.error ? <li><FieldMessage id={costF.errorId} kind="money" error={costF.error} params={{ example: decimalExample(locale) }} /></li> : null}
           </ul>
           {canPrice ? <p className="inset-group-foot">{t('productForm.priceFoot')}</p> : null}
         </section>
@@ -284,11 +358,14 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
           <p className="inset-group-foot">{t('productForm.trackFoot')}</p>
         </section>
         {error ? <p className="sheet-error" role="alert">{error}</p> : null}
-        <button type="button" className="btn btn-primary btn-large" disabled={busy || !name.trim()} onClick={() => void save()}>
+        <button type="button" className="btn btn-primary btn-large" disabled={busy || !name.trim() || !!owner} onClick={() => void save()}>
           {product ? t('common:action.save') : t('productForm.create')}
         </button>
         {!name.trim() ? <p className="why-line mb-8">{t('productForm.needName')}</p> : <div className="mb-8" />}
       </div>
+      <CategorySheet open={newCat} onClose={() => setNewCat(false)}
+        onSaved={(c) => { forgetCatalog(org.orgId); void cats.reload(); setCat(c.id); }} />
     </div>
+    </FormNav>
   );
 }

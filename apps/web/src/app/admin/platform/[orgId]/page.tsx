@@ -3,10 +3,11 @@
 // one business seen from the platform: its owners and owner invites, its numbers, and what the
 // super admin decides for it (features, limits, paused). opening it switches the admin into it.
 
-import { use, useEffect, useState } from 'react';
+import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FEATURES, type Feature, type Locale, type OrgControlsPatch } from '@custock/core';
 import { usePlatform } from '@/components/admin/admin-context';
+import { BusinessPolicies } from '@/components/platform/business-policies';
 import { Page } from '@/components/admin/shell';
 import { PlatformShell } from '@/components/platform/platform-shell';
 import { LinkActions, bytes } from '@/components/platform/bits';
@@ -15,6 +16,8 @@ import { Picker, Sheet, useToast } from '@/components/ui/client-kit';
 import { IconChart, IconMail, IconPlus, IconShop } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { date, number, relative } from '@/lib/format';
+import { isEmail, normalizeEmail } from '@custock/core';
+import { EmailInput } from '@/components/ui/field-kit';
 
 export default function BusinessPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = use(params);
@@ -36,9 +39,12 @@ function Business({ orgId }: { orgId: string }) {
   const [limits, setLimits] = useState<{ shops: string; staff: string }>({ shops: '', staff: '' });
   const d = b.data;
 
-  useEffect(() => {
+  // the limit fields follow the loaded business, set while rendering when it changes
+  const [seen, setSeen] = useState(d);
+  if (d !== seen) {
+    setSeen(d);
     if (d) setLimits({ shops: d.controls.maxShops?.toString() ?? '', staff: d.controls.maxStaff?.toString() ?? '' });
-  }, [d]);
+  }
 
   const err = (e: unknown) => toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
 
@@ -137,13 +143,13 @@ function Business({ orgId }: { orgId: string }) {
             <div className="list">
               <label className="row">
                 <span className="row-main row-title">{t('platform.limits.shops', { count: d.controls.shops })}</span>
-                <input className="field text-right tnum" style={{ maxWidth: 110 }} inputMode="numeric" placeholder={t('platform.limits.none')} value={limits.shops}
-                  onChange={(e) => setLimits((l) => ({ ...l, shops: e.target.value.replace(/[^0-9]/g, '') }))} aria-label={t('platform.limits.shopsLabel')} />
+                <input className="field text-right tnum" style={{ maxWidth: 110 }} inputMode="numeric" placeholder={t('platform.limits.none')} value={limits.shops} pattern="[0-9]*" autoComplete="off" enterKeyHint="next"
+                  onChange={(e) => setLimits((l) => ({ ...l, shops: e.target.value.replace(/[^0-9]/g, '').slice(0, 6) }))} aria-label={t('platform.limits.shopsLabel')} />
               </label>
               <label className="row row-sep">
                 <span className="row-main row-title">{t('platform.limits.staff', { count: d.controls.staff })}</span>
-                <input className="field text-right tnum" style={{ maxWidth: 110 }} inputMode="numeric" placeholder={t('platform.limits.none')} value={limits.staff}
-                  onChange={(e) => setLimits((l) => ({ ...l, staff: e.target.value.replace(/[^0-9]/g, '') }))} aria-label={t('platform.limits.staffLabel')} />
+                <input className="field text-right tnum" style={{ maxWidth: 110 }} inputMode="numeric" placeholder={t('platform.limits.none')} value={limits.staff} pattern="[0-9]*" autoComplete="off" enterKeyHint="done"
+                  onChange={(e) => setLimits((l) => ({ ...l, staff: e.target.value.replace(/[^0-9]/g, '').slice(0, 6) }))} aria-label={t('platform.limits.staffLabel')} />
               </label>
             </div>
             <div className="flex items-center gap-3 mt-2 px-4">
@@ -152,6 +158,8 @@ function Business({ orgId }: { orgId: string }) {
                 onClick={() => void save({ maxShops: limitValue(limits.shops), maxStaff: limitValue(limits.staff) }, t('platform.limits.saved'))}>{t('common:action.save')}</button>
             </div>
           </section>
+
+          <BusinessPolicies orgId={orgId} />
 
           <section className="inset-group">
             <h2 className="inset-group-head">{t('platform.status.title')}</h2>
@@ -207,15 +215,16 @@ function OwnerInviteSheet({ open, orgId, name, onClose, onDone }: { open: boolea
   const [lang, setLang] = useState<Locale>((['en', 'el', 'ru'].includes(locale) ? locale : 'el') as Locale);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (!open) { setEmail(''); setError(null); setBusy(false); } }, [open]);
-  const valid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) { setWasOpen(open); if (!open) { setEmail(''); setError(null); setBusy(false); } }
+  const valid = isEmail(email);
   const send = async () => {
     setBusy(true);
     setError(null);
     try {
-      const r = await api.inviteOwner(orgId, { email: email.trim(), locale: lang });
+      const r = await api.inviteOwner(orgId, { email: normalizeEmail(email), locale: lang });
       onClose();
-      onDone({ link: r.link, emailed: r.emailed, email: email.trim() });
+      onDone({ link: r.link, emailed: r.emailed, email: normalizeEmail(email) });
     } catch (e) {
       setError(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
     } finally {
@@ -231,7 +240,7 @@ function OwnerInviteSheet({ open, orgId, name, onClose, onDone }: { open: boolea
       <div className="list mb-2">
         <label className="block">
           <span className="field-label">{t('platform.new.ownerEmail')}</span>
-          <input className="field pt-1" type="email" inputMode="email" autoCapitalize="none" autoComplete="off" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} />
+          <EmailInput value={email} onChange={setEmail} enterKeyHint="done" />
         </label>
         <div className="row row-sep">
           <span className="row-main row-title">{t('platform.new.language')}</span>
@@ -252,7 +261,8 @@ function DeleteSheet({ open, orgId, name, slug, onClose }: { open: boolean; orgI
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (!open) { setTyped(''); setError(null); setBusy(false); } }, [open]);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) { setWasOpen(open); if (!open) { setTyped(''); setError(null); setBusy(false); } }
   const go = async () => {
     setBusy(true);
     setError(null);
@@ -276,7 +286,7 @@ function DeleteSheet({ open, orgId, name, slug, onClose }: { open: boolean; orgI
       <div className="list mb-2">
         <label className="block">
           <span className="field-label">{t('platform.delete.type', { slug })}</span>
-          <input className="field pt-1" autoCapitalize="none" autoComplete="off" spellCheck={false} value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={slug} />
+          <input className="field pt-1" autoCapitalize="none" autoComplete="off" autoCorrect="off" spellCheck={false} enterKeyHint="done" maxLength={60} value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={slug} />
         </label>
       </div>
     </Sheet>

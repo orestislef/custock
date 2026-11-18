@@ -1,11 +1,11 @@
 // keeps the demo working without a connection once it has been opened. photos come from
 // wikimedia and are cached as they load.
-const CACHE = 'custock-demo-v1';
+const CACHE = 'custock-demo-v2';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest',
   'assets/css/tokens.css', 'assets/css/app.css',
   'assets/js/images.js', 'assets/js/text.js', 'assets/js/data.js', 'assets/js/i18n.js',
-  'assets/js/i18n2.js', 'assets/js/i18n3.js', 'assets/js/app.js',
+  'assets/js/i18n2.js', 'assets/js/i18n3.js', 'assets/js/i18n4.js', 'assets/js/validate.js', 'assets/js/app.js',
   'assets/fonts/commissioner-latin.woff2', 'assets/fonts/commissioner-greek.woff2', 'assets/fonts/commissioner-cyrillic.woff2',
   'assets/icons/icon-192.png', 'assets/icons/apple-touch-icon.png',
 ];

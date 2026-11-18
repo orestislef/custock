@@ -8,7 +8,7 @@ import { getLocale } from '@/lib/i18n-server';
 
 export interface JoinState {
   status: 'idle' | 'pending' | 'error';
-  error?: ErrorCode | 'over15' | 'email';
+  error?: ErrorCode | 'over15' | 'email' | 'name';
   devConfirmLink?: string;
   email?: string;
 }
@@ -31,7 +31,10 @@ export async function joinAction(code: string, _prev: JoinState, form: FormData)
   };
   if (!raw.over15) return { status: 'error', error: 'over15', email: raw.email };
   const parsed = JoinInput.safeParse(raw);
-  if (!parsed.success) return { status: 'error', error: parsed.error.issues.some((i) => i.path[0] === 'email') ? 'email' : 'validation', email: raw.email };
+  if (!parsed.success) {
+    const at = (f: string) => parsed.error.issues.some((i) => i.path[0] === f);
+    return { status: 'error', error: at('email') ? 'email' : at('name') ? 'name' : 'validation', email: raw.email };
+  }
   try {
     const { api } = await serverApi(locale);
     const res = await api.join(code, parsed.data);
@@ -50,6 +53,21 @@ export async function unsubscribeAction(token: string, scope: 'shop' | 'org', pr
     // the sample data has no email tokens, so only the real api records the stop
     if (mode === 'real') await api.unsubscribe(token, scope === 'org');
     return { status: 'done' };
+  } catch (e) {
+    return { status: 'error', error: errorCode(e) };
+  }
+}
+
+export interface EmailRevertState { status: 'idle' | 'done' | 'error'; error?: ErrorCode; email?: string }
+
+// the way back from the notice to the old address after a login email change. the page only shows
+// a button, the change needs the press, so email scanners that open links change nothing.
+export async function emailRevertAction(token: string, prev: EmailRevertState): Promise<EmailRevertState> {
+  if (prev.status === 'done') return prev;
+  try {
+    const { api } = await serverApi();
+    const r = await api.revertEmailChange(token);
+    return { status: 'done', email: r.email };
   } catch (e) {
     return { status: 'error', error: errorCode(e) };
   }

@@ -38,7 +38,14 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: LayoutProps<'/'>) {
   const locale = await getLocale();
   return (
-    <html lang={locale} className={display.variable}>
+    // suppressHydrationWarning: public/theme.js may set data-theme on <html> before react starts
+    <html lang={locale} className={display.variable} suppressHydrationWarning>
+      <head>
+        {/* the appearance picked on this device, applied before the first paint so dark never flashes
+            light. a plain file under the base path, so the content security policy needs no inline script */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- it has to run before the first paint */}
+        <script src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/theme.js`} />
+      </head>
       <body>
         <I18nProvider locale={locale}>
           <ToastProvider>{children}</ToastProvider>

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-/* tokens from packages/tokens, thinking/10-design.md. light and dark follow the system. */
+/* tokens from packages/tokens, thinking/10-design.md. light and dark follow the system unless the
+   person picked one in the account sheet (data-theme on html, see public/theme.js). */
 :root {
   --c-shelf: #F3F3F0;
   --c-surface: #FFFFFF;
@@ -44,8 +45,10 @@
   color-scheme: light dark;
 }
 
+/* dark: the system's choice (Automatic) unless Light was picked in the account sheet, or Dark
+   picked there. the two blocks carry the same values, keep them together */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --c-shelf: #0F0F12;
     --c-surface: #1A1A1F;
     --c-elevated: #232329;
@@ -79,6 +82,41 @@
     --c-mark: #8E9099;
   }
 }
+:root[data-theme="dark"] {
+  --c-shelf: #0F0F12;
+  --c-surface: #1A1A1F;
+  --c-elevated: #232329;
+  --c-ink: #F2F1EE;
+  --c-ink-2: #A3A3AD;
+  --c-ink-3: #8C8C96; /* 5.2:1 on surface */
+  --c-line: #2E2E35;
+  --c-fill: rgba(118, 118, 128, 0.24);
+  --c-fill-solid: #2C2C32;
+  --c-accent: #FF6B8E;
+  --c-accent-fill: #C42A58;
+  --c-on-accent: #FFFFFF;
+  --c-accent-tint: #3A1622;
+  --c-few-text: #F5C76B;
+  --c-few-tint: #33270F;
+  --c-out-text: #B4B4BC;
+  --c-out-tint: #2A2A30;
+  --c-neg-text: #FF7A70;
+  --c-neg-tint: #3A1414;
+  --c-error: #FF7A70;
+  --c-success: #5BD08A;
+  --c-info: #8AA8FF;
+  --c-scrim: rgba(0, 0, 0, 0.5);
+  --c-bar: rgba(15, 15, 18, 0.72);
+  --c-bar-surface: rgba(26, 26, 31, 0.72);
+  /* solid toast: ink on elevated, action 5.8:1 */
+  --c-toast: #2E2E35;
+  --c-on-toast: #F2F1EE;
+  --c-toast-action: #FF85A3;
+  --c-seg-on: #5A5A62;
+  --c-mark: #8E9099;
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 
 /* increase contrast: stronger accent and text, a ring on badges */
 @media (prefers-contrast: more) {
@@ -91,12 +129,18 @@
     --badge-ring: currentColor;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --c-accent: #FF9DB6;
       --c-ink-2: #C9C9D1;
       --c-ink-3: #C9C9D1;
       --c-line: #4A4A53;
     }
+  }
+  :root[data-theme="dark"] {
+    --c-accent: #FF9DB6;
+    --c-ink-2: #C9C9D1;
+    --c-ink-3: #C9C9D1;
+    --c-line: #4A4A53;
   }
 }
 
@@ -520,6 +564,8 @@
   .scan-line { position: absolute; left: 10px; right: 10px; top: 12%; height: 2px; border-radius: 1px; background: #FF6B8E; box-shadow: 0 0 12px #FF6B8E; animation: scan-sweep 1.6s ease-in-out infinite alternate; }
   .scan-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 64px 24px 24px; text-align: center; color: rgba(255, 255, 255, 0.86); }
   .scan-empty p { max-width: 300px; }
+  /* the camera view is always dark: its buttons need light text in both appearances */
+  .scan-empty .btn-gray { background: rgba(255, 255, 255, 0.18); color: #fff; }
   .scan-top { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; z-index: 1; }
   .scan-pill { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 12px; border-radius: 15px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 13px; line-height: 16px; font-weight: 600; border: 0; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
   button.scan-pill { cursor: pointer; min-height: 36px; }
@@ -573,12 +619,18 @@
   --ord-3: #8E1A3F;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --chart-1: #E04A74;
     --ord-1: #8C3053;
     --ord-2: #C2486F;
     --ord-3: #F49AB3;
   }
+}
+:root[data-theme="dark"] {
+  --chart-1: #E04A74;
+  --ord-1: #8C3053;
+  --ord-2: #C2486F;
+  --ord-3: #F49AB3;
 }
 
 /* print: join link posters */
@@ -614,3 +666,103 @@
 .sheet-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .sheet-actions > .btn { flex: 1 1 0; min-width: 0; min-height: 50px; justify-content: center; }
 .sheet-actions > :not(.btn) { flex-basis: 100%; }
+
+/* date and time picker: the app's own, in place of the browser's. a popover on wide screens, a
+   sheet on phones. the calendar is a grid of 44px days, the time two snapping columns. */
+.dtp-trigger-field { position: relative; display: flex; align-items: center; }
+.dtp-trigger-row { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.dtp-field {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 11px 16px;
+  font: inherit; font-size: 17px; text-align: left; color: var(--c-ink); background: transparent; border: 0; cursor: pointer;
+}
+.dtp-trigger-field:has(.dtp-clear) .dtp-field { padding-right: 48px; }
+.dtp-icon { color: var(--c-ink-2); flex: none; }
+.dtp-value {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: 9px;
+  font: inherit; font-size: 17px; color: var(--c-accent); background: var(--c-fill); border: 0; cursor: pointer; white-space: nowrap;
+}
+.dtp-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dtp-placeholder { color: var(--c-ink-3); }
+.dtp-value .dtp-placeholder { color: var(--c-accent); }
+.dtp-clear {
+  display: inline-grid; place-items: center; width: 44px; height: 44px; flex: none; border: 0; background: transparent; cursor: pointer; color: var(--c-ink-2);
+}
+.dtp-trigger-field .dtp-clear { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+.dtp-clear svg { width: 22px; height: 22px; padding: 4px; border-radius: 50%; background: var(--c-fill); }
+.dtp-field:focus-visible, .dtp-value:focus-visible, .dtp-clear:focus-visible, .dtp-nav:focus-visible, .dtp-day:focus-visible, .dtp-col:focus-visible {
+  outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: 10px;
+}
+.dtp-row { gap: 12px; }
+
+.dtp-pop {
+  position: fixed; z-index: 70; width: max-content; max-width: calc(100vw - 24px);
+  padding: 14px 14px 12px; border-radius: 16px; background: var(--c-elevated); color: var(--c-ink);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 0 0.5px var(--c-line);
+  animation: dtp-in 200ms var(--ease-ios);
+  transform-origin: top left;
+}
+.dtp-pop.is-up { transform-origin: bottom left; }
+@keyframes dtp-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+.dtp-body { display: flex; flex-direction: column; gap: 12px; }
+.dtp-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.dtp-main { display: flex; flex-direction: column; gap: 12px; }
+.dtp-wide.dtp-with-time .dtp-main { flex-direction: row; align-items: stretch; gap: 16px; }
+.dtp-cal { width: 100%; max-width: 336px; margin: 0 auto; }
+.dtp-wide .dtp-cal { width: 308px; margin: 0; }
+.dtp-head { display: flex; align-items: center; gap: 4px; padding: 0 2px 6px 6px; }
+.dtp-month { flex: 1; margin: 0; font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.dtp-nav {
+  display: inline-grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 22px; background: transparent; color: var(--c-accent); cursor: pointer;
+}
+.dtp-nav:hover:not([disabled]) { background: var(--c-fill); }
+.dtp-nav[disabled] { color: var(--c-ink-3); opacity: 0.5; cursor: default; }
+.dtp-grid { display: flex; flex-direction: column; }
+.dtp-week { display: grid; grid-template-columns: repeat(7, 1fr); }
+.dtp-wd { display: grid; place-items: center; height: 28px; font-size: 13px; font-weight: 600; color: var(--c-ink-3); text-transform: uppercase; letter-spacing: 0.02em; }
+.dtp-cell { display: grid; place-items: center; }
+.dtp-day {
+  width: 44px; height: 44px; border: 0; border-radius: 22px; background: transparent; color: var(--c-ink);
+  font: inherit; font-size: 17px; font-variant-numeric: tabular-nums; cursor: pointer;
+  transition: background-color 120ms, color 120ms;
+}
+.dtp-wide .dtp-day { width: 40px; height: 40px; border-radius: 20px; font-size: 16px; }
+.dtp-day:hover:not([disabled]):not(.is-selected) { background: var(--c-fill); }
+.dtp-day.is-today { color: var(--c-accent); font-weight: 600; }
+.dtp-day.is-selected { background: var(--c-accent-fill); color: var(--c-on-accent); font-weight: 600; }
+.dtp-day[disabled] { color: var(--c-ink-3); opacity: 0.45; cursor: default; }
+
+.dtp-time { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.dtp-wide .dtp-time { padding-left: 16px; border-left: 0.5px solid var(--c-line); }
+.dtp-colon { font-size: 22px; font-weight: 600; color: var(--c-ink-2); padding-bottom: 2px; }
+.dtp-col-wrap { position: relative; width: 72px; height: 200px; }
+/* the band in the middle marks the chosen value, like a wheel */
+.dtp-col-wrap::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 80px; height: 40px; border-radius: 10px; background: var(--c-fill); pointer-events: none;
+}
+.dtp-col {
+  position: relative; height: 200px; overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain;
+  padding: 80px 0; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+}
+.dtp-col::-webkit-scrollbar { display: none; }
+.dtp-opt {
+  height: 40px; display: grid; place-items: center; scroll-snap-align: center;
+  font-size: 20px; font-variant-numeric: tabular-nums; color: var(--c-ink-2); cursor: pointer; user-select: none;
+}
+.dtp-opt.is-selected { color: var(--c-ink); font-weight: 600; }
+.dtp-opt.is-off { color: var(--c-ink-3); opacity: 0.4; cursor: default; }
+.dtp-zone { margin: 0; font-size: 13px; line-height: 18px; color: var(--c-ink-2); text-align: center; }
+.dtp-actions { padding-top: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .dtp-pop { animation: none; }
+  .dtp-day { transition: none; }
+  .dtp-col { scroll-behavior: auto; }
+}
+
+/* field checks: the error under its field, the counter near a limit */
+.field-msg { margin: 4px 16px 8px; font-size: 13px; line-height: 18px; color: var(--c-error); }
+.field-count { margin: 2px 16px 6px; font-size: 12px; line-height: 16px; color: var(--c-ink-3); text-align: right; font-variant-numeric: tabular-nums; }
+.field-count.over { color: var(--c-error); }
+.field[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px var(--c-error); border-radius: 10px; }

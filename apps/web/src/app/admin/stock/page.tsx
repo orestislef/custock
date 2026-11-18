@@ -95,7 +95,7 @@ function StockList() {
       <div className="sticky top-[52px] z-10 -mx-4 px-4 md:mx-0 md:px-0 pt-1 pb-3 flex flex-col gap-3" style={{ background: 'var(--c-shelf)' }}>
         <div className="search" style={{ height: 40 }}>
           <IconSearch size={18} />
-          <input ref={searchRef} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('stock.search')} aria-label={t('stock.search')} title={t('stock.searchKey')} />
+          <input ref={searchRef} type="search" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} maxLength={200} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('stock.search')} aria-label={t('stock.search')} title={t('stock.searchKey')} />
         </div>
         <Chips label={t('stock.filter')} value={filter} onChange={setF}
           options={[

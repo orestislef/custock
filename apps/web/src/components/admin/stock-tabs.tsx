@@ -14,9 +14,10 @@ export function StockTabs() {
     { href: '/admin/stock', key: 'products', show: true },
     { href: '/admin/stock/counts', key: 'counts', show: featureOn(org, 'counts') && (can('stock.count', null) || can('stock.count.approve', null)) },
     { href: '/admin/stock/transfers', key: 'transfers', show: featureOn(org, 'transfers') && (can('stock.transfer.send', null) || can('stock.transfer.receive', null)) },
+    { href: '/admin/stock/categories', key: 'categories', show: can('categories.manage', null) },
   ].filter((x) => x.show);
   if (tabs.length < 2) return null;
-  const active = (href: string) => (href === '/admin/stock' ? !/\/admin\/stock\/(counts|transfers)/.test(pathname) : pathname.startsWith(href));
+  const active = (href: string) => (href === '/admin/stock' ? !/\/admin\/stock\/(counts|transfers|categories)/.test(pathname) : pathname.startsWith(href));
   return (
     <nav aria-label={t('stockTabs.label')} className="tabs md:hidden">
       {tabs.map((x) => (

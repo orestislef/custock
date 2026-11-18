@@ -4,6 +4,7 @@ import { use, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Role } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
+import { LevelPolicies } from '@/components/policy/level-policies';
 import { Page } from '@/components/admin/shell';
 import { Switch } from '@/components/ui/kit';
 import { Picker, useToast } from '@/components/ui/client-kit';
@@ -11,6 +12,7 @@ import { useAsync } from '@/lib/use-async';
 import { PERM_GROUPS, rankAt } from '@/lib/perms';
 import { roleLabel } from '@/lib/names';
 import { RedirectHome } from '@/components/admin/redirect-home';
+import { cleanLine, LIMITS } from '@custock/core';
 
 // a role on its own page: permission groups in two columns, a sticky save with what changes
 export default function RoleEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -66,7 +68,7 @@ function Editor({ role, all }: { role: Role | null; all: Role[] }) {
       <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-2 gap-x-6 items-start">
         <section className="inset-group">
           <ul className="list" role="list">
-            <li><label className="block"><span className="field-label">{t('roles.name')}</span><input className="field pt-1" value={name} onChange={(e) => setName(e.target.value)} /></label></li>
+            <li><label className="block"><span className="field-label">{t('roles.name')}</span><input className="field pt-1" autoComplete="off" autoCapitalize="words" enterKeyHint="done" maxLength={LIMITS.roleName} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setName((v) => cleanLine(v))} /></label></li>
             <li className="row row-sep">
               <span className="row-main row-title">{t('roles.manageLabel')}</span>
               <Picker variant="plain" label={t('roles.manageLabel')} value={manages} onChange={setManages}
@@ -94,6 +96,8 @@ function Editor({ role, all }: { role: Role | null; all: Role[] }) {
           </section>
         ))}
       </div>
+
+      {role ? <LevelPolicies level={{ kind: 'role', roleId: role.id }} title={t('roles.limits')} /> : null}
 
       <div className="sticky bottom-[calc(84px+env(safe-area-inset-bottom))] md:bottom-4 z-10 mt-2">
         <div className="glass rounded-[16px] px-4 py-3 flex items-center gap-3 flex-wrap" style={{ boxShadow: '0 8px 30px rgba(0,0,0,0.12), 0 0 0 0.5px var(--c-line)' }}>

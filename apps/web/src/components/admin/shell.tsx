@@ -15,6 +15,7 @@ import { SuperAdminPill } from '@/components/platform/platform-shell';
 import { OutboxBadge } from './outbox-badge';
 import { Avatar } from '@/components/ui/kit';
 import { LocaleSwitch, Picker, Sheet, useToast } from '@/components/ui/client-kit';
+import { AppearanceRow } from '@/components/ui/appearance-switch';
 import {
   IconBox, IconChart, IconChevronDown, IconChevronLeft, IconChevronRight, IconGear, IconHome, IconLink, IconLogout, IconMegaphone, IconMore, IconPeople, IconShield, IconShop, IconHistory, IconMail, IconScan, IconWifiOff, IconPhoneApp,
 } from '@/components/ui/icons';
@@ -22,6 +23,7 @@ import { AppIcon, InstallRow, InstallSteps } from '@/components/pwa/install-coac
 import { PushRow } from '@/components/pwa/push-row';
 import { ProfilePhoto } from '@/components/ui/profile-photo';
 import { NameRow } from '@/components/ui/name-row';
+import { LevelPolicies } from '@/components/policy/level-policies';
 import { basePath } from '@/lib/api-client';
 import { devBuild } from '@/lib/env';
 import { startOfflineSync, useOnline, useOutbox } from '@/lib/outbox';
@@ -45,9 +47,11 @@ export function useNav(): NavItem[] {
       children: [
         { href: '/admin/stock/counts', key: 'counts', show: on('counts') && (anyShop('stock.count') || anyShop('stock.count.approve')) },
         { href: '/admin/stock/transfers', key: 'transfers', show: on('transfers') && (anyShop('stock.transfer.send') || anyShop('stock.transfer.receive')) },
+        { href: '/admin/stock/categories', key: 'categories', show: can('categories.manage', null) },
       ],
     },
-    { href: '/admin/scan', key: 'scan', icon: IconScan, show: ['stock.sell', 'stock.receive', 'stock.count', 'stock.transfer.send'].some(anyShop), section: 'main' },
+    // the same rule as the scan screen's modes: looking a code up counts, so viewers get Scan with Look up only
+    { href: '/admin/scan', key: 'scan', icon: IconScan, show: ['products.view', 'stock.sell', 'stock.receive', 'stock.count', 'stock.transfer.send'].some(anyShop), section: 'main' },
     { href: '/admin/customers', key: 'customers', icon: IconPeople, show: anyShop('customers.view'), section: 'main' },
     { href: '/admin/posts', key: 'posts', icon: IconMegaphone, show: on('posts') && anyShop('posts.view'), section: 'main' },
     { href: '/admin/reports', key: 'reports', icon: IconChart, show: on('reports') && anyShop('reports.view'), section: 'main' },
@@ -89,7 +93,7 @@ export function Shell({ children }: { children: ReactNode }) {
   // phone tabs: the first four sections, the rest under More
   const tabs = nav.slice(0, nav.length > 5 ? 4 : 5);
   const rest = nav.slice(tabs.length);
-  const stockChildActive = /\/admin\/stock\/(counts|transfers)/.test(pathname);
+  const stockChildActive = /\/admin\/stock\/(counts|transfers|categories)/.test(pathname);
 
   const link = (item: NavItem) => {
     const Icon = item.icon;
@@ -280,8 +284,11 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
           <p className="inset-group-foot">{t('push.staffFoot')}</p>
         </section>
+        {/* which staff alerts this person wants, their own choice */}
+        <LevelPolicies level={{ kind: 'me' }} groups={['alerts']} />
         <ul className="list mb-2" role="list">
           <li className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></li>
+          <AppearanceRow />
           <li>
             <button type="button" className="row" onClick={() => (unsynced && !confirmOut ? setConfirmOut(true) : void logout())} style={{ color: 'var(--c-error)' }}>
               <IconLogout size={20} />

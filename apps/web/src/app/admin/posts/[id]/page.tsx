@@ -9,7 +9,8 @@ import { Group, Row, Segmented } from '@/components/ui/kit';
 import { Photo, useToast } from '@/components/ui/client-kit';
 import { IconChevronLeft } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
-import { dateTime, money, number, percent } from '@/lib/format';
+import { StaffMissing, missingFrom } from '@/components/ui/gone';
+import { dateTime, money, number, percent, date } from '@/lib/format';
 
 export default function PostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -22,6 +23,8 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
   const p = post.data;
+  const missing = missingFrom(post.error);
+  if (!p && missing) return <StaffMissing kind={missing} title={t('gone.post.title')} body={t('gone.post.body')} href="/admin/posts" cta={t('gone.post.cta')} />;
   if (!p) return <div className="pt-6"><div className="h-[220px] skel mb-4" style={{ borderRadius: 16 }} /></div>;
 
   const langs = Object.keys(p.translations) as Locale[];
@@ -50,6 +53,9 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       <div className="flex gap-2 flex-wrap mb-8">
         {p.status === 'pending_approval' && can('posts.publish', null) ? (
           <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void act(() => api.approvePost(org.orgId, p.id), t('post.approved'))}>{t('post.approve')}</button>
+        ) : null}
+        {p.status === 'pending_approval' && can('posts.publish', null) ? (
+          <button type="button" className="btn btn-gray" disabled={busy} onClick={() => void act(() => api.cancelPost(org.orgId, p.id), t('post.rejected'))}>{t('post.reject')}</button>
         ) : null}
         {p.status === 'pending_approval' && !can('posts.publish', null) ? <p className="t-sub t-2 m-0">{t('post.waitingApproval')}</p> : null}
         {p.status === 'draft' && can('posts.create', null) ? (
@@ -83,7 +89,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         <Row title={t('composer.channels')} value={p.channels.map((c) => t(`common:channel.${c}`)).join(', ')} />
         {p.sentAt ? <Row title={t('post.sentAt')} value={dateTime(p.sentAt, locale)} /> : null}
         {p.scheduledAt ? <Row title={t('post.scheduledAt')} value={dateTime(p.scheduledAt, locale)} /> : null}
-        {p.validUntil ? <Row title={t('composer.until')} value={dateTime(p.validUntil, locale)} /> : null}
+        {p.validUntil ? <Row title={t('composer.until')} value={date(p.validUntil, locale, { weekday: 'short', day: 'numeric', month: 'short' })} /> : null}
       </Group>
 
       {p.products.length ? (

@@ -5,6 +5,7 @@
 
 import type { CustockApi, UploadPurpose } from '@custock/core';
 import { apiMode, basePath } from './api-client';
+import { reportError } from './report-error';
 
 const MAX = 1600;
 
@@ -32,8 +33,7 @@ export async function uploadPhoto(api: CustockApi, orgId: string, file: File, pu
   }
   const mime = blob.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
   const slot = await api.presignUpload(orgId, { purpose, mime, bytes: blob.size });
-  const res = await fetch(sameOrigin(slot.uploadUrl), { method: slot.method, headers: slot.headers, body: blob });
-  if (!res.ok) throw Object.assign(new Error('upload'), { code: 'internal' });
+  await put(slot, blob, purpose);
   return slot.publicUrl;
 }
 
@@ -70,9 +70,22 @@ async function square(file: File, mode: 'cover' | 'contain'): Promise<Blob> {
   return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode'))), 'image/jpeg', 0.86));
 }
 
-async function put(slot: { uploadUrl: string; method: string; headers: Record<string, string> }, blob: Blob) {
-  const res = await fetch(sameOrigin(slot.uploadUrl), { method: slot.method, headers: slot.headers, body: blob });
-  if (!res.ok) throw Object.assign(new Error('upload'), { code: 'internal' });
+// the bytes to the bucket. an answer that is not 2xx and a failed request (no network, or a bucket
+// that refuses the browser, as a CORS preflight does) end the same way: one error code the screens
+// turn into "the photo could not be added", and a report for the super admin. the report names
+// the purpose and the status only, never the signed address or its query string.
+async function put(slot: { uploadUrl: string; method: string; headers: Record<string, string> }, blob: Blob, purpose: UploadPurpose) {
+  let status = 0;
+  try {
+    const res = await fetch(sameOrigin(slot.uploadUrl), { method: slot.method, headers: slot.headers, body: blob });
+    status = res.status;
+    if (res.ok) return;
+  } catch {
+    status = 0;
+  }
+  const host = (() => { try { return new URL(slot.uploadUrl, window.location.href).host; } catch { return 'bucket'; } })();
+  reportError({ source: 'error', error: new Error(`photo upload failed (${purpose}): ${status ? `HTTP ${status}` : 'no answer (network or CORS)'} from ${host}`) });
+  throw Object.assign(new Error('upload'), { code: 'upload_failed' });
 }
 
 // the person's own profile photo. returns the file id for updateMe({ avatarFileId })
@@ -81,7 +94,7 @@ export async function uploadAvatar(api: CustockApi, file: File): Promise<{ fileI
   if (apiMode === 'fixtures') return { fileId: 'local-avatar', url: URL.createObjectURL(blob) };
   const mime = blob.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
   const slot = await api.presignAvatar({ mime, bytes: blob.size });
-  await put(slot, blob);
+  await put(slot, blob, 'avatar');
   return { fileId: slot.fileId, url: slot.publicUrl };
 }
 
@@ -90,6 +103,6 @@ export async function uploadLogo(api: CustockApi, orgId: string, file: File): Pr
   const blob = await square(file, 'contain');
   if (apiMode === 'fixtures') return { fileId: 'local-logo', url: URL.createObjectURL(blob) };
   const slot = await api.presignUpload(orgId, { purpose: 'logo', mime: 'image/png', bytes: blob.size });
-  await put(slot, blob);
+  await put(slot, blob, 'logo');
   return { fileId: slot.fileId, url: slot.publicUrl };
 }

@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Member, ScopeType } from '@custock/core';
 import { relative } from '@/lib/format';
 import { useAdmin } from '@/components/admin/admin-context';
+import { LevelPolicies } from '@/components/policy/level-policies';
 import { Page } from '@/components/admin/shell';
 import { Avatar, Group, Row } from '@/components/ui/kit';
 import { Picker, Sheet, useToast } from '@/components/ui/client-kit';
@@ -12,6 +13,8 @@ import { IconCheck, IconCopy, IconPlus, IconShare, IconShield } from '@/componen
 import { basePath } from '@/lib/api-client';
 import { useAsync } from '@/lib/use-async';
 import { RedirectHome } from '@/components/admin/redirect-home';
+import { normalizeEmail } from '@custock/core';
+import { EmailInput } from '@/components/ui/field-kit';
 
 export default function TeamPage() {
   const { api, org, t, can, locale } = useAdmin();
@@ -21,6 +24,17 @@ export default function TeamPage() {
   const toast = useToast();
   const invites = useAsync(() => (org.orgPerms.includes('members.invite') || org.shops.some((s) => s.perms.includes('members.invite')) ? api.invites(org.orgId) : Promise.resolve([])), [inviting]);
   const canInvite = !org.staffFull && (org.orgPerms.includes('members.invite') || org.shops.some((s) => s.perms.includes('members.invite')));
+  // a notification about someone who just joined opens them (?member=), once, then the link is dropped
+  useEffect(() => {
+    if (!members.data) return;
+    const u = new URL(window.location.href);
+    const wanted = u.searchParams.get('member');
+    if (!wanted) return;
+    const m = members.data.find((x) => x.membershipId === wanted);
+    if (m?.canManage) setManaging(m);
+    u.searchParams.delete('member');
+    window.history.replaceState(window.history.state, '', `${u.pathname}${u.search}${u.hash}`);
+  }, [members.data]);
   if (!org.orgPerms.includes('members.view') && !org.shops.some((s) => s.perms.includes('members.view'))) return <RedirectHome />;
 
   return (
@@ -88,7 +102,7 @@ function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
     if (!sc || !roleId) return;
     setError(null);
     try {
-      const r = await api.invite(org.orgId, { email: email.trim(), roleId, scopeType: sc.type, scopeId: sc.id, locale: locale as 'en' });
+      const r = await api.invite(org.orgId, { email: normalizeEmail(email), roleId, scopeType: sc.type, scopeId: sc.id, locale: locale as 'en' });
       const link = /^https?:/.test(r.link) ? r.link : `${window.location.origin}${basePath}${r.link}`;
       setDone({ link, emailed: r.emailed });
       if (r.emailed) toast(t('team.invited', { email }));
@@ -133,7 +147,7 @@ function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
       ) : (
         <>
           <ul className="list mb-4" role="list">
-            <li><label className="block"><span className="field-label">{t('team.email')}</span><input className="field pt-1" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label></li>
+            <li><label className="block"><span className="field-label">{t('team.email')}</span><EmailInput value={email} onChange={setEmail} enterKeyHint="done" /></label></li>
             <li className="row row-sep">
               <span className="row-main row-title">{t('team.where')}</span>
               <Picker variant="plain" label={t('team.where')} value={scope} onChange={(v) => { setScope(v); setRoleId(null); }} options={scopes.map((s, i) => ({ value: String(i), label: s.name }))} />
@@ -182,7 +196,8 @@ function MemberSheet({ member, onClose, onDone }: { member: Member; onClose: () 
           <div key={a.id} className="row"><span className="row-main row-title">{t(`common:role.${a.roleName}`, { defaultValue: a.roleName })}</span><span className="row-value">{a.scopeName}</span></div>
         ))}
       </div>
-      <div className="list mb-2">
+      <LevelPolicies level={{ kind: 'member', membershipId: member.membershipId }} title={t('team.limits')} />
+      <div className="list mb-2 mt-4">
         {member.status === 'suspended'
           ? <button type="button" className="row" style={{ color: 'var(--c-accent)' }} onClick={() => void set('active')}><span className="row-main row-title">{t('team.reactivate')}</span></button>
           : <button type="button" className="row" onClick={() => void set('suspended')}><span className="row-main"><span className="row-title block">{t('team.suspend')}</span><span className="row-sub block">{t('team.suspendSub')}</span></span></button>}

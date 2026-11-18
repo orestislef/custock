@@ -10,10 +10,15 @@ import { useRouter } from 'next/navigation';
 import { Group, Row, StockBadge, signed, stockState } from '@/components/ui/kit';
 import { Photo, useToast } from '@/components/ui/client-kit';
 import { Tally } from '@/components/ui/tally';
-import { IconBell, IconChevronLeft, IconPlus, IconEdit, IconTruck, IconGear } from '@/components/ui/icons';
+import { IconBell, IconChevronLeft, IconPlus, IconEdit, IconTruck, IconGear, IconPrint } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
+import { StaffMissing, missingFrom } from '@/components/ui/gone';
 import { productName, variantLabel } from '@/lib/names';
 import { money, qtyNumber, relative } from '@/lib/format';
+
+function variantIdsOf(p: { variants: { id: string }[] }): Set<string> {
+  return new Set(p.variants.map((v) => v.id));
+}
 
 export default function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -28,6 +33,8 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const router = useRouter();
 
   const p = product.data;
+  const missing = missingFrom(product.error);
+  if (!p && missing) return <StaffMissing kind={missing} title={t('gone.product.title')} body={t('gone.product.body')} href="/admin/stock" cta={t('gone.product.cta')} />;
   if (!p) {
     return <div className="pt-6"><div className="h-[240px] skel mb-4" style={{ borderRadius: 16 }} /><div className="h-8 w-1/2 skel" /></div>;
   }
@@ -42,7 +49,11 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   function onDone(r: MovementBatchResult) {
     product.setData((cur) => cur && {
       ...cur,
-      levels: cur.levels.map((l) => r.levels.find((x) => x.shopId === l.shopId && x.variantId === l.variantId) ?? l),
+      // updated levels replace the old ones, a shop that had none yet is added
+      levels: [
+        ...cur.levels.map((l) => r.levels.find((x) => x.shopId === l.shopId && x.variantId === l.variantId) ?? l),
+        ...r.levels.filter((x) => variantIdsOf(cur).has(x.variantId) && !cur.levels.some((l) => l.shopId === x.shopId && l.variantId === x.variantId)),
+      ],
     });
     void history.reload();
     for (const b of r.backInStock) {
@@ -71,6 +82,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
             {canReceive ? <button type="button" className="btn btn-primary" onClick={() => setSheet('receive')}><IconPlus size={18} />{t('product.receive')}</button> : null}
             {canAdjust ? <button type="button" className="btn btn-gray" onClick={() => setSheet('adjust')}>{t('product.adjust')}</button> : null}
             {can('products.edit', null) ? <Link href={`/admin/stock/${p.id}/edit`} className="btn btn-gray"><IconEdit size={18} />{t('common:action.edit')}</Link> : null}
+            {can('products.edit', null) && p.variants.some((v) => v.barcodes.length) ? <Link href={`/admin/print/label/${p.id}`} className="btn btn-gray"><IconPrint size={18} />{t('label.open')}</Link> : null}
           </div>
         </div>
       </div>

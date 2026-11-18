@@ -7,12 +7,14 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { usePathname, useRouter } from 'next/navigation';
 import type { CustockApi, MeContext, OrgAccess, OrgSettings, Shop } from '@custock/core';
 import type { TFunction } from '@custock/i18n';
-import { createBrowserApi, loadTokens, saveTokens } from '@/lib/api-client';
+import { basePath, createBrowserApi, loadTokens, saveTokens } from '@/lib/api-client';
+import { returnParam } from '@custock/core';
 import { useLocale, useT } from '@/lib/i18n-client';
 import { can as canFn } from '@/lib/perms';
 import { resetCatalogSync } from '@/lib/catalog-cache';
 import { wipeLocal } from '@/lib/outbox';
 import { disablePush } from '@/lib/push';
+import { setDisplayTimeZone } from '@/lib/format';
 
 interface AdminState {
   api: CustockApi;
@@ -97,7 +99,28 @@ const ORG_KEY = 'custock.org';
 
 // the business on screen: the one picked last, else the first of the person's own. a super admin
 // with no business of their own starts on the platform screens instead
+// a link from a notification or an email names its business (?org=) and maybe its shop (?shop=).
+// they are read once, applied when the person may open them, and taken off the address bar.
+function linkTarget(): { org: string | null; shop: string | null } {
+  if (typeof window === 'undefined') return { org: null, shop: null };
+  const q = new URLSearchParams(window.location.search);
+  return { org: q.get('org'), shop: q.get('shop') };
+}
+
+function dropLinkParams() {
+  const u = new URL(window.location.href);
+  if (!u.searchParams.has('org') && !u.searchParams.has('shop')) return;
+  u.searchParams.delete('org');
+  u.searchParams.delete('shop');
+  window.history.replaceState(window.history.state, '', `${u.pathname}${u.search}${u.hash}`);
+}
+
 function pickOrg(me: MeContext) {
+  const wanted = linkTarget().org;
+  if (wanted) {
+    const hit = me.orgs.find((o) => o.orgId === wanted);
+    if (hit) localStorage.setItem(ORG_KEY, hit.orgId);
+  }
   const saved = localStorage.getItem(ORG_KEY);
   return me.orgs.find((o) => o.orgId === saved) ?? (me.platformRole === 'superadmin' ? me.orgs.find((o) => !o.platformAccess) : me.orgs[0]);
 }
@@ -107,8 +130,16 @@ async function loadSession(api: CustockApi): Promise<Loaded> {
   const org = pickOrg(me);
   if (!org) return { me, orgId: null, settings: null, shops: [], shopId: null };
   session.versions.set(org.orgId, org.permsVersion);
-  const [settings, shops] = await Promise.all([api.orgSettings(org.orgId).catch(() => null), api.shops(org.orgId)]);
+  // a paused business refuses its own calls. its people get the paused screen, so nothing else loads
+  if (org.suspended && me.platformRole !== 'superadmin') return { me, orgId: org.orgId, settings: null, shops: [], shopId: null };
+  const paused = (e: unknown) => {
+    if ((e as { code?: string }).code === 'org_suspended') return [] as Shop[];
+    throw e;
+  };
+  const [settings, shops] = await Promise.all([api.orgSettings(org.orgId).catch(() => null), api.shops(org.orgId).catch(paused)]);
   const mine = new Set(org.shops.map((x) => x.shopId));
+  const linked = linkTarget().shop;
+  if (linked && mine.has(linked)) localStorage.setItem('custock.shop', linked);
   const saved = localStorage.getItem('custock.shop');
   const shopId = saved === 'all' && org.shops.length > 1 ? null
     : saved && mine.has(saved) ? saved
@@ -134,17 +165,32 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     if (isLogin) return;
     let alive = true;
     session.onStale = () => setVersion((v) => v + 1);
-    session.onUnauthorized = () => router.replace('/admin/login');
+    // signing in comes back to the page that was asked for (a notification, an email link)
+    const toLogin = () => {
+      const next = returnParam(window.location.pathname, window.location.search, basePath);
+      router.replace(next && next !== '/admin' ? `/admin/login?next=${encodeURIComponent(next)}` : '/admin/login');
+    };
+    session.onUnauthorized = toLogin;
     const go = async () => {
-      if (!loadTokens()) { router.replace('/admin/login'); return; }
+      if (!loadTokens()) { toLogin(); return; }
       try {
+        const wanted = linkTarget().org;
         const loaded = await loadSession(getApi());
-        if (alive) { setState(loaded); setFailed(false); }
+        if (!alive) return;
+        // a link to a business this person no longer works for: home, quietly
+        if (wanted && !loaded.me.orgs.some((o) => o.orgId === wanted)) {
+          dropLinkParams();
+          setState(loaded); setFailed(false);
+          router.replace('/admin');
+          return;
+        }
+        dropLinkParams();
+        setState(loaded); setFailed(false);
       } catch (e) {
         // only a rejected session signs you out. a network hiccup shows a retry instead
         if ((e as { status?: number }).status === 401 || (e as { code?: string }).code === 'unauthorized') {
           saveTokens(null);
-          router.replace('/admin/login');
+          toLogin();
         } else if (alive) setFailed(true);
       }
     };
@@ -189,6 +235,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     ? { api: getApi(), me: state.me, currentOrgId: org?.orgId ?? null, openOrg, refresh, logout, t, locale }
     : null;
   if (!org) {
+    setDisplayTimeZone(null);
     if (superadmin) {
       if (!onPlatform) return <Redirect to="/admin/platform" />;
       return <PlatformCtx.Provider value={platformValue}>{children}</PlatformCtx.Provider>;
@@ -201,6 +248,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     return <Paused t={t} name={org.name} others={state.me.orgs.filter((o) => o.orgId !== org.orgId && !o.suspended)} onOpen={openOrg} onLogout={logout} />;
   }
 
+  // every date on the admin screens shows in this business's time zone
+  setDisplayTimeZone(state.settings?.timezone ?? org.timezone);
   const value: AdminState = {
     api: getApi(), me: state.me, org, settings: state.settings, shops: state.shops, shopId: state.shopId, setShopId,
     can: (perm, s) => canFn(org, perm, s === undefined ? state.shopId : s),

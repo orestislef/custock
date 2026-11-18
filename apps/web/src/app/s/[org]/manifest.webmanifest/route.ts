@@ -2,6 +2,7 @@ import { colors } from '@custock/tokens';
 import { translator } from '@custock/i18n';
 import { getLocale } from '@/lib/i18n-server';
 import { orgInfo } from '@/lib/storefront';
+import { iconVersion, orgIconPath } from '@/lib/manifests';
 
 // each business is its own home screen app for its customers: its name, its icon, its pages
 export async function GET(_req: Request, { params }: RouteContext<'/s/[org]/manifest.webmanifest'>) {
@@ -11,6 +12,7 @@ export async function GET(_req: Request, { params }: RouteContext<'/s/[org]/mani
   const info = await orgInfo(org, locale);
   const base = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
   const home = `${base}/s/${encodeURIComponent(org)}`;
+  const v = iconVersion(info.name, info.logoUrl);
   return Response.json(
     {
       id: home,
@@ -26,11 +28,11 @@ export async function GET(_req: Request, { params }: RouteContext<'/s/[org]/mani
       background_color: colors.light.shelf,
       theme_color: colors.light.shelf,
       icons: [
-        { src: `${home}/icon/192`, sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: `${home}/icon/512`, sizes: '512x512', type: 'image/png', purpose: 'any' },
-        { src: `${home}/icon/512?maskable=1`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        { src: orgIconPath(org, 192, v), sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: orgIconPath(org, 512, v), sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: orgIconPath(org, 512, v, true), sizes: '512x512', type: 'image/png', purpose: 'maskable' },
       ],
     },
-    { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } },
+    { headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=300' } },
   );
 }

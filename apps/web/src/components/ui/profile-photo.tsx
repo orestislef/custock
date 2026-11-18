@@ -29,11 +29,14 @@ export function ProfilePhoto({ api, name, avatarUrl, size = 56, onChanged, child
   const [local, setLocal] = useState<string | null | undefined>(undefined);
   const shown = local === undefined ? avatarUrl ?? null : local;
 
-  const fail = (e: unknown) => toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
+  // a failed upload says so next to the photo, and the old photo stays
+  const [err, setErr] = useState<string | null>(null);
+  const fail = (e: unknown) => setErr(t(`common:error.${(e as { code?: string }).code ?? 'upload_failed'}`));
 
   async function choose(file: File | undefined) {
     if (!file) return;
     setBusy(true);
+    setErr(null);
     try {
       const r = await uploadAvatar(api, file);
       await api.updateMe({ avatarFileId: r.fileId });
@@ -50,6 +53,7 @@ export function ProfilePhoto({ api, name, avatarUrl, size = 56, onChanged, child
 
   async function remove() {
     setBusy(true);
+    setErr(null);
     try {
       await api.updateMe({ avatarFileId: null });
       setLocal(null);
@@ -78,6 +82,7 @@ export function ProfilePhoto({ api, name, avatarUrl, size = 56, onChanged, child
           <button type="button" className="btn btn-plain" style={{ minHeight: 32, padding: 0 }} disabled={busy} onClick={() => input.current?.click()}>{label}</button>
           {shown ? <button type="button" className="btn btn-plain" style={{ minHeight: 32, padding: 0, color: 'var(--c-error)' }} disabled={busy} onClick={() => void remove()}>{t('profile.remove')}</button> : null}
         </div>
+        {err ? <p className="t-foot m-0" role="alert" style={{ color: 'var(--c-error)' }}>{err}</p> : null}
       </div>
       <input ref={input} type="file" accept="image/*" hidden onChange={(e) => void choose(e.target.files?.[0])} />
     </div>

@@ -8,7 +8,7 @@
 //  - never touches the api (<base>/api/), uploads or anything that is not a GET
 //  - shows web push notifications and opens the right page when one is tapped
 
-const VERSION = 'v1';
+const VERSION = 'v3';
 const STATIC = `custock-static-${VERSION}`;
 const PAGES = `custock-pages-${VERSION}`;
 const BASE = new URL(self.registration.scope).pathname; // ends with a slash
@@ -87,31 +87,62 @@ self.addEventListener('push', (event) => {
     data = { body: event.data ? event.data.text() : '' };
   }
   const title = data.title || 'Custock';
+  // up to two buttons where the browser has them (chrome, edge). each carries its own page
+  const actions = Array.isArray(data.actions) ? data.actions.filter((a) => a && a.action && a.title).slice(0, 2) : [];
   const options = {
     body: data.body || '',
+    // the business's icon for its pushes, custock's own otherwise. the badge is the single colour
+    // silhouette android puts in the status bar
     icon: data.icon || `${BASE}icons/icon-192.png`,
-    badge: data.badge || `${BASE}icons/badge-96.png`,
+    badge: `${BASE}icons/badge-96.png`,
     tag: data.tag || undefined,
     renotify: !!data.tag,
-    data: { url: data.url || BASE },
+    data: { url: data.url || BASE, actions: Object.fromEntries(actions.map((a) => [a.action, a.url || data.url || BASE])) },
   };
   if (data.image) options.image = data.image;
+  if (actions.length && 'actions' in Notification.prototype) options.actions = actions.map((a) => ({ action: a.action, title: a.title }));
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
+// which app a page belongs to: the staff app (/admin), one business's home screen app (/s/<slug>),
+// or the rest of the site. a tap never pulls a staff window onto a shop page or the other way round.
+function appOf(pathname) {
+  const rest = pathname.startsWith(BASE) ? pathname.slice(BASE.length) : pathname;
+  if (rest === 'admin' || rest.startsWith('admin/')) return 'admin';
+  const shop = /^s\/([a-z0-9-]+)/.exec(rest);
+  if (shop) return `s/${shop[1]}`;
+  return 'site';
+}
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const target = new URL((event.notification.data && event.notification.data.url) || BASE, self.location.origin);
+  const data = event.notification.data || {};
+  // a button opens its own page, a tap on the notification the main one
+  const picked = event.action && data.actions && data.actions[event.action];
+  let target;
+  try {
+    target = new URL(picked || data.url || BASE, self.location.origin);
+  } catch {
+    target = new URL(BASE, self.location.origin);
+  }
   // only our own pages
   const url = target.origin === self.location.origin && target.pathname.startsWith(BASE) ? target.href : new URL(BASE, self.location.origin).href;
+  const app = appOf(new URL(url).pathname);
   event.waitUntil((async () => {
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const same = all.find((c) => c.url === url);
+    const ours = all.filter((c) => { try { return new URL(c.url).origin === self.location.origin; } catch { return false; } });
+    const same = ours.find((c) => c.url === url);
     if (same) return same.focus();
-    const ours = all.find((c) => new URL(c.url).pathname.startsWith(BASE));
-    if (ours) {
-      await ours.focus();
-      return ours.navigate(url).catch(() => self.clients.openWindow(url));
+    // a window of the same app: bring it forward and take it to the page
+    const sameApp = ours.find((c) => appOf(new URL(c.url).pathname) === app);
+    if (sameApp) {
+      try {
+        await sameApp.focus();
+        const moved = await sameApp.navigate(url);
+        if (moved) return moved;
+      } catch {
+        // a window from before this worker took over cannot be moved, a new one opens instead
+      }
     }
     return self.clients.openWindow(url);
   })());

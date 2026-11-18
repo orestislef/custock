@@ -170,7 +170,7 @@ window.I18N = {
 
     'panel.title': 'Custock demo', 'panel.sub': 'Made-up data. Click around, nothing is saved.', 'panel.screen': 'This screen', 'panel.viewas': 'View as',
     'panel.phones': 'Other phones', 'panel.phone.of': "{name}'s phone", 'panel.switch': 'Open as {name}', 'panel.look': 'Look',
-    'panel.lang': 'Language', 'panel.appearance': 'Appearance', 'panel.light': 'Light', 'panel.dark': 'Dark', 'panel.motion': 'Reduce motion', 'panel.sound': 'Sounds',
+    'panel.lang': 'Language', 'panel.appearance': 'Appearance', 'panel.auto': 'Automatic', 'panel.light': 'Light', 'panel.dark': 'Dark', 'panel.motion': 'Reduce motion', 'panel.sound': 'Sounds',
     'panel.custpage': 'Customer page (Lemoni)', 'panel.custpage.note': 'Switch to Anna to see the effect on her catalog and product pages.',
     'panel.push': 'Send a test push', 'panel.push.note': 'If the push is for someone else, it shows up under other phones.',
     'panel.reset': 'Reset demo', 'panel.foot': 'Demo with made-up data. Not the real app.', 'panel.thinking': 'Thinking docs', 'panel.pill': 'Demo',
@@ -348,7 +348,7 @@ window.I18N = {
 
     'panel.title': 'Custock demo', 'panel.sub': 'Φανταστικά δεδομένα. Πάτα παντού, τίποτα δεν αποθηκεύεται.', 'panel.screen': 'Αυτή η οθόνη', 'panel.viewas': 'Δες ως',
     'panel.phones': 'Άλλα κινητά', 'panel.phone.of': 'Κινητό: {name}', 'panel.switch': 'Άνοιξε ως {name}', 'panel.look': 'Εμφάνιση',
-    'panel.lang': 'Γλώσσα', 'panel.appearance': 'Θέμα', 'panel.light': 'Φωτεινό', 'panel.dark': 'Σκούρο', 'panel.motion': 'Λιγότερη κίνηση', 'panel.sound': 'Ήχοι',
+    'panel.lang': 'Γλώσσα', 'panel.appearance': 'Θέμα', 'panel.auto': 'Αυτόματο', 'panel.light': 'Φωτεινό', 'panel.dark': 'Σκούρο', 'panel.motion': 'Λιγότερη κίνηση', 'panel.sound': 'Ήχοι',
     'panel.custpage': 'Σελίδα πελατών (Lemoni)', 'panel.custpage.note': 'Γίνε Άννα για να δεις το αποτέλεσμα στον κατάλογο και στα προϊόντα.',
     'panel.push': 'Δοκιμαστικό push', 'panel.push.note': 'Αν το push είναι για κάποιον άλλον, εμφανίζεται στα άλλα κινητά.',
     'panel.reset': 'Επαναφορά demo', 'panel.foot': 'Demo με φανταστικά δεδομένα. Όχι η κανονική εφαρμογή.', 'panel.thinking': 'Κείμενα σχεδιασμού', 'panel.pill': 'Demo',
@@ -527,7 +527,7 @@ window.I18N = {
 
     'panel.title': 'Демо Custock', 'panel.sub': 'Вымышленные данные. Нажимайте что угодно, ничего не сохраняется.', 'panel.screen': 'Этот экран', 'panel.viewas': 'Смотреть как',
     'panel.phones': 'Другие телефоны', 'panel.phone.of': 'Телефон: {name}', 'panel.switch': 'Открыть как {name}', 'panel.look': 'Вид',
-    'panel.lang': 'Язык', 'panel.appearance': 'Тема', 'panel.light': 'Светлая', 'panel.dark': 'Тёмная', 'panel.motion': 'Меньше движения', 'panel.sound': 'Звуки',
+    'panel.lang': 'Язык', 'panel.appearance': 'Тема', 'panel.auto': 'Авто', 'panel.light': 'Светлая', 'panel.dark': 'Тёмная', 'panel.motion': 'Меньше движения', 'panel.sound': 'Звуки',
     'panel.custpage': 'Страница клиентов (Lemoni)', 'panel.custpage.note': 'Переключитесь на Анну, чтобы увидеть эффект в её каталоге и товарах.',
     'panel.push': 'Тестовый push', 'panel.push.note': 'Если push для кого-то другого, он появится в других телефонах.',
     'panel.reset': 'Сбросить демо', 'panel.foot': 'Демо с вымышленными данными. Не настоящее приложение.', 'panel.thinking': 'Документы проекта', 'panel.pill': 'Демо',

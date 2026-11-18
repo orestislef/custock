@@ -10,7 +10,7 @@ import { colors } from '@custock/tokens';
 
 const font = readFile(join(process.cwd(), 'assets', 'fonts', 'Commissioner-SemiBold.ttf'));
 
-export async function monogram(name: string, size: number, maskable = false): Promise<ImageResponse> {
+export async function monogram(name: string, size: number, maskable = false, cacheControl = 'public, max-age=300'): Promise<ImageResponse> {
   const letter = [...name.trim()][0]?.toLocaleUpperCase() ?? 'C';
   return new ImageResponse(
     (
@@ -18,17 +18,17 @@ export async function monogram(name: string, size: number, maskable = false): Pr
         <div style={{ color: '#FFFFFF', fontSize: size * (maskable ? 0.42 : 0.56), fontFamily: 'Commissioner', lineHeight: 1, marginTop: size * 0.02 }}>{letter}</div>
       </div>
     ),
-    { width: size, height: size, fonts: [{ name: 'Commissioner', data: await font, weight: 600, style: 'normal' }], headers: { 'Cache-Control': 'public, max-age=86400' } },
+    { width: size, height: size, fonts: [{ name: 'Commissioner', data: await font, weight: 600, style: 'normal' }], headers: { 'Cache-Control': cacheControl } },
   );
 }
 
 // the home screen icon of a business with a logo: the logo on white, inside the safe zone. the logo
 // is fetched here and handed over as data, so a slow or missing logo falls back to the monogram.
-export async function logoIcon(logoUrl: string, name: string, size: number, maskable = false): Promise<ImageResponse> {
+export async function logoIcon(logoUrl: string, name: string, size: number, maskable = false, cacheControl = 'public, max-age=300'): Promise<ImageResponse> {
   try {
     const res = await fetch(logoUrl, { signal: AbortSignal.timeout(4000) });
     const type = res.headers.get('content-type') ?? '';
-    if (!res.ok || !/^image\/(png|jpeg)/.test(type)) return monogram(name, size, maskable);
+    if (!res.ok || !/^image\/(png|jpeg)/.test(type)) return monogram(name, size, maskable, 'public, max-age=300');
     const data = `data:${type.split(';')[0]};base64,${Buffer.from(await res.arrayBuffer()).toString('base64')}`;
     const inner = Math.round(size * (maskable ? 0.6 : 0.76));
     return new ImageResponse(
@@ -38,9 +38,9 @@ export async function logoIcon(logoUrl: string, name: string, size: number, mask
           <img src={data} width={inner} height={inner} alt="" style={{ objectFit: 'contain' }} />
         </div>
       ),
-      { width: size, height: size, headers: { 'Cache-Control': 'public, max-age=86400' } },
+      { width: size, height: size, headers: { 'Cache-Control': cacheControl } },
     );
   } catch {
-    return monogram(name, size, maskable);
+    return monogram(name, size, maskable, 'public, max-age=300');
   }
 }

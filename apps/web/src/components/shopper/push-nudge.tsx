@@ -13,7 +13,7 @@ import { useShopper } from './shopper-context';
 
 export function PushNudge() {
   const t = useT();
-  const { api, follow, slug, orgName } = useShopper();
+  const { api, follow, slug, orgName, iconVersion } = useShopper();
   const push = usePushSwitch(api, follow?.orgId ?? null);
   const [steps, setSteps] = useState(false);
   const [done, setDone] = useState(false);
@@ -36,7 +36,7 @@ export function PushNudge() {
           {push.why && push.why !== push.blocked ? <p className="t-foot t-2 m-0 mt-2" role="status">{t(`push.why.${push.why}`)}</p> : null}
         </div>
       </div>
-      <InstallSteps open={steps} onClose={() => setSteps(false)} appName={orgName} icon={<AppIcon src={orgIconSrc(slug)} size={44} label={orgName} />} />
+      <InstallSteps open={steps} onClose={() => setSteps(false)} appName={orgName} icon={<AppIcon src={orgIconSrc(slug, iconVersion)} size={44} label={orgName} />} />
     </div>
   );
 }

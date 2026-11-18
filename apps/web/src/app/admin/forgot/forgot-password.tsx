@@ -10,6 +10,8 @@ import { LocaleSwitch } from '@/components/ui/client-kit';
 import { IconMail } from '@/components/ui/icons';
 import { createBrowserApi } from '@/lib/api-client';
 import { useLocale, useT } from '@/lib/i18n-client';
+import { emailProblem, normalizeEmail, type FieldError } from '@custock/core';
+import { FieldMessage } from '@/components/ui/field-kit';
 
 const WAIT_S = 60;
 
@@ -21,6 +23,7 @@ export function ForgotPassword({ initialEmail }: { initialEmail: string }) {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<FieldError | null>(null);
   const [wait, setWait] = useState(0);
 
   useEffect(() => {
@@ -31,8 +34,11 @@ export function ForgotPassword({ initialEmail }: { initialEmail: string }) {
 
   async function send(e?: React.FormEvent) {
     e?.preventDefault();
-    const address = email.trim();
+    const address = normalizeEmail(email);
     if (!address || busy) return;
+    const problem = emailProblem(address);
+    if (problem) { setEmailError(problem); return; }
+    setEmail(address);
     setBusy(true);
     setError(null);
     try {
@@ -73,9 +79,13 @@ export function ForgotPassword({ initialEmail }: { initialEmail: string }) {
                 <div className="list mb-3">
                   <label className="block">
                     <span className="sr-only">{t('forgot.email')}</span>
-                    <input className="field" type="email" autoComplete="username" inputMode="email" placeholder={t('forgot.email')} value={email}
-                      onChange={(e) => setEmail(e.target.value)} required autoFocus={!initialEmail} />
+                    <input className="field" type="email" autoComplete="username" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="send" maxLength={254}
+                      placeholder={t('forgot.email')} value={email} aria-invalid={emailError ? true : undefined} aria-describedby={emailError ? 'forgot-email-error' : undefined}
+                      onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(null); }}
+                      onBlur={() => { setEmail((v) => normalizeEmail(v)); if (email.trim()) setEmailError(emailProblem(email)); }}
+                      required autoFocus={!initialEmail} />
                   </label>
+                  <FieldMessage id="forgot-email-error" kind="email" error={emailError} />
                 </div>
                 {error ? <p className="t-sub mb-3" role="alert" style={{ color: 'var(--c-error)' }}>{error}</p> : null}
                 <button className="btn btn-primary btn-large" type="submit" disabled={busy || !email.trim()}>{t('forgot.send')}</button>

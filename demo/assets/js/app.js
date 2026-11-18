@@ -17,7 +17,10 @@
   const mqReduce = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
   const S = {
     lang: prefs.lang || guessLang(),
-    theme: prefs.theme || (mqDark && mqDark.matches ? 'dark' : 'light'),
+    // automatic follows the system, light and dark are a choice in the panel. older saved themes
+    // count as automatic, so everyone starts on the system setting
+    appearance: prefs.appearance === 'light' || prefs.appearance === 'dark' ? prefs.appearance : 'auto',
+    theme: 'light',
     reduce: prefs.reduce != null ? prefs.reduce : !!(mqReduce && mqReduce.matches),
     sound: prefs.sound != null ? prefs.sound : true,
     role: prefs.role || 'eleni',
@@ -25,7 +28,9 @@
     data: window.CSData.makeData(),
     shop: {}, tab: null, stacks: {}, previews: [], ui: {}, compose: null, pendingAccess: {}
   };
-  function save() { try { localStorage.setItem(PREF, JSON.stringify({ lang: S.lang, theme: S.theme, reduce: S.reduce, sound: S.sound, role: S.role, tips: S.tips })); } catch (e) { /* private mode */ } }
+  function systemTheme() { return mqDark && mqDark.matches ? 'dark' : 'light'; }
+  S.theme = S.appearance === 'auto' ? systemTheme() : S.appearance;
+  function save() { try { localStorage.setItem(PREF, JSON.stringify({ lang: S.lang, appearance: S.appearance, reduce: S.reduce, sound: S.sound, role: S.role, tips: S.tips })); } catch (e) { /* private mode */ } }
 
   /* ---------------- i18n and formats ---------------- */
   const PR = {};
@@ -1128,17 +1133,39 @@
     const code = el.dataset.code;
     S.ui.np = { name: '', price: '' };
     openSheet({ title: t('np.title'), detent: 'large', noFocus: true, render: () => '<div class="list">' +
-      '<div class="input-cell"><label for="np-name">' + T('np.name') + '</label><input id="np-name" data-in="np-name" placeholder="' + T('np.name.ph') + '" autocomplete="off"></div>' +
-      '<div class="input-cell"><label for="np-price">' + T('np.price') + '</label><input id="np-price" data-in="np-price" inputmode="decimal" placeholder="0,00"></div>' +
+      '<div class="input-cell"><label for="np-name">' + T('np.name') + '</label><input id="np-name" data-in="np-name" placeholder="' + T('np.name.ph') + '" autocomplete="off" autocapitalize="sentences" enterkeyhint="next" maxlength="200"></div>' +
+      '<div class="input-cell"><label for="np-price">' + T('np.price') + '</label><input id="np-price" data-in="np-price" inputmode="decimal" autocomplete="off" enterkeyhint="done" maxlength="20" placeholder="0,00"></div>' +
       '<div class="input-cell"><label>' + T('np.code') + '</label><input value="' + esc(code) + '" readonly></div></div>' +
       '<p class="section-f">' + T('np.note') + '</p><div class="mt16"><button class="btn primary block" data-act="np-save" data-code="' + esc(code) + '">' + T('np.save') + '</button></div>',
       after: (sh) => { const i = $('#np-name', sh); if (i) setTimeout(() => i.focus(), 350); } });
   };
+  // the error line under a field, gone again as soon as the field changes
+  function fieldErr(el, key) {
+    if (!el) return;
+    el.setAttribute('aria-invalid', 'true');
+    const host = el.closest('.input-cell') || el.parentElement;
+    let m = host && host.nextElementSibling && host.nextElementSibling.classList.contains('field-msg') ? host.nextElementSibling : null;
+    if (!m && host) { m = document.createElement('p'); m.className = 'field-msg'; m.setAttribute('role', 'alert'); host.insertAdjacentElement('afterend', m); }
+    if (m) m.textContent = t(key);
+    el.focus();
+  }
+  function fieldOk(el) {
+    if (!el) return;
+    el.removeAttribute('aria-invalid');
+    const host = el.closest('.input-cell') || el.parentElement;
+    const m = host && host.nextElementSibling;
+    if (m && m.classList.contains('field-msg')) m.remove();
+  }
+  const moneyKey = (e) => (e === 'tooManyDecimals' ? 'field.tooManyDecimals' : e === 'negative' ? 'field.negative' : e === 'tooLarge' ? 'field.tooLarge' : 'field.money');
   IN['np-name'] = (el) => { S.ui.np.name = el.value; };
-  IN['np-price'] = (el) => { S.ui.np.price = el.value; };
+  IN['np-price'] = (el) => { S.ui.np.price = el.value; fieldOk(el); };
   ACT['np-save'] = (el) => {
-    const name = (S.ui.np.name || '').trim() || t('np.default');
-    const price = Math.round(parseFloat(String(S.ui.np.price || '0').replace(',', '.')) * 100) || 0;
+    const name = CV.line(S.ui.np.name, 200) || t('np.default');
+    // the price with the same rules as the real app: 9,90 and 9.90 work, 9,,90 does not
+    const raw = String(S.ui.np.price || '').trim();
+    const r = raw ? CV.money(raw) : { ok: true, value: 0 };
+    if (!r.ok) { fieldErr($('#np-price'), moneyKey(r.error)); return; }
+    const price = r.value;
     const id = 'new-' + Date.now();
     const v = { id: id, pid: id, opt: null, price: price, cost: 0, stock: { kif: 0, mar: 0, gly: 0 }, rp: {}, sku: 'LEM-NEW', barcodes: [el.dataset.code] };
     const p = { id: id, img: null, cat: 'pantry', vat: 24, pop: 0, name: { en: name, el: name, ru: name }, desc: { en: '', el: '', ru: '' }, variants: [v] };
@@ -1410,7 +1437,13 @@
   SEG.cwhen = (v) => { S.compose.when = v; refresh(); };
   IN['cmp-title'] = (el) => { S.compose.title[S.compose.lang] = el.value; refreshPart('lang-tabs'); };
   IN['cmp-body'] = (el) => { S.compose.body[S.compose.lang] = el.value; };
-  IN['offer-price'] = (el) => { const x = S.compose.products.find((p) => p.vid === el.dataset.vid); const v = parseFloat(el.value.replace(',', '.')); x.offer = isNaN(v) ? null : Math.round(v * 100); };
+  IN['offer-price'] = (el) => {
+    const x = S.compose.products.find((p) => p.vid === el.dataset.vid);
+    const r = el.value.trim() ? CV.money(el.value) : { ok: true, value: null };
+    x.offer = r.ok ? r.value : null;
+    x.offerBad = r.ok ? null : r.error;
+    if (r.ok) el.removeAttribute('aria-invalid');
+  };
   ACT['cmp-example'] = () => {
     const c = S.compose;
     c.kind = 'new_arrival';
@@ -1434,6 +1467,14 @@
   ACT['cmp-toggle'] = (el) => { const c = S.compose, vid = el.dataset.vid; c.products = c.products.some((x) => x.vid === vid) ? c.products.filter((x) => x.vid !== vid) : c.products.concat([{ vid: vid, offer: null }]); haptic(6); sheetRefresh(); };
   ACT['cmp-send'] = () => {
     const c = S.compose;
+    const bad = c.products.find((x) => x.offerBad);
+    if (c.kind === 'offer' && bad) {
+      const i = $('[data-in="offer-price"][data-vid="' + bad.vid + '"]');
+      if (i) i.setAttribute('aria-invalid', 'true');
+      toast(t(moneyKey(bad.offerBad)), { icon: 'info' });
+      if (i) i.focus();
+      return;
+    }
     const lang = ['el', 'en', 'ru'].find((l) => c.title[l]) || null;
     if (!lang) { toast(t('cmp.need.title'), { icon: 'info' }); const i = $('[data-in="cmp-title"]'); if (i) i.focus(); return; }
     if (!c.scopes.length) { toast(t('cmp.need.scope'), { icon: 'info' }); return; }
@@ -1734,17 +1775,19 @@
   function inviteHtml() {
     const v = S.ui.inv, scopes = scopesWith('members.invite');
     const p = v.sc.split(':'), sc = { scope: p[0], id: p[1] };
-    return '<div class="list"><div class="input-cell"><label for="inv-email">' + T('inv.email') + '</label><input id="inv-email" type="email" inputmode="email" autocomplete="off" data-in="inv-email" value="' + esc(v.email) + '" placeholder="name@example.com"></div></div>' +
+    return '<div class="list"><div class="input-cell"><label for="inv-email">' + T('inv.email') + '</label><input id="inv-email" type="email" inputmode="email" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="254" data-in="inv-email" value="' + esc(v.email) + '" placeholder="name@example.com"></div></div>' +
       '<div class="section-h">' + T('inv.where') + '</div><div class="chips">' + scopes.map((s) => '<button class="chip" data-act="inv-sc" data-k="' + skey(s) + '" aria-pressed="' + (v.sc === skey(s)) + '">' + esc(s.scope === 'org' ? t('scope.org.short') : scopeName(s)) + '</button>').join('') + '</div>' +
       '<div class="section-h">' + T('inv.role') + '</div>' + roleChoices(sc, v.role, 'inv-role', {}) +
       '<p class="section-f">' + T('inv.rules') + '</p>' +
       '<div class="mt16"><button class="btn primary block" data-act="inv-send"' + (v.role ? '' : ' disabled') + '>' + ic('send') + T('inv.send') + '</button></div>';
   }
-  IN['inv-email'] = (el) => { S.ui.inv.email = el.value; };
+  IN['inv-email'] = (el) => { S.ui.inv.email = el.value; fieldOk(el); };
   ACT['inv-sc'] = (el) => { S.ui.inv.sc = el.dataset.k; S.ui.inv.role = null; sheetRefresh(); };
   ACT['inv-role'] = (el) => { S.ui.inv.role = el.dataset.role; sheetRefresh(); };
   ACT['inv-send'] = () => {
-    const v = S.ui.inv, email = (v.email || '').trim() || 'new.person@example.com';
+    const v = S.ui.inv, typed = CV.normalizeEmail(v.email);
+    if (typed) { const p = CV.emailProblem(typed); if (p) { fieldErr($('#inv-email'), p === 'spaces' ? 'field.spaces' : 'field.email'); return; } }
+    const email = typed || 'new.person@example.com';
     const p = v.sc.split(':');
     Dt().members.push({ id: 'inv' + Date.now(), name: email, email: email, tile: 5, status: 'invited', assign: [{ role: v.role, scope: p[0], id: p[1] }] });
     closeSheet(); toast(t('inv.sent', { email: email }), { icon: 'mail' }); refresh();
@@ -2158,8 +2201,8 @@
         '<div class="brand-head"><span class="logo-tile">L</span><div><div class="t-title3">Lemoni ' + esc(sname('gly')) + '</div><div class="muted t-foot">' + esc(L(shopById('gly').addr)) + '</div></div></div>' +
         (already ? '<div class="why">' + ic('check') + '<span>' + T('join.already') + '</span></div>' :
           '<p class="t-callout" style="margin:0 0 12px">' + T('join.lead') + '</p>' +
-          '<label class="t-foot muted" for="j-name">' + T('join.name') + '</label><input class="join-input" id="j-name" data-in="j-name" value="' + esc(j.name) + '" autocomplete="name">' +
-          '<label class="t-foot muted" for="j-email" style="display:block;margin-top:10px">' + T('join.email') + '</label><input class="join-input" id="j-email" type="email" inputmode="email" data-in="j-email" value="' + esc(j.email) + '" autocomplete="email">' +
+          '<label class="t-foot muted" for="j-name">' + T('join.name') + '</label><input class="join-input" id="j-name" data-in="j-name" value="' + esc(j.name) + '" autocomplete="name" autocapitalize="words" enterkeyhint="next" maxlength="40">' +
+          '<label class="t-foot muted" for="j-email" style="display:block;margin-top:10px">' + T('join.email') + '</label><input class="join-input" id="j-email" type="email" inputmode="email" data-in="j-email" value="' + esc(j.email) + '" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="254">' +
           '<div class="t-foot muted" style="margin:14px 0 6px">' + T('join.interests') + '</div><div class="chips" style="margin:0 -16px 6px">' + Dt().categories.map((c) => '<button class="chip" data-act="j-int" data-id="' + c.id + '" aria-pressed="' + (j.interests.indexOf(c.id) >= 0) + '">' + esc(L(c.name)) + '</button>').join('') + '</div>' +
           '<div class="checkrow"><input type="checkbox" id="j-em" data-ch="j-em"' + (j.email_ok ? ' checked' : '') + '><label for="j-em">' + T('join.c.email') + '</label></div>' +
           '<div class="checkrow"><input type="checkbox" id="j-pu" data-ch="j-pu"' + (j.push_ok ? ' checked' : '') + '><label for="j-pu">' + T('join.c.push') + '</label></div>' +
@@ -2172,12 +2215,19 @@
     };
   };
   IN['j-name'] = (el) => { S.ui.join.name = el.value; refreshPart('join-cta'); };
-  IN['j-email'] = (el) => { S.ui.join.email = el.value; refreshPart('join-cta'); };
+  IN['j-email'] = (el) => { S.ui.join.email = el.value; fieldOk(el); refreshPart('join-cta'); };
   CH['j-em'] = (el) => { S.ui.join.email_ok = el.checked; };
   CH['j-pu'] = (el) => { S.ui.join.push_ok = el.checked; };
   CH['j-age'] = (el) => { S.ui.join.age = el.checked; refreshPart('join-cta'); };
   ACT['j-int'] = (el) => { const j = S.ui.join, k = el.dataset.id; j.interests = j.interests.indexOf(k) >= 0 ? j.interests.filter((x) => x !== k) : j.interests.concat([k]); el.setAttribute('aria-pressed', String(j.interests.indexOf(k) >= 0)); };
-  ACT['join-go'] = () => { if (S.ui.join.email_ok) go('c-email'); else { finishJoin(false); go('c-welcome'); } };
+  ACT['join-go'] = () => {
+    const j = S.ui.join;
+    j.name = CV.line(j.name, 40);
+    j.email = CV.normalizeEmail(j.email);
+    const p = CV.emailProblem(j.email);
+    if (p) { fieldErr($('#j-email'), p === 'spaces' ? 'field.spaces' : 'field.email'); return; }
+    if (j.email_ok) go('c-email'); else { finishJoin(false); go('c-welcome'); }
+  };
   function finishJoin(confirmed) {
     const a = ANNA(), j = S.ui.join, now = Date.now();
     if (!a.subs.some((s) => s.scope === 'shop' && s.id === 'gly')) a.subs.push({ scope: 'shop', id: 'gly', status: 'subscribed', at: now });
@@ -2406,7 +2456,7 @@
       }).join('') + '</div></div>' : '') +
       '<div class="p-sec"><h2>' + T('panel.look') + '</h2><div class="p-box">' +
       '<div class="p-stack"><span class="p-l">' + T('panel.lang') + '</span>' + seg('lang', [['en', 'English'], ['el', 'Ελληνικά'], ['ru', 'Русский']], S.lang) + '</div>' +
-      '<div class="p-stack"><span class="p-l">' + T('panel.appearance') + '</span>' + seg('theme', [['light', t('panel.light')], ['dark', t('panel.dark')]], S.theme) + '</div>' +
+      '<div class="p-stack"><span class="p-l">' + T('panel.appearance') + '</span>' + seg('theme', [['auto', t('panel.auto')], ['light', t('panel.light')], ['dark', t('panel.dark')]], S.appearance) + '</div>' +
       '<div class="p-row"><span class="p-l">' + T('panel.motion') + '</span>' + sw('p-reduce', S.reduce, false, t('panel.motion')) + '</div>' +
       '<div class="p-row"><span class="p-l">' + T('panel.sound') + '</span>' + sw('p-sound', S.sound, false, t('panel.sound')) + '</div></div></div>' +
       '<div class="p-sec"><h2>' + T('panel.custpage') + '</h2><div class="p-box">' +
@@ -2439,7 +2489,7 @@
     if (last && last.n.route) setTimeout(() => openRoute(last.n.route), 250);
   };
   SEG.lang = (v) => { S.lang = v; save(); applyChrome(); renderPanel(); refresh(); renderTabs(); };
-  SEG.theme = (v) => { S.theme = v; save(); applyChrome(); };
+  SEG.theme = (v) => { S.appearance = v; S.theme = v === 'auto' ? systemTheme() : v; save(); applyChrome(); };
   CH['p-reduce'] = (el) => { S.reduce = el.checked; save(); applyChrome(); };
   CH['p-sound'] = (el) => { S.sound = el.checked; save(); };
   SEG['s-cat'] = (v) => { Dt().org.settings.catalog = v; refresh(); renderNarration(); };
@@ -2478,7 +2528,7 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { if (SHEET) closeSheet(); else if ($('#panel.open')) closePanel(); }
   });
-  if (mqDark && mqDark.addEventListener) mqDark.addEventListener('change', (e) => { if (!loadPrefs().theme) { S.theme = e.matches ? 'dark' : 'light'; applyChrome(); } });
+  if (mqDark && mqDark.addEventListener) mqDark.addEventListener('change', (e) => { if (S.appearance === 'auto') { S.theme = e.matches ? 'dark' : 'light'; applyChrome(); } });
 
   /* ---------------- clock in the fake status bar ---------------- */
   function clock() { const el = $('#sb-time'); if (el) el.textContent = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(Date.now()); }

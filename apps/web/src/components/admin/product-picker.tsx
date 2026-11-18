@@ -17,7 +17,7 @@ export function ProductPicker({ open, onClose, onPick, title }: { open: boolean;
   const list = useAsync(() => (open ? api.products(org.orgId, { q: q || undefined, limit: 60 }) : Promise.resolve(null)), [open, q]);
   return (
     <Sheet open={open} onClose={onClose} title={title}>
-      <div className="search mb-3"><IconSearch size={18} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('stock.search')} aria-label={t('stock.search')} /></div>
+      <div className="search mb-3"><IconSearch size={18} /><input type="search" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} maxLength={200} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('stock.search')} aria-label={t('stock.search')} /></div>
       <div className="list mb-2">
         {(list.data?.items ?? []).flatMap((p) => p.variants.map((v) => (
           <button key={v.id} type="button" className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties} onClick={() => onPick({ product: p, variantId: v.id })}>

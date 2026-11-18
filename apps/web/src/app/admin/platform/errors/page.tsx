@@ -85,7 +85,7 @@ function ErrorList() {
         <label className="flex items-center gap-2 px-3 rounded-[10px]" style={{ background: 'var(--c-fill)', minHeight: 40 }}>
           <IconSearch size={18} className="t-2" />
           <span className="sr-only">{t('issues.search')}</span>
-          <input className="flex-1 bg-transparent border-0 outline-none t-body" style={{ fontSize: 16 }} type="search" placeholder={t('issues.search')} value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="flex-1 bg-transparent border-0 outline-none t-body" style={{ fontSize: 16 }} type="search" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} maxLength={200} aria-label={t('issues.search')} placeholder={t('issues.search')} value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
       </div>
 

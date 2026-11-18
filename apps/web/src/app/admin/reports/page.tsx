@@ -5,7 +5,7 @@ import { Page } from '@/components/admin/shell';
 import { BarList, ChartCard, ColumnChart, DataTable, FunnelBars, Legend } from '@/components/admin/charts';
 import { Group, Row } from '@/components/ui/kit';
 import { useAsync } from '@/lib/use-async';
-import { date, money, number, qtyNumber } from '@/lib/format';
+import { date, money, number, qtyNumber, intlLocale } from '@/lib/format';
 import type { Uom } from '@custock/core';
 import { RedirectHome } from '@/components/admin/redirect-home';
 
@@ -30,7 +30,7 @@ export default function ReportsPage() {
 
   const eur = (n: number) => money(n, org.currency, locale);
   // the same currency style as every other amount, whole units on the axis
-  const eurAxis = (n: number) => new Intl.NumberFormat(locale === 'el' ? 'el-GR' : locale === 'ru' ? 'ru-RU' : 'en-GB', { style: 'currency', currency: org.currency, maximumFractionDigits: 0 }).format(n / 100);
+  const eurAxis = (n: number) => new Intl.NumberFormat(intlLocale(locale), { style: 'currency', currency: org.currency, maximumFractionDigits: 0 }).format(n / 100);
   const days = (sales.data ?? []).map((p) => {
     const ms = new Date(`${p.day}T12:00:00Z`).getTime();
     return { key: p.day, label: date(ms, locale, { day: 'numeric' }), long: date(ms, locale, { weekday: 'long', day: 'numeric', month: 'long' }), value: p.value };

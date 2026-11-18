@@ -68,7 +68,7 @@ export function PriceLine({ p, t, locale, small }: { p: PublicProduct; t: TFunct
         {!small ? (
           <p className="t-foot t-2 mt-1 mb-0">
             {t('product.wasNote')}
-            {p.offer.validUntil ? ` ${t('product.until', { date: date(p.offer.validUntil, locale, { weekday: 'long', day: 'numeric', month: 'long' }) })}` : ''}
+            {p.offer.validUntil ? ` ${t('product.until', { date: date(p.offer.validUntil, locale, { weekday: 'long', day: 'numeric', month: 'long' }, p.timezone) })}` : ''}
           </p>
         ) : null}
       </div>

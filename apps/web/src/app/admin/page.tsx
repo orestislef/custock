@@ -19,7 +19,7 @@ import { useNames } from '@/lib/use-names';
 import { AppIcon, InstallCoach } from '@/components/pwa/install-coach';
 import { PushCard } from '@/components/pwa/push-card';
 import { basePath } from '@/lib/api-client';
-import { date, qtyNumber, relative } from '@/lib/format';
+import { date, hourIn, qtyNumber, relative } from '@/lib/format';
 
 // home answers "what needs me" first, then what changed, then a few numbers as a list.
 // staff get their own today: the actions they do all day and what they did last.
@@ -32,8 +32,9 @@ export default function Home() {
   return staffLike ? <StaffToday /> : <ManagerHome key={org.orgId} />;
 }
 
+// the hour where the business is, not where the device is
 function greeting(t: TFunction, name: string, now: number) {
-  const hour = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/Athens' }).format(now));
+  const hour = hourIn(now);
   return t(hour < 12 ? 'dash.morning' : hour < 18 ? 'dash.afternoon' : 'dash.evening', { name });
 }
 
@@ -45,6 +46,10 @@ function ManagerHome() {
   const names = useNames(api, org.orgId, locale);
   const [now] = useState(Date.now);
   const d = cards.data;
+  // what happened to the posts this person wrote: approved and sent, or stopped, in the last 3 days
+  const posted = useAsync(() => (can('posts.create', null) ? api.posts(org.orgId) : Promise.resolve(null)), []);
+  const myPosts = (posted.data?.items ?? []).filter((p) => p.authorId === me.user.id && now - (p.sentAt ?? p.createdAt) < 3 * 86_400_000
+    && ((['sent', 'sending', 'scheduled'].includes(p.status) && p.approvedBy && p.approvedBy !== me.user.id) || p.status === 'cancelled')).slice(0, 3);
   const shopName = (id: string) => shops.find((s) => s.id === id)?.name ?? '';
 
   const needs = d
@@ -78,6 +83,15 @@ function ManagerHome() {
               {!d ? <Row title={<span className="inline-block h-4 w-40 skel" />} /> : needs.length ? needs.map((n) => (
                 <Row key={n.key} href={n.href} leading={<IconTile tone={n.tone}>{n.icon}</IconTile>} title={t(`dash.need.${n.key}`, { count: n.n })} />
               )) : <Row leading={<IconTile tone="ok"><IconCheck size={18} /></IconTile>} title={t('dash.nothing')} />}
+            </Group>
+          ) : null}
+
+          {myPosts.length ? (
+            <Group title={t('dash.yourPosts')}>
+              {myPosts.map((p) => (
+                <Row key={p.id} href={`/admin/posts/${p.id}`} leading={<IconTile tone={p.status === 'cancelled' ? undefined : 'ok'}><IconMegaphone size={18} /></IconTile>}
+                  title={t(p.status === 'cancelled' ? 'dash.postStopped' : 'dash.postWent')} subtitle={p.translations[p.defaultLocale]?.title ?? ''} />
+              ))}
             </Group>
           ) : null}
 

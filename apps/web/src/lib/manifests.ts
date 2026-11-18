@@ -1,6 +1,9 @@
 // the two kinds of home screen app, as metadata for the pages that belong to them
 
 import type { Metadata } from 'next';
+import { iconVersion } from '@custock/core';
+
+export { iconVersion };
 
 const base = () => process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
@@ -13,12 +16,17 @@ export function staffAppMetadata(): Metadata {
   return { manifest: `${base()}/manifest.webmanifest`, icons: appIcons(), appleWebApp: { capable: true, title: 'Custock', statusBarStyle: 'default' } };
 }
 
-// a business's pages carry its own name and monogram icon to the home screen
-export function orgAppMetadata(slug: string, name: string): Metadata {
+export function orgIconPath(slug: string, size: 180 | 192 | 512, version: string, maskable = false): string {
+  return `${base()}/s/${encodeURIComponent(slug)}/icon/${size}?v=${version}${maskable ? '&maskable=1' : ''}`;
+}
+
+// a business's pages carry its own name and icon (logo or monogram) to the home screen
+export function orgAppMetadata(slug: string, name: string, logoUrl?: string | null): Metadata {
   const home = `${base()}/s/${encodeURIComponent(slug)}`;
+  const v = iconVersion(name, logoUrl);
   return {
-    manifest: `${home}/manifest.webmanifest`,
-    icons: { icon: [{ url: `${home}/icon/192`, sizes: '192x192', type: 'image/png' }], apple: [{ url: `${home}/icon/180`, sizes: '180x180' }] },
+    manifest: `${home}/manifest.webmanifest?v=${v}`,
+    icons: { icon: [{ url: orgIconPath(slug, 192, v), sizes: '192x192', type: 'image/png' }], apple: [{ url: orgIconPath(slug, 180, v), sizes: '180x180' }] },
     appleWebApp: { capable: true, title: name, statusBarStyle: 'default' },
   };
 }

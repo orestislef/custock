@@ -23,7 +23,7 @@
       "subject": "Confirm you want news from {{scope}}",
       "preheader": "One tap and you will hear about new arrivals and offers.",
       "heading": "Confirm your email",
-      "lead": "Hi {{name}}, tap the button to get news and offers from {{scope}}.",
+      "lead": "Tap the button to get news and offers from {{scope}}.",
       "button": "Yes, keep me posted",
       "note": "If it was not you, ignore this email and nothing will be sent."
     },
@@ -55,7 +55,9 @@
       "preheader": "Your account now uses {{email}}.",
       "heading": "Your email was changed",
       "lead": "The email on your Custock account is now {{email}}. From now on we write to that address.",
-      "note": "If this was not you, reply to this email right away and we will lock the account."
+      "note": "If this was not you, reply to this email right away and we will lock the account.",
+      "button": "This was not me, undo it",
+      "noteRevert": "The button works for 7 days. It puts your old email back and signs everyone out of the account."
     },
     "post": {
       "buttonNews": "Read more",
@@ -108,6 +110,20 @@
         "storage": "photo storage",
         "client": "browser"
       }
+    },
+    "deleteCode": {
+      "subject": "Your code to delete your Custock account: {{code}}",
+      "preheader": "It works for 10 minutes.",
+      "heading": "Confirm deleting your account",
+      "lead": "Enter this code in Custock to delete your account. It works for 10 minutes.",
+      "note": "If you did not ask for it, ignore this email. Nothing is deleted."
+    },
+    "emailReverted": {
+      "subject": "Your Custock email is back",
+      "preheader": "Your account uses {{email}} again.",
+      "heading": "Your email is back",
+      "lead": "The email on your Custock account is {{email}} again, and every device was signed out.",
+      "note": "If you also lost your password, ask for a new one on the sign in page."
     }
   },
   "push": {
@@ -144,6 +160,48 @@
       "title": "{{app}}",
       "bodyStaff": "Alerts work on this device. Low stock, deliveries and posts to approve will show up like this.",
       "bodyCustomer": "Notifications work. Offers and back in stock news will show up like this."
+    },
+    "platform": {
+      "error": {
+        "title": "New error on Custock",
+        "body": "{{title}}"
+      },
+      "storage": {
+        "title": "Photo storage at {{percent}}%",
+        "body": "Of the free tier. New photos stop at 95%."
+      },
+      "owner": {
+        "title": "{{org}} has its owner",
+        "body": "{{name}} set a password and can start."
+      },
+      "budget": {
+        "title": "Email is waiting",
+        "body": "More than {{limit}} emails in an hour. The rest goes out next hour."
+      }
+    },
+    "action": {
+      "view": "View",
+      "offers": "Offers",
+      "open": "Open"
+    },
+    "transferReceived": {
+      "title": "Arrived at {{shop}}",
+      "body_one": "{{count}} item from {{from}} was received.",
+      "body_other": "{{count}} items from {{from}} were received.",
+      "bodyShort_one": "{{count}} item from {{from}} was received, {{short}} missing.",
+      "bodyShort_other": "{{count}} items from {{from}} were received, {{short}} missing."
+    },
+    "postPublished": {
+      "title": "Your post is out",
+      "body": "\"{{title}}\" was approved and sent."
+    },
+    "postScheduled": {
+      "title": "Your post is approved",
+      "body": "\"{{title}}\" goes out at the time you set."
+    },
+    "postReturned": {
+      "title": "Your post was not sent",
+      "body": "\"{{title}}\" was stopped before it went out."
     }
   }
 }

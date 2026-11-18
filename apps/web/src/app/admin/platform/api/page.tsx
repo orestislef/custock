@@ -91,7 +91,7 @@ function ApiDocs() {
         <>
           <div className="search mb-3" style={{ height: 40 }}>
             <IconSearch size={18} />
-            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('platform.dev.api.search')} aria-label={t('platform.dev.api.search')} autoComplete="off" spellCheck={false} />
+            <input type="search" inputMode="search" enterKeyHint="search" autoCorrect="off" autoCapitalize="none" maxLength={200} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('platform.dev.api.search')} aria-label={t('platform.dev.api.search')} autoComplete="off" spellCheck={false} />
           </div>
           <FadeRow className="flex gap-2 overflow-x-auto mb-5 -mx-4 px-4 md:mx-0 md:px-0" label={t('platform.dev.api.title')}>
             <button type="button" className="chip" aria-pressed={access === 'all'} onClick={() => setAccess('all')}>{t('platform.dev.api.all')}</button>

@@ -46,7 +46,7 @@ export default function TransfersPage() {
         <Group key={g.key} title={t(`transfers.group.${g.key}`)} footer={g.key === 'incoming' ? t('transfers.incomingFoot') : undefined}>
           {g.items.map((x) => (
             <Row key={x.id} href={`/admin/stock/transfers/${x.id}`} leading={<span className="icon-tile"><IconTruck size={18} /></span>}
-              title={`${name(x.fromShopId)} → ${name(x.toShopId)}`}
+              title={`${x.fromShopName ?? name(x.fromShopId)} → ${x.toShopName ?? name(x.toShopId)}`}
               subtitle={`${t(`transfers.status.${x.status}`)} · ${t('transfers.items', { count: x.lines.reduce((a, l) => a + l.qtySent, 0) })} · ${relative(x.sentAt ?? x.createdAt, locale)}`} />
           ))}
         </Group>
@@ -101,7 +101,8 @@ function NewTransfer({ open, onClose, onCreated }: { open: boolean; onClose: () 
             <div key={l.variantId} className="row">
               <span className="row-main row-title">{l.name}</span>
               <input className="t-body tnum text-right bg-transparent border-0 outline-none w-16 rounded-[8px] px-2 py-1" style={{ background: 'var(--c-fill)' }} inputMode="numeric"
-                aria-label={t('stockSheet.qty')} value={l.qty} onChange={(e) => { const n = Math.max(1, Number(e.target.value) || 1); setLines((x) => x.map((y, j) => (j === i ? { ...y, qty: n } : y))); }} />
+                aria-label={t('stockSheet.qty')} pattern="[0-9]*" autoComplete="off" enterKeyHint="done" value={l.qty}
+                onChange={(e) => { const digits = e.target.value.replace(/\D/g, '').slice(0, 9); const n = Math.max(1, Number(digits) || 1); setLines((x) => x.map((y, j) => (j === i ? { ...y, qty: n } : y))); }} />
               <button type="button" className="icon-btn" aria-label={t('common:action.remove')} onClick={() => setLines((x) => x.filter((_, j) => j !== i))}><IconClose size={18} /></button>
             </div>
           ))}

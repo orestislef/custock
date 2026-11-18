@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/client-kit';
 import { useLocale, useT } from '@/lib/i18n-client';
 import { PushNudge } from './push-nudge';
 import { useShopper } from './shopper-context';
+import { Gone } from '@/components/ui/gone';
 
 export function ProductActions({ p, joinHref }: { p: PublicProduct; joinHref: string | null }) {
   const t = useT();
@@ -98,6 +99,10 @@ export function FollowerProduct({ id, joinHref }: { id: string; joinHref: string
     void api.publicProduct(slug, id).then(setP, () => setP(null));
   }, [api, slug, id, follow]);
   if (status === 'loading' || (follow && p === undefined)) return <div className="h-64 rounded-[16px] skel" aria-busy="true" />;
+  // a follower opening a product the shop took off the shelf (an old notification, a saved link)
+  if (follow && p === null) {
+    return <Gone title={t('gone.shopProduct.title')} body={t('gone.shopProduct.body', { org: orgName })} href={`/s/${slug}`} cta={t('gone.shopProduct.cta', { org: orgName })} />;
+  }
   if (!follow || !p) {
     return (
       <Empty icon={<IconBox size={40} />} title={t('catalog.followersTitle', { org: orgName })} body={t('catalog.followersBody')}

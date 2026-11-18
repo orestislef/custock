@@ -46,6 +46,8 @@ export function NewsView() {
   return (
     <>
       {first ? <p className="t-body t-2 mt-0 mb-5">{t('shopper.news.hello', { name: first })}</p> : null}
+      {/* a notification for a post that was taken down since: one quiet line, the news as usual */}
+      {focus && !items.some((i) => i.post.id === focus) ? <p className="t-sub t-2 mt-0 mb-4" role="status">{t('gone.shopPost')}</p> : null}
       {items.length ? (
         <ul className="list-none p-0 m-0 flex flex-col gap-4">
           {items.map((it) => <li key={it.post.id} id={`post-${it.post.id}`} style={{ scrollMarginTop: 72 }}><PostCard item={it} focused={it.post.id === focus} /></li>)}

@@ -2,6 +2,12 @@
   "locale": {
     "label": "Language"
   },
+  "appearance": {
+    "label": "Appearance",
+    "auto": "Automatic",
+    "light": "Light",
+    "dark": "Dark"
+  },
   "tip": {
     "dismiss": "Got it"
   },
@@ -51,7 +57,8 @@
     "checkTitle": "Check your email",
     "checkBody": "We sent a link to {{email}}. Open it to confirm, then you are in.",
     "checkHint": "Nothing there? Look in spam, or give it a minute.",
-    "devConfirm": "Confirm now (development)"
+    "devConfirm": "Confirm now (development)",
+    "nameInvalid": "Use letters for your name, up to 40. Spaces, dots, dashes and apostrophes are fine."
   },
   "confirm": {
     "title": "You are in",
@@ -199,12 +206,15 @@
     "recent": "Latest stock changes",
     "tipQr": "Print the window QR from QR codes. People join in 30 seconds, no app needed.",
     "atAGlance": "At a glance",
-    "recentEmpty": "No stock changes yet"
+    "recentEmpty": "No stock changes yet",
+    "yourPosts": "Your posts",
+    "postWent": "Your post went out",
+    "postStopped": "Your post was stopped"
   },
   "stock": {
     "title": "Stock",
     "newProduct": "New product",
-    "search": "Search by name, Greeklish or barcode",
+    "search": "Search by name, Greeklish, barcode or QR code",
     "filter": "Filter",
     "f": {
       "all": "All",
@@ -221,7 +231,7 @@
     "noResultsBody": "Nothing found for \"{{q}}\".",
     "emptyTitle": "Nothing here",
     "empty": {
-      "all": "Add your first product, or scan its barcode with Scan.",
+      "all": "Add your first product, or scan its barcode or QR code with Scan.",
       "low": "Nothing is running low.",
       "out": "Nothing is out of stock.",
       "negative": "No negative stock. Good.",
@@ -237,7 +247,7 @@
     "form": {
       "name": "Name",
       "category": "Category",
-      "barcode": "Barcode (optional)",
+      "barcode": "Barcode or QR code (optional)",
       "price": "Price with VAT",
       "foot": "Leave the barcode empty and we make our own label code."
     },
@@ -427,7 +437,8 @@
     "readersOf_other": "{{count}} followers read {{lang}}",
     "needTitle": "Write a title in {{lang}} first.",
     "needAudience": "Pick who gets it.",
-    "needTime": "Pick a date and time."
+    "needTime": "Pick a date and time.",
+    "untilNone": "No end date"
   },
   "post": {
     "approve": "Approve and publish",
@@ -450,7 +461,9 @@
     "scheduledAt": "Goes out",
     "deleteConfirm": "Delete this post?",
     "deleteSent": "Delete it? Pushes and emails already sent cannot be taken back.",
-    "deleted": "Post deleted"
+    "deleted": "Post deleted",
+    "reject": "Don't publish",
+    "rejected": "Stopped. The author hears about it."
   },
   "team": {
     "title": "Team",
@@ -492,7 +505,8 @@
     "linkReadySub": "Send it to {{email}} however you like. It works once, for 7 days.",
     "copyLink": "Copy link",
     "shareTitle": "Join {{org}} on Custock",
-    "shareText": "Your invite to the {{org}} team."
+    "shareText": "Your invite to the {{org}} team.",
+    "limits": "Limits"
   },
   "roles": {
     "title": "Roles",
@@ -514,7 +528,8 @@
     "andBelow": "{{role}} and below",
     "manageFoot": "People with this role can invite and manage the roles they sit above.",
     "diff": "{{added}} added, {{removed}} removed",
-    "save": "Save role"
+    "save": "Save role",
+    "limits": "Limits for this role"
   },
   "reports": {
     "title": "Reports",
@@ -655,11 +670,12 @@
     "label": "Stock views",
     "products": "Products",
     "counts": "Counts",
-    "transfers": "Transfers"
+    "transfers": "Transfers",
+    "categories": "Categories"
   },
   "scan": {
     "open": "Scan with the camera",
-    "title": "Scan a barcode",
+    "title": "Scan a barcode or QR code",
     "hint": "Hold the code inside the frame. A usb scanner also works, it types into the field.",
     "noCamera": "No camera access. Type the code, or allow the camera in the browser settings."
   },
@@ -669,8 +685,8 @@
     "brand": "Brand",
     "description": "Description",
     "noCategory": "No category",
-    "barcode": "Barcode",
-    "barcodePh": "Scan or type a barcode",
+    "barcode": "Barcode or QR code",
+    "barcodePh": "Scan or type a barcode or QR code",
     "ownCode": "Make a shop barcode",
     "barcodeFoot": "Leave it empty and add one later, or make our own code for products without one.",
     "barcodeAddFoot_one": "This product has {{count}} barcode. A new one is added, the old ones keep working.",
@@ -706,7 +722,11 @@
     "upload": "Add photos",
     "uploading": "Uploading",
     "uploadFailed": "That photo did not upload. Try another one.",
-    "newPhoto": "New photo"
+    "newPhoto": "New photo",
+    "photoN": "Photo {{n}}",
+    "coverPhoto": "Cover, shown first",
+    "barcodeOn": "Already on {{name}}.",
+    "barcodeOpen": "Open it"
   },
   "shopSettings": {
     "open": "Settings for {{shop}}",
@@ -746,7 +766,7 @@
     "lines_one": "{{count}} line",
     "lines_other": "{{count}} lines",
     "started": "started {{when}}",
-    "scanPh": "Scan or type a barcode, then Enter",
+    "scanPh": "Scan or type a barcode or QR code, then Enter",
     "addProduct": "Add product",
     "unknownCode": "{{code}} is not in the catalog",
     "counted": "Counted",
@@ -859,7 +879,11 @@
       "stock.count_applied": "applied a stock count",
       "stock.movement_on_archived": "moved stock of an archived product",
       "stock.negative_accepted_offline": "synced an offline sale below zero",
-      "stock.transfer_shortage": "recorded a transfer shortage"
+      "stock.transfer_shortage": "recorded a transfer shortage",
+      "policies.business_changed": "Changed business limits",
+      "policies.shop_changed": "Changed shop limits",
+      "policies.role_changed": "Changed role limits",
+      "policies.user_changed": "Changed personal limits"
     },
     "aProduct": "a product",
     "s": {
@@ -907,7 +931,7 @@
       "transfer": "Transfer"
     },
     "hint": {
-      "lookup": "Point at a barcode to open the product.",
+      "lookup": "Point at a barcode or QR code to open the product.",
       "receive": "Scan everything that arrived, then confirm once.",
       "sell": "Each scan takes one off, with undo.",
       "count": "Scan each item. Differences show against the expected stock.",
@@ -937,13 +961,13 @@
     "clear": "Clear",
     "torch": "Torch",
     "typeCode": "Type a code",
-    "typeCodePlaceholder": "Barcode digits",
+    "typeCodePlaceholder": "Barcode or QR code",
     "samples": "Try a sample code",
     "unknownTitle": "Unknown code",
     "damaged": "This code looks damaged. Check the digits.",
     "createWithCode": "New product with this code",
     "unknownSaved": "Saved, so it can be added to a product later.",
-    "cameraWhy": "The camera reads barcodes. Nothing is recorded or saved.",
+    "cameraWhy": "The camera reads barcodes and QR codes. Nothing is recorded or saved.",
     "lowStock_one": "{{count}} product just dropped to its reorder point",
     "lowStock_other": "{{count}} products just dropped to their reorder point",
     "countSubmitted": "Count sent for review",
@@ -1045,7 +1069,12 @@
       "customerBody": "Offers, news and back in stock from {{org}}, as a notification on this device.",
       "customerLater": "Later: You, then Notifications.",
       "customerOnTitle": "Notifications are on",
-      "customerOnBody": "{{org}} can reach you on this device. At most 2 a day, never at night."
+      "customerOnBody": "{{org}} can reach you on this device. At most 2 a day, never at night.",
+      "platformTitle": "Know first when something breaks",
+      "platformBody": "New errors, storage near the free limit and new owners joining, as a notification on this device.",
+      "platformLater": "Later: tap your initials, then Alerts on this device.",
+      "platformOnTitle": "Alerts are on",
+      "platformOnBody": "This device hears about new errors, storage near the free limit and new owners."
     },
     "test": {
       "send": "Send a test notification",
@@ -1053,7 +1082,8 @@
       "none": "No device has notifications on yet.",
       "wait": "One test a minute. Try again shortly.",
       "failed": "That did not work. Try again in a moment."
-    }
+    },
+    "platformSub": "New errors, storage near the free limit, new owners joining."
   },
   "shopper": {
     "tabsLabel": "Sections",
@@ -1108,7 +1138,15 @@
       "deleteTitle": "Delete your account?",
       "deleteBody": "Your details are erased from every business you follow and you are signed out. This cannot be undone.",
       "deleteConfirm": "Delete account",
-      "deleted": "Your account is deleted"
+      "deleted": "Your account is deleted",
+      "deleteContinue": "Continue",
+      "deleteCodeSent": "We sent a code to {{email}}. Enter it to delete your account.",
+      "deleteCodeLabel": "Code from the email",
+      "deletePasswordLabel": "Your password",
+      "deleteWrongCode": "That code is not right. Check the email and try again.",
+      "deleteWrongPassword": "That password is not right.",
+      "deleteExpired": "The code expired. Send a new one.",
+      "deleteResend": "Send a new code"
     },
     "product": {
       "save": "Save",
@@ -1121,7 +1159,7 @@
   "landing": {
     "lead": "Stock and customers for your shops, in one app on your phone.",
     "scanTitle": "Scan to sell, receive and count",
-    "scanSub": "The phone camera is the barcode reader. Works with weak signal.",
+    "scanSub": "The phone camera reads barcodes and QR codes. Works with weak signal.",
     "peopleTitle": "Your customers, with their consent",
     "peopleSub": "They join from a QR code at the till, the window or a receipt.",
     "offersTitle": "Offers that reach people",
@@ -1267,6 +1305,14 @@
           "invite_revoked": "Super admin invite withdrawn",
           "removed": "Super admin removed",
           "granted_cli": "Super admin made on the server"
+        },
+        "policies": {
+          "platform_changed": "Changed platform limits",
+          "business_controls_changed": "Changed limits for a business",
+          "business_changed": "Changed business limits",
+          "shop_changed": "Changed shop limits",
+          "role_changed": "Changed role limits",
+          "user_changed": "Changed personal limits"
         }
       }
     },
@@ -1530,6 +1576,16 @@
         "retry": "Try again",
         "foot": "No keys or passwords are ever shown here, only on or off and addresses."
       }
+    },
+    "policies": {
+      "title": "Limits and options",
+      "sub": "What every business starts from, and the safety values",
+      "saved": "Saved",
+      "reset": "Back to the built in values",
+      "businessTitle": "Limits for this business",
+      "businessLead": "The ceiling for each limit, and whether the owner may change it.",
+      "ownerCan": "Owner can change it",
+      "now": "Now {{value}}"
     }
   },
   "platformInvite": {
@@ -1638,5 +1694,95 @@
       "retry": "Try again",
       "home": "Go to the start"
     }
+  },
+  "categories": {
+    "title": "Categories",
+    "new": "New category",
+    "newInPicker": "New category…",
+    "rename": "Rename category",
+    "create": "Add category",
+    "name": "Name",
+    "nameIn": {
+      "en": "Name in English",
+      "el": "Name in Greek",
+      "ru": "Name in Russian"
+    },
+    "optional": "Optional",
+    "foot": "Customers see the name in their language when there is one.",
+    "taken": "There is already a category with this name.",
+    "created": "{{name}} added",
+    "saved": "Category saved",
+    "deleted": "{{name}} deleted",
+    "deleteTitle": "Delete {{name}}?",
+    "deleteBody": "Its products stay, they just have no category until you choose one.",
+    "emptyTitle": "No categories yet",
+    "emptyBody": "Group products like Oils, Honey or Gifts, so they are easy to find in the shop page and in Stock.",
+    "listFoot": "Tap a category to rename it."
+  },
+  "picker": {
+    "choose": "Choose a date and time",
+    "chooseDate": "Choose a date",
+    "clear": "Clear {{label}}",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "today": "today",
+    "hour": "Hour",
+    "minute": "Minute",
+    "quick": "Quick choices",
+    "inHour": "In 1 hour",
+    "tomorrowAt": "Tomorrow {{time}}",
+    "dayAt": "{{day}} {{time}}",
+    "zone": "Times are in {{zone}}."
+  },
+  "label": {
+    "open": "Print shelf label",
+    "title": "Shelf label",
+    "lead": "Cut along the dashed lines. The QR code opens the product's page, where customers can ask to hear when it is back.",
+    "noCode": "Add a barcode or make a shop code first, the label needs one.",
+    "size": "Label size",
+    "variant": "Variant",
+    "copies": "Labels",
+    "fewer": "Fewer labels",
+    "more": "More labels",
+    "noPrice": "The price is left off because customers do not see prices. Settings, What customers see."
+  },
+  "emailRevert": {
+    "title": "Put your old email back?",
+    "lead": "The email on your Custock account was changed. If it was not you, undo it here. Every device is signed out and your old email works again.",
+    "button": "Undo the change",
+    "doneTitle": "Your email is back",
+    "doneBody": "Your account uses {{email}} again. Sign in once more on your devices.",
+    "signIn": "Sign in",
+    "forgot": "If someone also changed your password, ask for a new one.",
+    "failTitle": "This link does not work any more",
+    "failBody": "It was used already, it is older than 7 days, or the email was changed again since."
+  },
+  "gone": {
+    "post": {
+      "title": "This post is no longer here",
+      "body": "It was deleted.",
+      "cta": "All posts"
+    },
+    "product": {
+      "title": "This product is no longer here",
+      "body": "It was archived or deleted.",
+      "cta": "All products"
+    },
+    "transfer": {
+      "title": "This transfer is no longer here",
+      "body": "It was deleted.",
+      "cta": "All transfers"
+    },
+    "count": {
+      "title": "This count is no longer here",
+      "body": "It was deleted.",
+      "cta": "All counts"
+    },
+    "shopProduct": {
+      "title": "This product is no longer available",
+      "body": "{{org}} took it off the shelf.",
+      "cta": "Browse {{org}}"
+    },
+    "shopPost": "This post is no longer available."
   }
 }

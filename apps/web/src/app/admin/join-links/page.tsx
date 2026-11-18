@@ -13,6 +13,7 @@ import { useAsync } from '@/lib/use-async';
 import { basePath } from '@/lib/api-client';
 import { number, percent } from '@/lib/format';
 import { RedirectHome } from '@/components/admin/redirect-home';
+import { cleanLine, LIMITS } from '@custock/core';
 
 export default function JoinLinksPage() {
   const { api, org, t, locale, can, shops } = useAdmin();
@@ -101,7 +102,7 @@ function NewLink({ open, onClose, onCreated }: { open: boolean; onClose: () => v
           <span className="row-main row-title">{t('links.for')}</span>
           <Picker variant="plain" label={t('links.for')} value={i} onChange={setI} options={options.map((o, k) => ({ value: String(k), label: o.name }))} />
         </li>
-        <li><label className="block row-sep relative"><span className="field-label">{t('links.labelPh')}</span><input className="field pt-1" value={label} onChange={(e) => setLabel(e.target.value)} /></label></li>
+        <li><label className="block row-sep relative"><span className="field-label">{t('links.labelPh')}</span><input className="field pt-1" autoComplete="off" autoCapitalize="sentences" enterKeyHint="done" maxLength={LIMITS.joinLabel} value={label} onChange={(e) => setLabel(e.target.value)} onBlur={() => setLabel((v) => cleanLine(v))} /></label></li>
       </ul>
       <p className="inset-group-foot px-0">{t('links.labelFoot')}</p>
     </Sheet>

@@ -14,6 +14,9 @@ import { useAsync } from '@/lib/use-async';
 import { useMedia } from '@/lib/use-media';
 import { date } from '@/lib/format';
 import { RedirectHome } from '@/components/admin/redirect-home';
+import { LIMITS } from '@custock/core';
+import { checkAll, useEmailField, useLineField, usePhoneField } from '@/lib/fields';
+import { FieldMessage, FormNav } from '@/components/ui/field-kit';
 
 type Channel = 'all' | 'email' | 'push';
 
@@ -63,7 +66,8 @@ export default function CustomersPage() {
       <div className="sticky top-[52px] z-10 -mx-4 px-4 md:mx-0 md:px-0 pt-1 pb-3 flex flex-col gap-3" style={{ background: 'var(--c-shelf)' }}>
         <div className="search" style={{ height: 40 }}>
           <IconSearch size={18} />
-          <input ref={searchRef} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('customers.search')} aria-label={t('customers.search')} title={t('stock.searchKey')} />
+          <input ref={searchRef} type="search" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false} maxLength={LIMITS.search}
+            value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('customers.search')} aria-label={t('customers.search')} title={t('stock.searchKey')} />
         </div>
         <div><Segmented label={t('customers.channel')} value={channel} onChange={setChannel} options={[{ value: 'all', label: t('customers.all') }, { value: 'email', label: t('common:channel.email') }, { value: 'push', label: t('common:channel.push') }]} /></div>
       </div>
@@ -131,22 +135,32 @@ function AddCustomer({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
   const toast = useToast();
   const allowed = shops.filter((s) => can('customers.add', s.id));
   const [shop, setShop] = useState(shopId && allowed.some((s) => s.id === shopId) ? shopId : allowed[0]?.id ?? '');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const nameF = useLineField('', { max: 120, required: true, capitalize: 'words' });
+  const emailF = useEmailField('', { required: false, autoComplete: 'off' });
+  const phoneF = usePhoneField('');
+  const name = nameF.text;
+  const email = emailF.text;
   const [lang, setLang] = useState<Locale>(org.defaultLocale);
   const [emailNews, setEmailNews] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
+    if (!checkAll([nameF, emailF, phoneF])) return;
+    const nameV = nameF.check()!;
+    const emailV = emailF.check() || '';
+    const phoneV = phoneF.check() ?? null;
     setBusy(true);
     setError(null);
     try {
-      await api.addCustomer(org.orgId, { name: name.trim(), ...(email.trim() ? { email: email.trim() } : {}), ...(phone.trim() ? { phone: phone.trim() } : {}), locale: lang, shopId: shop, emailNews, push: false, tags: [] });
-      toast(t('customers.added', { name }));
+      await api.addCustomer(org.orgId, { name: nameV, ...(emailV ? { email: emailV } : {}), ...(phoneV ? { phone: phoneV } : {}), locale: lang, shopId: shop, emailNews: emailNews && !!emailV, push: false, tags: [] });
+      toast(t('customers.added', { name: nameV }));
       onAdded();
     } catch (e) {
+      const fields = (e as { problem?: { fields?: Record<string, string> } }).problem?.fields ?? {};
+      if (fields.name) nameF.setError(fields.name as never);
+      if (fields.email) emailF.setError(fields.email as never);
+      if (fields.phone) phoneF.setError(fields.phone as never);
       setError(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
       setBusy(false);
     }
@@ -159,11 +173,14 @@ function AddCustomer({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
         {!name.trim() ? <p className="why-line">{t('customers.needName')}</p> : null}
       </>}>
       <p className="t-sub t-2 mt-0 mb-4">{t('customers.addLead')}</p>
-      <div className="list mb-4">
-        <label className="block"><span className="field-label">{t('join.name')}</span><input className="field pt-1" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" /></label>
-        <label className="block row-sep relative"><span className="field-label">{t('join.email')}</span><input className="field pt-1" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" /></label>
-        <label className="block row-sep relative"><span className="field-label">{t('customer.phone')}</span><input className="field pt-1" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="off" /></label>
-      </div>
+      <FormNav onDone={() => void save()} last="done" className="list mb-4">
+        <label className="block"><span className="field-label">{t('join.name')}</span><input className="field pt-1" {...nameF.inputProps} autoComplete="off" /></label>
+        <FieldMessage id={nameF.errorId} kind="line" error={nameF.error} params={{ max: 120 }} />
+        <label className="block row-sep relative"><span className="field-label">{t('join.email')}</span><input className="field pt-1" {...emailF.inputProps} /></label>
+        <FieldMessage id={emailF.errorId} kind="email" error={emailF.error} />
+        <label className="block row-sep relative"><span className="field-label">{t('customer.phone')}</span><input className="field pt-1" {...phoneF.inputProps} autoComplete="off" /></label>
+        <FieldMessage id={phoneF.errorId} kind="phone" error={phoneF.error} />
+      </FormNav>
       <ul className="list mb-4" role="list">
         <li className="row">
           <span className="row-main row-title">{t('stockSheet.shop')}</span>

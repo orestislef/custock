@@ -27,6 +27,7 @@ import { RedirectHome } from '@/components/admin/redirect-home';
 
 type Mode = 'lookup' | 'sell' | 'receive' | 'count' | 'transfer';
 const MODES: Mode[] = ['lookup', 'sell', 'receive', 'count', 'transfer'];
+const MODE_KEY = 'custock.scan.mode';
 const MODE_PERM: Record<Mode, string> = { lookup: 'products.view', receive: 'stock.receive', sell: 'stock.sell', count: 'stock.count', transfer: 'stock.transfer.send' };
 
 interface Line { variantId: string; product: Product; qty: number; expected: number }
@@ -55,7 +56,14 @@ function Scan() {
   const modes = MODES.filter((m) => can(MODE_PERM[m], m === 'lookup' ? null : workShop) && (m !== 'transfer' || otherShops > 0)
     && (m !== 'count' || featureOn(org, 'counts')) && (m !== 'transfer' || featureOn(org, 'transfers')));
   const asked = params.get('mode') as Mode | null;
-  const [mode, setMode] = useState<Mode>(asked && modes.includes(asked) ? asked : modes.includes('sell') ? 'sell' : modes[0] ?? 'lookup');
+  // the mode asked for in the link, else the one this device used last, else sell
+  const [mode, setMode] = useState<Mode>(() => {
+    if (asked && modes.includes(asked)) return asked;
+    let last: string | null = null;
+    try { last = typeof window === 'undefined' ? null : localStorage.getItem(MODE_KEY); } catch {}
+    if (last && modes.includes(last as Mode)) return last as Mode;
+    return modes.includes('sell') ? 'sell' : modes[0] ?? 'lookup';
+  });
   const [lines, setLines] = useState<Line[]>([]);
   const [manual, setManual] = useState(false);
   const [code, setCode] = useState('');
@@ -220,6 +228,7 @@ function Scan() {
 
   function changeMode(m: Mode) {
     setMode(m);
+    try { localStorage.setItem(MODE_KEY, m); } catch {}
     setLines([]);
     setUnknown(null);
     countId.current = null;
@@ -259,7 +268,8 @@ function Scan() {
         {manual ? (
           <form className="list flex items-center gap-2 pl-4 pr-1.5" onSubmit={(e) => { e.preventDefault(); void handleCode(code); setCode(''); }}>
             <IconBarcode size={20} className="flex-none" style={{ color: 'var(--c-ink-2)' }} />
-            <input className="flex-1 min-w-0 bg-transparent border-0 outline-none t-body tnum min-h-[48px]" style={{ color: 'var(--c-ink)' }} inputMode="numeric" autoComplete="off" autoFocus
+            <input className="flex-1 min-w-0 bg-transparent border-0 outline-none t-body tnum min-h-[48px]" style={{ color: 'var(--c-ink)' }} inputMode="text" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+              enterKeyHint="go" maxLength={500} autoFocus
               placeholder={t('scanner.typeCodePlaceholder')} aria-label={t('scanner.typeCode')} value={code} onChange={(e) => setCode(e.target.value)} />
             <button type="submit" className="btn btn-tinted" disabled={!code.trim()}>{t('common:action.add')}</button>
           </form>

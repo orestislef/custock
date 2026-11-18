@@ -3,7 +3,7 @@
 // the other super admins: who they are, invites waiting, inviting one more and removing one.
 // both ask first, because a super admin has full access to every business. the last one stays.
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Locale } from '@custock/core';
 import { usePlatform } from '@/components/admin/admin-context';
 import { Avatar, Group, Row } from '@/components/ui/kit';
@@ -12,6 +12,8 @@ import { IconMail, IconPlus } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { relative } from '@/lib/format';
 import { LinkActions } from './bits';
+import { isEmail, normalizeEmail } from '@custock/core';
+import { EmailInput } from '@/components/ui/field-kit';
 
 type Step = 'form' | 'confirm' | 'done';
 
@@ -120,17 +122,19 @@ function InviteSuperAdminSheet({ open, onClose, onDone }: { open: boolean; onClo
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ link: string; emailed: boolean } | null>(null);
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (!open) { setStep('form'); setEmail(''); setError(null); setDone(null); setBusy(false); }
-  }, [open]);
+  }
 
-  const valid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
+  const valid = isEmail(email);
 
   const invite = async () => {
     setBusy(true);
     setError(null);
     try {
-      const r = await api.inviteSuperAdmin({ email: email.trim(), locale: lang });
+      const r = await api.inviteSuperAdmin({ email: normalizeEmail(email), locale: lang });
       setDone(r);
       setStep('done');
       onDone();
@@ -164,7 +168,7 @@ function InviteSuperAdminSheet({ open, onClose, onDone }: { open: boolean; onClo
           <div className="list mb-2">
             <label className="block">
               <span className="field-label">{t('platform.admins.email')}</span>
-              <input className="field pt-1" type="email" inputMode="email" autoCapitalize="none" autoComplete="off" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} />
+              <EmailInput value={email} onChange={setEmail} enterKeyHint="done" />
             </label>
             <div className="row row-sep">
               <span className="row-main row-title">{t('platform.new.language')}</span>

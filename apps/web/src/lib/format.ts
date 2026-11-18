@@ -22,12 +22,51 @@ export function percent(n: number, locale: string): string {
   return new Intl.NumberFormat(intlLocale(locale), { style: 'percent', maximumFractionDigits: 0 }).format(n);
 }
 
-export function date(ms: number, locale: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }): string {
-  return new Intl.DateTimeFormat(intlLocale(locale), { timeZone: 'Europe/Athens', ...opts }).format(ms);
+// dates show in the business's time zone, never the device's. the admin and the customer pages
+// set it once the business is known (setDisplayTimeZone), server rendered pages pass it in.
+export const DEFAULT_TIME_ZONE = 'Europe/Athens';
+let displayZone = DEFAULT_TIME_ZONE;
+
+export function setDisplayTimeZone(tz: string | null | undefined) {
+  // only in the browser: on the server one module serves every request
+  if (typeof window === 'undefined') return;
+  displayZone = validZone(tz) ? tz! : DEFAULT_TIME_ZONE;
 }
 
-export function dateTime(ms: number, locale: string): string {
-  return date(ms, locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+export function displayTimeZone(): string {
+  return displayZone;
+}
+
+const zoneOk = new Map<string, boolean>();
+function validZone(tz: string | null | undefined): boolean {
+  if (!tz) return false;
+  let ok = zoneOk.get(tz);
+  if (ok === undefined) {
+    try {
+      new Intl.DateTimeFormat('en-GB', { timeZone: tz });
+      ok = true;
+    } catch {
+      ok = false;
+    }
+    zoneOk.set(tz, ok);
+  }
+  return ok;
+}
+
+export function date(ms: number, locale: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }, tz?: string | null): string {
+  const zone = validZone(tz) ? tz! : displayZone;
+  return new Intl.DateTimeFormat(intlLocale(locale), { timeZone: zone, ...opts }).format(ms);
+}
+
+// 24 hour clock in every language: the shops are in europe and en means en-GB here
+export function dateTime(ms: number, locale: string, tz?: string | null): string {
+  return date(ms, locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }, tz);
+}
+
+// the hour of the day (0 to 23) in the business's time zone
+export function hourIn(ms: number, tz?: string | null): number {
+  const zone = validZone(tz) ? tz! : displayZone;
+  return Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: zone }).format(ms)) % 24;
 }
 
 export function relative(ms: number, locale: string, now = Date.now()): string {

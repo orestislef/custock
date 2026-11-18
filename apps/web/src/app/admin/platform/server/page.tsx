@@ -14,7 +14,7 @@ import { Empty, Group, Row } from '@/components/ui/kit';
 import { Sheet } from '@/components/ui/client-kit';
 import { IconWarning } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
-import { dateTime, number, relative } from '@/lib/format';
+import { dateTime, number, relative, intlLocale } from '@/lib/format';
 
 export default function PlatformServerPage() {
   return (
@@ -25,8 +25,8 @@ export default function PlatformServerPage() {
 }
 
 function mb(bytes: number, locale: string): string {
-  if (bytes < 1024 * 1024) return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Math.max(1, Math.round(bytes / 1024)))} KB`;
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024))} MB`;
+  if (bytes < 1024 * 1024) return `${new Intl.NumberFormat(intlLocale(locale), { maximumFractionDigits: 0 }).format(Math.max(1, Math.round(bytes / 1024)))} KB`;
+  return `${new Intl.NumberFormat(intlLocale(locale), { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024))} MB`;
 }
 
 // a dot and a word, so the state never rests on colour alone

@@ -6,6 +6,7 @@ import { joinAction, type JoinState } from '@/app/actions';
 import { useLocale, useT } from '@/lib/i18n-client';
 import { categoryName } from '@/lib/use-names';
 import { IconCheck, IconMail } from '@/components/ui/icons';
+import { cleanLine, normalizeEmail } from '@custock/core';
 
 const initial: JoinState = { status: 'idle' };
 
@@ -45,13 +46,17 @@ export function JoinForm({ code, interests, notifyName, orgName }: { code: strin
         <div className="list">
           <label className="block">
             <span className="field-label">{t('join.name')}</span>
-            <input className="field pt-1" name="name" autoComplete="name" required maxLength={120} placeholder={t('join.namePlaceholder')} />
+            <input className="field pt-1" name="name" autoComplete="name" autoCapitalize="words" enterKeyHint="next" required maxLength={40} placeholder={t('join.namePlaceholder')} aria-invalid={err === 'name'}
+              onBlur={(e) => { e.currentTarget.value = cleanLine(e.currentTarget.value); }} />
           </label>
           <label className="block row-sep relative">
             <span className="field-label">{t('join.email')}</span>
-            <input className="field pt-1" name="email" type="email" inputMode="email" autoComplete="email" required placeholder="name@example.com" defaultValue={state.email} aria-invalid={err === 'email'} />
+            <input className="field pt-1" name="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="done" maxLength={254}
+              required placeholder="name@example.com" defaultValue={state.email} aria-invalid={err === 'email'}
+              onBlur={(e) => { e.currentTarget.value = normalizeEmail(e.currentTarget.value); }} />
           </label>
         </div>
+        {err === 'name' ? <p className="inset-group-foot" style={{ color: 'var(--c-error)' }}>{t('join.nameInvalid')}</p> : null}
         {err === 'email' ? <p className="inset-group-foot" style={{ color: 'var(--c-error)' }}>{t('join.emailInvalid')}</p> : null}
       </section>
 
@@ -93,7 +98,7 @@ export function JoinForm({ code, interests, notifyName, orgName }: { code: strin
         {err === 'over15' ? <p className="inset-group-foot" style={{ color: 'var(--c-error)' }}>{t('join.over15Needed')}</p> : null}
       </section>
 
-      {err && err !== 'email' && err !== 'over15' ? (
+      {err && err !== 'email' && err !== 'over15' && err !== 'name' ? (
         <p className="t-sub mb-4" role="alert" style={{ color: 'var(--c-error)' }}>{t(`common:error.${err}`)}</p>
       ) : null}
 
