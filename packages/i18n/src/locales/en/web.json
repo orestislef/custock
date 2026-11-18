@@ -47,7 +47,7 @@
     "emailNews": "Email news and offers",
     "emailNewsSub": "From {{org}}, a few times a month at most",
     "push": "Notifications in the app",
-    "pushSub": "Offers and back in stock alerts, at most 2 a day",
+    "pushSub": "Offers and back in stock alerts",
     "over15": "I am 15 or older",
     "over15Needed": "You need to be 15 or older to join.",
     "submit": "Join",
@@ -58,7 +58,8 @@
     "checkBody": "We sent a link to {{email}}. Open it to confirm, then you are in.",
     "checkHint": "Nothing there? Look in spam, or give it a minute.",
     "devConfirm": "Confirm now (development)",
-    "nameInvalid": "Use letters for your name, up to 40. Spaces, dots, dashes and apostrophes are fine."
+    "nameInvalid": "Use letters for your name, up to 40. Spaces, dots, dashes and apostrophes are fine.",
+    "pushSubCap": "Offers and back in stock alerts, at most {{count}} a day"
   },
   "confirm": {
     "title": "You are in",
@@ -136,7 +137,8 @@
     "button": "Stop emails",
     "doneTitle": "Done",
     "doneShop": "No more emails from {{shop}}.",
-    "doneOrg": "No more emails from {{org}}."
+    "doneOrg": "No more emails from {{org}}.",
+    "failBody": "This link is old or broken. Use the link in your newest email from the shop."
   },
   "login": {
     "lead": "Sign in to run your shops.",
@@ -419,11 +421,10 @@
     "follow_other": "{{n}} follow {{name}}",
     "pushTo": "Push to {{n}} of them.",
     "pushNot": "{{off}} turned push off, {{noApp}} do not have the app.",
-    "quietHours": "It is quiet hours now, so pushes wait until 09:00.",
-    "quietHoursRule": "Pushes between 22:00 and 09:00 wait until morning.",
+    "quietHours": "It is quiet hours now, so pushes wait until {{to}}.",
+    "quietHoursRule": "Pushes between {{from}} and {{to}} wait until {{to}}.",
     "emailTo": "Email to {{n}} of them.",
     "emailUnconfirmed": "{{n}} have not confirmed their email yet.",
-    "capRule": "Nobody gets more than 2 pushes a day from you. Extra ones still reach the feed.",
     "publish": "Publish",
     "schedule": "Schedule",
     "submit": "Submit for approval",
@@ -442,7 +443,9 @@
     "needTitle": "Write a title in {{lang}} first.",
     "needAudience": "Pick who gets it.",
     "needTime": "Pick a date and time.",
-    "untilNone": "No end date"
+    "untilNone": "No end date",
+    "capRule_one": "Nobody gets more than {{count}} push a day from you. Extra ones still reach the feed.",
+    "capRule_other": "Nobody gets more than {{count}} pushes a day from you. Extra ones still reach the feed."
   },
   "post": {
     "approve": "Approve and publish",
@@ -644,6 +647,13 @@
       "saved": "Logo saved",
       "removed": "Logo removed",
       "alt": "Logo of {{org}}"
+    },
+    "business": {
+      "title": "Business",
+      "name": "Business name",
+      "language": "Language for customers",
+      "timezone": "Time zone",
+      "foot": "Dates, quiet hours and reports follow this time zone. Customers whose own language is unknown get emails in this language."
     }
   },
   "links": {
@@ -1026,7 +1036,9 @@
     "listLabel": "Scanned",
     "less": "One less {{name}}",
     "more": "One more {{name}}",
-    "openTransfer": "Open"
+    "openTransfer": "Open",
+    "archivedTitle": "Archived product",
+    "archivedBody": "{{name}} is archived. It is not sold, received or counted any more."
   },
   "offline": {
     "badge_one": "{{count}} not synced yet",
@@ -1106,12 +1118,13 @@
       "customerBody": "Offers, news and back in stock from {{org}}, as a notification on this device.",
       "customerLater": "Later: You, then Notifications.",
       "customerOnTitle": "Notifications are on",
-      "customerOnBody": "{{org}} can reach you on this device. At most 2 a day, never at night.",
+      "customerOnBody": "{{org}} can reach you on this device, never at night.",
       "platformTitle": "Know first when something breaks",
       "platformBody": "New errors, storage near the free limit and new owners joining, as a notification on this device.",
       "platformLater": "Later: tap your initials, then Alerts on this device.",
       "platformOnTitle": "Alerts are on",
-      "platformOnBody": "This device hears about new errors, storage near the free limit and new owners."
+      "platformOnBody": "This device hears about new errors, storage near the free limit and new owners.",
+      "customerOnBodyCap": "{{org}} can reach you on this device. At most {{count}} a day, never at night."
     },
     "test": {
       "send": "Send a test notification",
@@ -1142,7 +1155,11 @@
       "otherEmail": "Use another email",
       "already": "Already joined? Sign in",
       "notYet": "Not following yet?",
-      "joinLink": "Join {{org}}"
+      "joinLink": "Join {{org}}",
+      "resend": "Send a new code",
+      "resendIn_one": "Send a new code in {{count}} second",
+      "resendIn_other": "Send a new code in {{count}} seconds",
+      "resent": "A new code is on its way. Only the newest one works."
     },
     "news": {
       "title": "News",
@@ -1159,8 +1176,8 @@
       "title": "You",
       "channels": "How {{org}} reaches you",
       "push": "Notifications",
-      "pushSub": "Offers, news and back in stock, at most 2 a day",
-      "channelsFoot": "Never between 22:00 and 09:00. You can change this anytime.",
+      "pushSub": "Offers, news and back in stock",
+      "channelsFoot": "Notifications never come between {{from}} and {{to}}, they wait until then. You can turn each one off here.",
       "waiting": "Waiting for",
       "waitingEmpty": "Nothing yet",
       "waitingFoot": "You hear once, when it is back.",
@@ -1183,7 +1200,8 @@
       "deleteWrongCode": "That code is not right. Check the email and try again.",
       "deleteWrongPassword": "That password is not right.",
       "deleteExpired": "The code expired. Send a new one.",
-      "deleteResend": "Send a new code"
+      "deleteResend": "Send a new code",
+      "pushSubCap": "Offers, news and back in stock, at most {{count}} a day"
     },
     "product": {
       "save": "Save",
