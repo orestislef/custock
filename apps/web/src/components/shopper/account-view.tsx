@@ -1,0 +1,210 @@
+'use client';
+
+// "you" in a business's app: how this business may reach you, what you wait for and saved, the
+// language, the home screen, your data, signing out. signed out it is the sign in card.
+
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import type { PublicProduct, StockAlertItem } from '@custock/core';
+import { AppIcon, InstallRow, InstallSteps } from '@/components/pwa/install-coach';
+import { PushRow } from '@/components/pwa/push-row';
+import { LocaleSwitch, Photo, Sheet, useToast } from '@/components/ui/client-kit';
+import { Avatar, Empty, Switch } from '@/components/ui/kit';
+import { IconBell, IconChevronRight, IconDownload, IconHeart, IconLogout, IconMail, IconPeople, IconPhoneApp, IconTrash } from '@/components/ui/icons';
+import { useT } from '@/lib/i18n-client';
+import { orgIconSrc } from './org-coach';
+import { SignInCard } from './sign-in';
+import { useShopper } from './shopper-context';
+
+export function AccountView() {
+  const t = useT();
+  const toast = useToast();
+  const { api, status, me, follow, slug, orgName, joinCode, signOut } = useShopper();
+  const [alerts, setAlerts] = useState<StockAlertItem[] | null>(null);
+  const [saved, setSaved] = useState<PublicProduct[] | null>(null);
+  const [emailOn, setEmailOn] = useState(true);
+  const [steps, setSteps] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const icon = <AppIcon src={orgIconSrc(slug)} size={44} label={orgName} />;
+
+  useEffect(() => {
+    if (!follow) return;
+    void api.alerts().then((a) => setAlerts(a.filter((x) => x.orgId === follow.orgId && x.status === 'waiting')), () => setAlerts([]));
+    void api.favorites().then((f) => setSaved(f.filter((x) => x.orgId === follow.orgId)), () => setSaved([]));
+  }, [api, follow]);
+
+  if (status === 'loading') return <div className="h-40 rounded-[16px] skel" aria-busy="true" />;
+  if (status === 'signedOut' || !me) {
+    return (
+      <>
+        <SignInCard />
+        <section className="inset-group mt-7">
+          <div className="list"><div className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></div></div>
+        </section>
+      </>
+    );
+  }
+
+  const exportData = async () => {
+    const data = await api.exportMyData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const file = new File([blob], `custock-${slug}-my-data.json`, { type: 'application/json' });
+    // the share sheet on phones, a download elsewhere
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: t('shopper.me.export') }).catch(() => {});
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = file.name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    toast(t('shopper.me.exported'));
+  };
+
+  const deleteAccount = async () => {
+    setBusy(true);
+    try {
+      await api.deleteMyAccount();
+      await signOut();
+      toast(t('shopper.me.deleted'));
+    } catch (e) {
+      toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
+    } finally {
+      setBusy(false);
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <>
+      <section className="inset-group">
+        <div className="list">
+          <div className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties}>
+            <Avatar name={me.user.displayName} size={44} />
+            <span className="row-main">
+              <span className="row-title block">{me.user.displayName}</span>
+              <span className="row-sub block">{me.user.email}</span>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {follow ? (
+        <section className="inset-group">
+          <h2 className="inset-group-head">{t('shopper.me.channels', { org: orgName })}</h2>
+          <div className="list">
+            <div className="row has-icon">
+              <span className="icon-tile"><IconMail size={18} /></span>
+              <span className="row-main"><span className="row-title block">{t('common:channel.email')}</span></span>
+              <Switch checked={emailOn} label={t('common:channel.email')} onChange={(v) => { setEmailOn(v); void api.setChannel(follow.orgId, 'email', v).catch(() => setEmailOn(!v)); }} />
+            </div>
+            <PushRow api={api} orgId={follow.orgId} title={t('shopper.me.push')} sub={t('shopper.me.pushSub')} onInstall={() => setSteps(true)} icon={<span className="icon-tile"><IconBell size={18} /></span>} />
+          </div>
+          <p className="inset-group-foot">{t('shopper.me.channelsFoot')}</p>
+        </section>
+      ) : (
+        <Empty icon={<IconPeople size={40} />} title={t('shopper.news.notFollowingTitle', { org: orgName })} body={t('shopper.news.notFollowingBody')}
+          action={joinCode ? <Link href={`/j/${joinCode}`} className="btn btn-primary">{t('catalog.joinToBrowse', { org: orgName })}</Link> : undefined} />
+      )}
+
+      {follow ? (
+        <>
+          <section className="inset-group">
+            <h2 className="inset-group-head">{t('shopper.me.waiting')}</h2>
+            <ul className="list" role="list">
+              {alerts === null ? <li className="row"><span className="row-main t-2">…</span></li>
+                : alerts.length ? alerts.map((a) => (
+                  <li key={a.id} className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties}>
+                    <Photo src={a.imageUrl} alt={a.productName} size={44} />
+                    <Link href={`/s/${slug}/p/${a.productId}`} className="row-main hover:no-underline" style={{ color: 'var(--c-ink)' }}>
+                      <span className="row-title block truncate">{a.productName}</span>
+                      {a.shopName ? <span className="row-sub block">{a.shopName}</span> : null}
+                    </Link>
+                    <button type="button" className="btn btn-plain" style={{ minHeight: 44, padding: '0 4px' }}
+                      onClick={() => void api.cancelAlert(a.id).then(() => setAlerts((x) => (x ?? []).filter((y) => y.id !== a.id)))}>
+                      {t('shopper.me.stopWaiting')}
+                    </button>
+                  </li>
+                )) : <li className="row t-2"><span className="row-main">{t('shopper.me.waitingEmpty')}</span></li>}
+            </ul>
+            <p className="inset-group-foot">{t('shopper.me.waitingFoot')}</p>
+          </section>
+
+          <section className="inset-group">
+            <h2 className="inset-group-head">{t('shopper.me.saved')}</h2>
+            <ul className="list" role="list">
+              {saved === null ? <li className="row"><span className="row-main t-2">…</span></li>
+                : saved.length ? saved.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`/s/${slug}/p/${p.id}`} className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties}>
+                      <Photo src={p.images[0]?.url} alt={p.name} size={44} />
+                      <span className="row-main"><span className="row-title block truncate">{p.name}</span></span>
+                      <IconChevronRight size={16} className="chev" />
+                    </Link>
+                  </li>
+                )) : <li className="row t-2"><span className="row-main flex items-center gap-2"><IconHeart size={16} />{t('shopper.me.savedEmpty')}</span></li>}
+            </ul>
+          </section>
+        </>
+      ) : null}
+
+      <section className="inset-group">
+        <ul className="list" role="list">
+          <li className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></li>
+          <InstallRow appName={orgName} icon={icon} render={(open, label) => (
+            <li>
+              <button type="button" className="row has-icon" onClick={open}>
+                <span className="icon-tile"><IconPhoneApp size={18} /></span>
+                <span className="row-main row-title">{label}</span>
+                <IconChevronRight size={16} className="chev" />
+              </button>
+            </li>
+          )} />
+        </ul>
+      </section>
+
+      <section className="inset-group">
+        <h2 className="inset-group-head">{t('shopper.me.privacy')}</h2>
+        <ul className="list" role="list">
+          <li>
+            <button type="button" className="row has-icon" onClick={() => void exportData()}>
+              <span className="icon-tile"><IconDownload size={18} /></span>
+              <span className="row-main row-title">{t('shopper.me.export')}</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" className="row has-icon" onClick={() => setDeleting(true)} style={{ color: 'var(--c-error)' }}>
+              <span className="icon-tile neg"><IconTrash size={18} /></span>
+              <span className="row-main row-title">{t('shopper.me.delete')}</span>
+            </button>
+          </li>
+        </ul>
+        <p className="inset-group-foot">{t('shopper.me.privacyFoot')}</p>
+      </section>
+
+      <section className="inset-group">
+        <ul className="list" role="list">
+          <li>
+            <button type="button" className="row" onClick={() => void signOut()} style={{ color: 'var(--c-error)' }}>
+              <IconLogout size={20} />
+              <span className="row-main row-title">{t('common:action.signOut')}</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+
+      <InstallSteps open={steps} onClose={() => setSteps(false)} appName={orgName} icon={icon} />
+      <Sheet open={deleting} onClose={() => setDeleting(false)} title={t('shopper.me.deleteTitle')}
+        footer={
+          <div className="flex flex-col gap-2 pb-2">
+            <button type="button" className="btn btn-large" style={{ background: 'var(--c-error)', color: '#fff' }} disabled={busy} onClick={() => void deleteAccount()}>{t('shopper.me.deleteConfirm')}</button>
+            <button type="button" className="btn btn-gray btn-large" onClick={() => setDeleting(false)}>{t('common:action.cancel')}</button>
+          </div>
+        }>
+        <p className="t-body m-0 mb-3">{t('shopper.me.deleteBody')}</p>
+      </Sheet>
+    </>
+  );
+}

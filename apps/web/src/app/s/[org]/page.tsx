@@ -1,11 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { serverApi } from '@/lib/api-server';
+import { redirect } from 'next/navigation';
 import { getT } from '@/lib/i18n-server';
+import { publicCatalog } from '@/lib/storefront';
 import { PublicShell } from '@/components/public/public-shell';
 import { CatalogGrid } from '@/components/public/catalog-grid';
+import { FollowerCatalog } from '@/components/shopper/follower-catalog';
+import { OrgCoach } from '@/components/shopper/org-coach';
 import { Empty } from '@/components/ui/kit';
-import { IconBox, IconSearch } from '@/components/ui/icons';
+import { IconSearch } from '@/components/ui/icons';
+import { orgInfo } from '@/lib/storefront';
 
 export const metadata: Metadata = { title: 'Catalog' };
 
@@ -13,42 +17,37 @@ export default async function CatalogPage({ params, searchParams }: PageProps<'/
   const { org } = await params;
   const sp = await searchParams;
   const q = typeof sp.q === 'string' ? sp.q : '';
+  // a tapped notification about a post lands on the news, at that post
+  if (typeof sp.post === 'string' && sp.post) redirect(`/s/${org}/news?post=${encodeURIComponent(sp.post)}`);
   const { t, locale } = await getT();
-  const { api } = await serverApi(locale);
-  const items = await api.catalog(org, q ? { q } : undefined).catch(() => null);
-  // the business name and its join link come from the business wide join page
-  const joinCode = process.env.CUSTOCK_DEFAULT_JOIN_CODE ?? 'ig4m8x';
-  const join = await api.joinPage(joinCode).catch(() => null);
-  const orgName = items?.[0]?.orgName ?? join?.orgName ?? org.charAt(0).toUpperCase() + org.slice(1);
-
-  if (!items) {
-    return (
-      <PublicShell orgName={orgName} t={t}>
-        <Empty icon={<IconBox size={40} />} title={t('catalog.followersTitle', { org: orgName })} body={t('catalog.followersBody')}
-          action={join ? <Link href={`/j/${joinCode}`} className="btn btn-primary">{t('catalog.joinToBrowse', { org: orgName })}</Link> : undefined} />
-      </PublicShell>
-    );
-  }
-
-  const offers = items.filter((p) => p.offer).length;
+  const info = await orgInfo(org, locale);
+  const items = await publicCatalog(org, { q, locale });
+  const offers = items?.filter((p) => p.offer).length ?? 0;
 
   return (
-    <PublicShell orgName={orgName} t={t}>
+    <PublicShell orgName={info.name} t={t}>
       <h1 className="t-large t-display m-0">{t('catalog.title')}</h1>
-      <form className="search mt-4 mb-3" role="search" action={`/s/${org}`}>
-        <IconSearch size={18} />
-        <input name="q" defaultValue={q} placeholder={t('catalog.search')} aria-label={t('catalog.search')} />
-      </form>
-      {offers ? (
-        <Link href={`/s/${org}/offers`} className="row card mb-5" style={{ color: 'var(--c-ink)' }}>
-          <span className="badge badge-accent">{t('common:postKind.offer')}</span>
-          <span className="row-main t-sub">{t('catalog.offersLink', { count: offers })}</span>
-        </Link>
-      ) : null}
-      {items.length ? (
-        <CatalogGrid items={items} t={t} locale={locale} hrefFor={(p) => `/s/${org}/p/${p.id}`} />
+      <OrgCoach className="mt-4" />
+      {items ? (
+        <>
+          <form className="search mt-4 mb-3" role="search" action="">
+            <IconSearch size={18} />
+            <input name="q" type="search" defaultValue={q} placeholder={t('catalog.search')} aria-label={t('catalog.search')} enterKeyHint="search" />
+          </form>
+          {offers ? (
+            <Link href={`/s/${org}/offers`} className="row card mb-5" style={{ color: 'var(--c-ink)' }}>
+              <span className="badge badge-accent">{t('common:postKind.offer')}</span>
+              <span className="row-main t-sub">{t('catalog.offersLink', { count: offers })}</span>
+            </Link>
+          ) : null}
+          {items.length ? (
+            <CatalogGrid items={items} t={t} locale={locale} hrefFor={(p) => `/s/${org}/p/${p.id}`} />
+          ) : (
+            <Empty icon={<IconSearch size={40} />} title={t('catalog.noResults')} body={q ? t('catalog.noResultsBody', { q }) : undefined} />
+          )}
+        </>
       ) : (
-        <Empty icon={<IconSearch size={40} />} title={t('catalog.noResults')} body={t('catalog.noResultsBody', { q })} />
+        <div className="mt-6"><FollowerCatalog /></div>
       )}
     </PublicShell>
   );

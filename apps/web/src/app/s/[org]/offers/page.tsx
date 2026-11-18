@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { serverApi } from '@/lib/api-server';
 import { getT } from '@/lib/i18n-server';
+import { orgInfo, publicCatalog } from '@/lib/storefront';
 import { PublicShell } from '@/components/public/public-shell';
 import { CatalogGrid } from '@/components/public/catalog-grid';
+import { FollowerCatalog } from '@/components/shopper/follower-catalog';
 import { Empty } from '@/components/ui/kit';
 import { IconTag } from '@/components/ui/icons';
 
@@ -12,24 +13,23 @@ export const metadata: Metadata = { title: 'Offers' };
 export default async function OffersPage({ params }: PageProps<'/s/[org]/offers'>) {
   const { org } = await params;
   const { t, locale } = await getT();
-  const { api } = await serverApi(locale);
-  const all = await api.catalog(org).catch(() => null);
+  const info = await orgInfo(org, locale);
+  const all = await publicCatalog(org, { locale });
   const items = (all ?? []).filter((p) => p.offer);
   // ending soonest first
   items.sort((a, b) => (a.offer?.validUntil ?? Infinity) - (b.offer?.validUntil ?? Infinity));
-  const joinCode = process.env.CUSTOCK_DEFAULT_JOIN_CODE ?? 'ig4m8x';
-  const join = await api.joinPage(joinCode).catch(() => null);
-  const orgName = items[0]?.orgName ?? join?.orgName ?? org.charAt(0).toUpperCase() + org.slice(1);
 
   return (
-    <PublicShell orgName={orgName} t={t} back={{ href: `/s/${org}`, label: t('catalog.title') }}>
+    <PublicShell orgName={info.name} t={t}>
       <h1 className="t-large t-display m-0">{t('offers.title')}</h1>
       <p className="t-sub t-2 mt-2 mb-5">{t('offers.lead')}</p>
-      {items.length ? (
+      {!all ? (
+        <FollowerCatalog offersOnly />
+      ) : items.length ? (
         <CatalogGrid items={items} t={t} locale={locale} hrefFor={(p) => `/s/${org}/p/${p.id}`} />
       ) : (
-        <Empty icon={<IconTag size={40} />} title={all ? t('offers.emptyTitle') : t('catalog.followersTitle', { org: orgName })} body={all ? t('offers.emptyBody') : t('catalog.followersBody')}
-          action={join ? <Link href={`/j/${joinCode}`} className="btn btn-primary">{t('offers.join', { org: orgName })}</Link> : undefined} />
+        <Empty icon={<IconTag size={40} />} title={t('offers.emptyTitle')} body={t('offers.emptyBody')}
+          action={info.joinCode ? <Link href={`/j/${info.joinCode}`} className="btn btn-primary">{t('offers.join', { org: info.name })}</Link> : undefined} />
       )}
     </PublicShell>
   );
