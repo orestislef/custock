@@ -4,7 +4,7 @@
 // cancelled transfer): one calm line and the way to the list it belonged to. never a 404 page.
 // an item the person can no longer open at all sends them home without a word.
 
-import Link from 'next/link';
+import Link from '@/components/admin/org-link';
 import type { ReactNode } from 'react';
 import { Empty } from './kit';
 import { IconSearch } from './icons';

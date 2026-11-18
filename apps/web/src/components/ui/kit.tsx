@@ -2,7 +2,7 @@
 // empty states and the "why not" line (only for things a person can act on, never about rights).
 // no state here, so they work in server components too.
 
-import Link from 'next/link';
+import Link from '@/components/admin/org-link';
 import type { ReactNode } from 'react';
 import { IconChevronRight, IconHalf, IconInfo, IconSlash, IconTruck, IconWarning } from './icons';
 import { FadeRow } from './client-kit';

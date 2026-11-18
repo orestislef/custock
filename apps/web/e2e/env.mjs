@@ -2,7 +2,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import cfg from './e2e.config.mjs';
 
@@ -57,7 +57,7 @@ export function buildWeb() {
 }
 
 export function standaloneDir() {
-  return b('web', '.next', 'standalone', 'e2e-build', 'web');
+  return b('web', '.next', 'standalone', basename(cfg.build), 'web');
 }
 
 export function builtStandalone() {
@@ -66,8 +66,8 @@ export function builtStandalone() {
 }
 
 const procs = [];
-export const dbFile = join(tmpdir(), `custock-e2e.db`);
-export const uploadDir = join(tmpdir(), `custock-e2e-uploads`);
+export const dbFile = join(tmpdir(), `custock-e2e-${cfg.apiPort}.db`);
+export const uploadDir = join(tmpdir(), `custock-e2e-uploads-${cfg.apiPort}`);
 export const apiLog = [];
 export const webLog = [];
 

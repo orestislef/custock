@@ -2,7 +2,7 @@
 // reads the nonce from the request's CSP header and puts it on its inline scripts. script files
 // are allowed from this origin only ('self'), so a plain <script src="/theme.js"> in the head runs
 // before the first paint without a nonce. no 'strict-dynamic': it would switch 'self' off.
-// the app has its own origin (custock.orestislef.gr), so 'self' is only this app's own files.
+// the app has its own origin (custock.example.com), so 'self' is only this app's own files.
 // the fixed headers (frames, sniffing, referrer, permissions) are in next.config.ts.
 
 import { NextResponse, type NextRequest } from 'next/server';

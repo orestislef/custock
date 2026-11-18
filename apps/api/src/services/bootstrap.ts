@@ -1,7 +1,7 @@
 // a business from nothing: the org, its roles, the owner and maybe a first shop. used by the cli
 // on a production server, where there is no seed data and no dev login. also new shops.
 
-import { DEFAULT_ROLES, normalize, transliterate, uuidv7 } from '@custock/core';
+import { DEFAULT_ROLES, normalize, transliterate, uuidv7, RESERVED_SLUGS } from '@custock/core';
 import { randomToken, sha256, type Db } from '@custock/db';
 import { audit, bumpPerms } from '../lib/audit';
 import { platform, Tenant } from '../lib/tenant';
@@ -50,7 +50,7 @@ export function createBusiness(db: Db, b: NewBusiness): { orgId: string; userId:
   if (invite && !b.webUrl) throw new BootstrapError('the invite link needs CUSTOCK_PUBLIC_WEB_URL');
   // an existing account can still be invited: it signs in and accepts
   if (!invite && p.get('SELECT 1 FROM users WHERE email = @e', { e: email })) throw new BootstrapError(`${email} already has an account`);
-  if (p.get('SELECT 1 FROM organizations WHERE slug = @s', { s: b.slug })) throw new BootstrapError(`the slug ${b.slug} is taken`);
+  if (RESERVED_SLUGS.has(b.slug) || p.get('SELECT 1 FROM organizations WHERE slug = @s', { s: b.slug })) throw new BootstrapError(`the slug ${b.slug} is taken`);
   const orgId = uuidv7(now);
   const userId = invite ? null : uuidv7(now);
   let shopId: string | null = null;

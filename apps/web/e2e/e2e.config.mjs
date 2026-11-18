@@ -12,7 +12,8 @@ export const repo = join(here, '..', '..', '..');
 export default {
   repo,
   // two levels under the repo, so the web's turbopack root (two levels up) is the repo itself
-  build: join(repo, 'e2e-build'),
+  // E2E_BUILD_DIR lets two runs build side by side (a sibling folder of the repo root's e2e-build)
+  build: process.env.E2E_BUILD_DIR ? join(repo, process.env.E2E_BUILD_DIR) : join(repo, 'e2e-build'),
   results: join(here, 'results'),
   basePath: '/custock',
   apiPort: Number(process.env.E2E_API_PORT ?? 8811),

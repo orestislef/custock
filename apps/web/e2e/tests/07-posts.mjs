@@ -1,5 +1,5 @@
 // posts, the approval flow and the staff alerts: who gets what, by role and shop
-import { see, L, api, eq, expect, go, lemoni, login, ok, one, open, q, seed, sleep, test, text } from '../lib.mjs';
+import { see, L, api, eq, expect, go, lemoni, login, ok, one, open, q, seed, sleep, test, text, WEB } from '../lib.mjs';
 import { waitPath } from '../helpers.mjs';
 
 const ids = {};
@@ -89,7 +89,7 @@ test('posts', 'approval: the alert link opens the post, approving sends it, the 
   const url = payload.url ?? `/admin/posts/${ids.pending}`;
   const owner = await login(seed.owner);
   const page = await open(t, { tokens: owner });
-  await page.goto(url.startsWith('http') ? url : `http://localhost:3811/custock${url}`, { waitUntil: 'networkidle' });
+  await page.goto(url.startsWith('http') ? url : `${WEB}${url}`, { waitUntil: 'networkidle' });
   await waitPath(page, new RegExp(`/admin/posts/${ids.pending}`));
   await see(page, 'E2E needs approval', 10_000);
   await ok(`/v1/orgs/${l.orgId}/posts/${ids.pending}/approve`, { method: 'POST', token: owner });

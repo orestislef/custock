@@ -4,10 +4,10 @@
 // never links here for them, this only catches an old link or a typed address.
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useOrgRouter as useRouter } from '@/components/admin/org-link';
 
-export function RedirectHome() {
+export function RedirectHome({ to = '/admin' }: { to?: string } = {}) {
   const router = useRouter();
-  useEffect(() => { router.replace('/admin'); }, [router]);
+  useEffect(() => { router.replace(to); }, [router, to]);
   return null;
 }

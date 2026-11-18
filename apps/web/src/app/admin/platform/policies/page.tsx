@@ -48,7 +48,7 @@ function Defaults() {
     <Page title={t('platform.policies.title')} back={{ href: '/admin/platform', label: t('platform.title') }} subtitle={t('platform.policies.sub')}>
       {!entries ? <div className="h-64 rounded-[16px] skel" aria-busy="true" /> : (
         <>
-          <PolicyGroups entries={entries} groups={POLICY_GROUPS} busyKey={saver.busyKey} onChange={(k, v: PolicyValue | null) => void saver.change(k, v)} />
+          <PolicyGroups entries={entries} groups={POLICY_GROUPS} hardBounds busyKey={saver.busyKey} onChange={(k, v: PolicyValue | null) => void saver.change(k, v)} />
           {saver.error ? <p className="sheet-error" role="alert">{t(`common:error.${saver.error}`, { defaultValue: t('common:error.internal') })}</p> : null}
           {changed.length ? (
             <div className="flex justify-center mt-2 mb-8">

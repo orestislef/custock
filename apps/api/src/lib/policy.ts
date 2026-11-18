@@ -15,6 +15,7 @@ import {
   coerce, effectiveAtScope, inBounds, isPlatformActor, canManageMember, POLICIES, policyDef, resolvePolicy, within, hasLevel, uuidv7,
   type AccessAssignment, type PolicyDef, type PolicyLayers, type PolicyPatch, type PolicyValue, type PolicyEntry, type Topology,
   type BusinessPolicyControl, type BusinessPolicyControlsPatch, type PlatformPolicyEntry, type ErrorCode,
+  type BusinessAuditAction, type PlatformAuditAction,
 } from '@custock/core';
 import type { Db } from '@custock/db';
 import { ApiProblem } from './problem';
@@ -208,7 +209,7 @@ function put(db: Db, level: Level, orgId: string, targetId: string, key: string,
   if (level === 'platform') platformCache.delete(db);
 }
 
-function auditBusiness(db: Db, orgId: string, actor: { id: string | null; superadmin: boolean }, action: string, entity: { type: string; id: string }, before: unknown, after: unknown, now: number) {
+function auditBusiness(db: Db, orgId: string, actor: { id: string | null; superadmin: boolean }, action: BusinessAuditAction, entity: { type: string; id: string }, before: unknown, after: unknown, now: number) {
   platform(db).run(
     `INSERT INTO audit_log (id, org_id, actor_id, actor_kind, action, entity_type, entity_id, before_json, after_json, created_at)
      VALUES (@id, @org, @actor, @kind, @action, @et, @eid, @b, @a, @now)`,
@@ -217,7 +218,7 @@ function auditBusiness(db: Db, orgId: string, actor: { id: string | null; supera
   if (actor.superadmin) auditPlatform(db, actor.id, action, orgId, entity, before, after, now);
 }
 
-function auditPlatform(db: Db, actorId: string | null, action: string, orgId: string | null, entity: { type: string; id: string } | null, before: unknown, after: unknown, now: number) {
+function auditPlatform(db: Db, actorId: string | null, action: PlatformAuditAction | BusinessAuditAction, orgId: string | null, entity: { type: string; id: string } | null, before: unknown, after: unknown, now: number) {
   platform(db).run(
     `INSERT INTO platform_audit (id, actor_id, action, org_id, entity_type, entity_id, details_json, created_at)
      VALUES (@id, @a, @action, @org, @et, @eid, @d, @now)`,

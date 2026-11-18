@@ -12,6 +12,7 @@ import { createBrowserApi } from '@/lib/api-client';
 import { useLocale, useT } from '@/lib/i18n-client';
 import { emailProblem, normalizeEmail, type FieldError } from '@custock/core';
 import { FieldMessage } from '@/components/ui/field-kit';
+import { SessionGate } from '@/components/session-gate';
 
 const WAIT_S = 60;
 
@@ -56,7 +57,8 @@ export function ForgotPassword({ initialEmail }: { initialEmail: string }) {
   const time = `0:${String(wait).padStart(2, '0')}`;
 
   return (
-    <main className="min-h-dvh flex flex-col px-4" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <main data-guest className="min-h-dvh flex flex-col px-safe-4" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <SessionGate />
       <div className="w-full max-w-[400px] mx-auto flex justify-end pt-3"><LocaleSwitch /></div>
       <div className="flex-1 grid place-items-center py-8">
         <div className="w-full max-w-[400px] page-in">

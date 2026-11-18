@@ -8,6 +8,7 @@ import { variantLabel } from '../services/catalog';
 import { dayKey } from '../lib/time';
 import { loadPosts, postShops } from '../services/posts';
 import { canSee, customerVisibility, loadSubscriptions, reachedShops } from '../services/customers';
+import { lowSql } from '../lib/low-stock';
 
 const DAY = 86_400_000;
 
@@ -61,7 +62,7 @@ export function reportRoutes(app: Hono<AppEnv>) {
                LEFT JOIN shop_variant_settings ss ON ss.shop_id = l.shop_id AND ss.variant_id = l.variant_id
               WHERE l.org_id = @org AND p.archived_at IS NULL AND v.archived_at IS NULL AND p.track_stock = 1
                 AND l.shop_id IN (SELECT value FROM json_each(@shops)) AND ${cond}`,
-            { shops: stockShops },
+            { shops: stockShops, fewLeft: org.few_left_threshold },
           )
         : 0;
 
@@ -86,7 +87,7 @@ export function reportRoutes(app: Hono<AppEnv>) {
     })();
 
     const cards: DashboardCards = {
-      lowStock: levelCount('l.on_hand > 0 AND l.on_hand <= coalesce(ss.reorder_point, -1)'),
+      lowStock: levelCount(lowSql()),
       outOfStock: levelCount('l.on_hand = 0'),
       negativeStock: levelCount('l.on_hand < 0'),
       peopleWaiting:

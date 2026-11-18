@@ -114,7 +114,7 @@ const appConfig: Config = {
   jwtSecret,
   unsubSecret,
   publicWebUrl,
-  corsOrigins: (env.CUSTOCK_CORS ?? 'http://localhost:3000,http://localhost:8081,http://localhost:19006').split(','),
+  corsOrigins: (env.CUSTOCK_CORS ?? 'http://localhost:3000').split(','),
   trustedProxy: env.CUSTOCK_TRUSTED_PROXY === '1',
   turnstileSecret: env.CUSTOCK_TURNSTILE_SECRET,
   apiPublicUrl: env.CUSTOCK_API_URL ?? `http://localhost:${port}`,

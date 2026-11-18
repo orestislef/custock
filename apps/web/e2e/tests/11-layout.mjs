@@ -1,4 +1,4 @@
-import { L, a11y, expect, go, login, open, overflow, pageProblems, seed, sheetGaps, shot, test, text, underTabBar, unnamedControls } from '../lib.mjs';
+import { API, L, a11y, expect, go, login, open, overflow, pageProblems, seed, sheetGaps, shot, test, text, underTabBar, unnamedControls } from '../lib.mjs';
 import { openSheet, superAdmin } from '../helpers.mjs';
 
 const STAFF_PAGES = ['/admin', '/admin/stock', '/admin/scan', '/admin/customers', '/admin/posts', '/admin/posts/new', '/admin/reports', '/admin/team', '/admin/team/roles', '/admin/join-links', '/admin/settings', '/admin/audit', '/admin/stock/counts', '/admin/stock/transfers', '/admin/stock/new', '/admin/stock/categories'];
@@ -144,7 +144,7 @@ test('layout', 'controls inside open sheets have names in the accessibility tree
     if (a.length) found.push(`${p}: ${a.join(', ')}`);
     if (tree.length) found.push(`${p} tree: ${[...new Set(tree)].join(', ')}`);
   }
-  const product = (await (await fetch(`http://127.0.0.1:8811/v1/orgs/${(await (await fetch('http://127.0.0.1:8811/v1/me/context', { headers: { Authorization: `Bearer ${owner.accessToken}` } })).json()).orgs[0].orgId}/products?limit=1`, { headers: { Authorization: `Bearer ${owner.accessToken}` } })).json()).items?.[0];
+  const product = (await (await fetch(`${API}/v1/orgs/${(await (await fetch(`${API}/v1/me/context`, { headers: { Authorization: `Bearer ${owner.accessToken}` } })).json()).orgs[0].orgId}/products?limit=1`, { headers: { Authorization: `Bearer ${owner.accessToken}` } })).json()).items?.[0];
   if (product) {
     await go(page, `/admin/stock/${product.id}`);
     await openSheet(page, page.getByRole('button', { name: L('product.receive') }).first()).catch(() => found.push('receive sheet did not open'));

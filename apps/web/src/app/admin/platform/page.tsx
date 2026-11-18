@@ -13,7 +13,7 @@ import { NewBusinessSheet } from '@/components/platform/new-business-sheet';
 import { SuperAdminsSection } from '@/components/platform/super-admins';
 import { Empty, Group, Row, Switch } from '@/components/ui/kit';
 import { Sheet, useToast } from '@/components/ui/client-kit';
-import { IconGear, IconHistory, IconLink, IconPlus, IconSearch, IconShop } from '@/components/ui/icons';
+import { IconChevronRight, IconGear, IconHistory, IconLink, IconPlus, IconSearch, IconShop } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { useHashScroll } from '@/lib/use-hash-scroll';
 import { ErrorsNavRow } from './errors/nav-row';
@@ -33,7 +33,8 @@ export default function PlatformPage() {
 }
 
 function PlatformHome() {
-  const { api, t, locale, refresh } = usePlatform();
+  const { api, t, locale, refresh, me, currentOrgId, openOrg } = usePlatform();
+  const lastOrg = currentOrgId ? me.orgs.find((o) => o.orgId === currentOrgId) ?? null : null;
   const toast = useToast();
   const overview = useAsync(() => api.platformOverview(), []);
   const businesses = useAsync(() => api.platformBusinesses(), []);
@@ -70,6 +71,11 @@ function PlatformHome() {
       actions={<button type="button" className="btn btn-primary" onClick={() => setCreating(true)}><IconPlus size={18} />{t('platform.newBusiness')}</button>}
       phoneAction={<button type="button" className="icon-btn" style={{ background: 'var(--c-accent-tint)' }} aria-label={t('platform.newBusiness')} onClick={() => setCreating(true)}><IconPlus size={22} /></button>}>
 
+      {lastOrg ? (
+        <button type="button" className="chip mb-5 inline-flex items-center gap-1 min-h-[44px]" onClick={() => openOrg(lastOrg.orgId)}>
+          {t('platform.continueIn', { name: lastOrg.name })}<IconChevronRight size={16} />
+        </button>
+      ) : null}
       <PushCard api={api} orgId={null} place="platform-home" className="mb-6 max-w-[640px]"
         title={t('push.card.platformTitle')} body={t('push.card.platformBody')} later={t('push.card.platformLater')}
         onTitle={t('push.card.platformOnTitle')} onBody={t('push.card.platformOnBody')}

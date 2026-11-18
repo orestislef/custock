@@ -33,6 +33,20 @@ export function BusinessPolicies({ orgId }: { orgId: string }) {
     }
   };
 
+  // the business's own value, for settings without a ceiling: a super admin sets it directly
+  const saveValue = async (key: string, value: PolicyValue | null) => {
+    setBusy(key);
+    try {
+      await api.setOrgPolicies(orgId, { [key]: value });
+      q.setData(await api.businessPolicies(orgId));
+      toast(t('platform.policies.saved'));
+    } catch (e) {
+      toast(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`, { defaultValue: t('common:error.internal') }));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (!controls) return <div className="h-48 rounded-[16px] skel mb-6" aria-busy="true" />;
   return (
     <>
@@ -42,35 +56,50 @@ export function BusinessPolicies({ orgId }: { orgId: string }) {
         const list = controls.filter((c) => policyDef(c.key)?.group === g);
         if (!list.length) return null;
         return (
-          <Group key={g} title={t(`common:policyGroup.${g}`)}>
-            {list.map((c) => <ControlRows key={c.key} c={c} busy={busy === c.key} onSave={(ch) => void save(c.key, ch)} />)}
-          </Group>
+          <section key={g} className="mb-6">
+            <h3 className="t-headline m-0 mb-2 px-1">{t(`common:policyGroup.${g}`)}</h3>
+            {list.map((c) => (
+              <ControlBlock key={c.key} c={c} busy={busy === c.key}
+                onSave={(ch) => void save(c.key, ch)} onValue={(v) => void saveValue(c.key, v)} />
+            ))}
+          </section>
         );
       })}
     </>
   );
 }
 
-function ControlRows({ c, busy, onSave }: { c: BusinessPolicyControl; busy: boolean; onSave: (change: Change) => void }) {
+// one setting as one group: its name on top, the control that fits its type, and under it a
+// separate row for whether the owner may change it. a setting with a stricter side gets the
+// ceiling it is held to; a free one gets the business's own value.
+function ControlBlock({ c, busy, onSave, onValue }: { c: BusinessPolicyControl; busy: boolean; onSave: (change: Change) => void; onValue: (v: PolicyValue | null) => void }) {
   const { t } = usePlatform();
   const def = policyDef(c.key)!;
   const title = t(`common:policy.${c.key}.title`);
-  // a ceiling only means something for limits with a stricter side
   const bounded = def.cap !== 'free';
-  // the ceiling itself moves inside the hard bounds only
-  const entry: PolicyEntry = {
-    key: c.key,
-    value: c.limit,
-    inherited: def.type === 'int' ? (def.noneIsZero ? 0 : (def.max ?? 0)) : def.type === 'window' ? '00:00-00:00' : c.platform,
-    effective: c.limit ?? c.platform,
-    editable: true,
-  };
+  const inUse = t('platform.policies.inUse', { value: policyText(t, def, c.business) });
+  const entry: PolicyEntry = bounded
+    ? {
+        key: c.key,
+        value: c.limit,
+        // the ceiling itself moves inside the hard bounds only
+        inherited: def.type === 'int' ? (def.noneIsZero ? 0 : (def.max ?? 0)) : def.type === 'window' ? '00:00-00:00' : c.platform,
+        effective: c.limit ?? c.platform,
+        editable: true,
+      }
+    : { key: c.key, value: c.business, inherited: c.platform, effective: c.business, editable: true };
+  const foot = t(`common:policy.${c.key}.foot`, { defaultValue: '' });
   return (
-    <>
-      {bounded ? <PolicyControl entry={entry} busy={busy} onChange={(v) => onSave({ limit: v })} /> : null}
-      <Row title={bounded ? t('platform.policies.ownerCan') : title}
-        subtitle={t('platform.policies.now', { value: policyText(t, def, c.business) })}
-        trailing={<Switch label={`${t('platform.policies.ownerCan')}: ${title}`} checked={c.delegated} disabled={busy} onChange={(v) => onSave({ delegated: v })} />} />
-    </>
+    <div data-policy-block={c.key}>
+    <Group title={title} footer={foot || undefined}>
+      <PolicyControl entry={entry} busy={busy}
+        title={bounded ? t(`platform.policies.ceiling.${def.cap}`) : t('platform.policies.value')}
+        subtitle={bounded ? inUse : undefined}
+        onChange={(v) => (bounded ? onSave({ limit: v }) : onValue(v))} />
+      <Row title={t('platform.policies.ownerCan')}
+        subtitle={c.delegated ? t('platform.policies.ownerCanOn') : t('platform.policies.ownerCanOff')}
+        trailing={<span data-policy-delegate={c.key} className="contents"><Switch label={`${t('platform.policies.ownerCan')}: ${title}`} checked={c.delegated} disabled={busy} onChange={(v) => onSave({ delegated: v })} /></span>} />
+    </Group>
+    </div>
   );
 }

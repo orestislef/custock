@@ -6,7 +6,7 @@ import { IconSearch } from '@/components/ui/icons';
 export default async function NotFound() {
   const { t } = await getT();
   return (
-    <main className="min-h-dvh grid place-items-center px-4">
+    <main className="min-h-dvh grid place-items-center px-safe-4">
       <Empty
         icon={<IconSearch size={44} />}
         title={t('notFound.title')}

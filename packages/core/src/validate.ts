@@ -289,6 +289,14 @@ export function normalizeOtp(input: string): string {
   return input.replace(/\D/g, '').slice(0, LIMITS.otp);
 }
 
+// business web names that would collide with app pages (/admin/<slug>/..., the staff app's own
+// pages, and the public paths). treated as taken.
+export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
+  'admin', 'login', 'forgot', 'reset', 'platform', 'print', 'stock', 'scan', 'customers', 'posts', 'reports', 'team',
+  'join-links', 'settings', 'audit', 'dev-outbox', 'api', 'files', 'email', 'v1', 's', 'p', 'j', 'invite',
+  'platform-invite', 'account', 'confirm', 'unsubscribe', 'offline', 'icons', 'wasm', 'new', 'me',
+]);
+
 export function slugProblem(input: string): FieldError | null {
   if (!input) return 'empty';
   if (input.length > LIMITS.slug) return 'tooLong';

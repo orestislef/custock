@@ -13,14 +13,21 @@ export async function generateMetadata({ params }: PageProps<'/s/[org]/p/[id]'>)
   return p ? { title: p.name } : {};
 }
 
-export default async function CatalogProductPage({ params }: PageProps<'/s/[org]/p/[id]'>) {
+// back goes to the part of the shop the product was opened from (?from=news, offers, me), else
+// the catalog. only these known values, never an address from the query string
+const FROM = { news: ['news', 'shopper.tabs.news'], offers: ['offers', 'shopper.tabs.offers'], me: ['me', 'shopper.tabs.you'] } as const;
+
+export default async function CatalogProductPage({ params, searchParams }: PageProps<'/s/[org]/p/[id]'>) {
   const { org, id } = await params;
+  const q = await searchParams;
   const { t, locale } = await getT();
+  const from = typeof q.from === 'string' && q.from in FROM ? FROM[q.from as keyof typeof FROM] : null;
+  const back = from ? { href: `/s/${org}/${from[0]}`, label: t(from[1]) } : { href: `/s/${org}`, label: t('catalog.title') };
   const info = await orgInfo(org, locale);
   const joinHref = info.joinCode ? `/j/${info.joinCode}` : null;
   const p = await publicProductById(org, id, locale);
   return (
-    <PublicShell orgName={info.name} logoUrl={info.logoUrl} t={t} back={{ href: `/s/${org}`, label: t('catalog.title') }}>
+    <PublicShell orgName={info.name} logoUrl={info.logoUrl} t={t} back={back}>
       {p ? <ProductView p={p} t={t} locale={locale} actions={<ProductActions p={p} joinHref={joinHref} />} />
         // the catalog is open to everyone, so a missing product is really gone
         : info.catalogShared ? <Gone title={t('gone.shopProduct.title')} body={t('gone.shopProduct.body', { org: info.name })} href={`/s/${org}`} cta={t('gone.shopProduct.cta', { org: info.name })} />

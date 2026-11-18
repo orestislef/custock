@@ -1,7 +1,8 @@
 'use client';
 
-// the frame of the super admin screens: a translucent toolbar with the platform name, a way back
-// into the business that was open, and the account sheet. one centered column, phone and desktop.
+// the frame of the super admin screens: a translucent toolbar with the platform name and the
+// account sheet. one centered column, phone and desktop. the way back into the business that was
+// open is a quiet chip on All businesses, not a back arrow.
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -9,7 +10,7 @@ import { usePlatform } from '@/components/admin/admin-context';
 import { Avatar } from '@/components/ui/kit';
 import { LocaleSwitch, Sheet } from '@/components/ui/client-kit';
 import { AppearanceRow } from '@/components/ui/appearance-switch';
-import { IconChevronLeft, IconLogout, IconShield } from '@/components/ui/icons';
+import { IconLogout, IconShield } from '@/components/ui/icons';
 import { PlatformBanners } from './bits';
 import { PushRow } from '@/components/pwa/push-row';
 import { AppIcon, InstallSteps } from '@/components/pwa/install-coach';
@@ -25,24 +26,18 @@ export function SuperAdminPill({ label }: { label: string }) {
 }
 
 export function PlatformShell({ children }: { children: ReactNode }) {
-  const { t, me, currentOrgId, logout, api, locale } = usePlatform();
+  const { t, me, logout, api, locale } = usePlatform();
   const [installSteps, setInstallSteps] = useState(false);
   // a browser that rotated its subscription, or the same super admin signing in again
   useEffect(() => { void refreshSubscription(api, { orgId: null, locale: locale as 'en' }); }, [api, locale]);
   const [userOpen, setUserOpen] = useState(false);
-  const current = currentOrgId ? me.orgs.find((o) => o.orgId === currentOrgId) : null;
   return (
     <div className="min-h-dvh flex flex-col">
       <a href="#main" className="skip-link t-sub">{t('admin.skip')}</a>
       <header className="bar" data-toolbar>
-        <div className="flex items-center gap-2 h-[52px] px-4 md:px-8 max-w-[1100px] w-full mx-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-          {current ? (
-            <Link href="/admin" className="inline-flex items-center t-body min-h-[44px] -ml-2 max-w-[40%]" aria-label={t('platform.backTo', { name: current.name })}>
-              <IconChevronLeft size={22} /><span className="truncate">{current.name}</span>
-            </Link>
-          ) : (
-            <span className="t-headline t-display">Custock</span>
-          )}
+        <div className="flex items-center gap-2 h-[52px] px-safe-4 md:px-safe-8 max-w-[1100px] w-full mx-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          {/* all businesses is the root of a super admin: the name, never a back arrow */}
+          <Link href="/admin/platform" className="t-headline t-display hover:no-underline" style={{ color: 'var(--c-ink)' }}>Custock</Link>
           <span id="bar-title" className="t-headline flex-1 text-center truncate opacity-0 transition-opacity" aria-hidden="true" />
           <SuperAdminPill label={t('platform.superadmin')} />
           <button type="button" className="icon-btn" aria-label={t('admin.account')} onClick={() => setUserOpen(true)}>
@@ -50,7 +45,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
           </button>
         </div>
       </header>
-      <main id="main" tabIndex={-1} className="outline-none flex-1 px-4 md:px-8 pb-16 w-full max-w-[1100px] mx-auto">
+      <main id="main" tabIndex={-1} className="outline-none flex-1 px-safe-4 md:px-safe-8 pb-[max(4rem,calc(2rem+env(safe-area-inset-bottom)))] w-full max-w-[1100px] mx-auto">
         <PlatformBanners me={me} t={t} />
         {children}
       </main>

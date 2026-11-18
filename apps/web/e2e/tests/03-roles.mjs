@@ -1,4 +1,4 @@
-import { L, expect, go, login, open, path, permissionWords, seed, test } from '../lib.mjs';
+import { L, expect, go, login, open, path, permissionWords, seed, shortPath, test } from '../lib.mjs';
 
 // every admin page, and the nav entry that leads to it (null: reached from a button on another page)
 const PAGES = [
@@ -16,7 +16,7 @@ const ROLES = [
 ];
 
 async function navLinks(page) {
-  return page.evaluate((base) => [...document.querySelectorAll('nav a[href]')].map((a) => new URL(a.href).pathname.replace(base, '')), '/custock');
+  return (await page.evaluate((base) => [...document.querySelectorAll('nav a[href]')].map((a) => new URL(a.href).pathname.replace(base, '')), '/custock')).map(shortPath);
 }
 
 for (const [role, email] of ROLES) {
@@ -32,12 +32,15 @@ for (const [role, email] of ROLES) {
       let allowed = nav ? links.has(nav) : false;
       if (!nav) {
         await go(page, PARENT[p]);
-        const hrefs = await page.evaluate((base) => [...document.querySelectorAll('a[href]')].map((a) => new URL(a.href).pathname.replace(base, '')), '/custock');
+        const hrefs = (await page.evaluate((base) => [...document.querySelectorAll('a[href]')].map((a) => new URL(a.href).pathname.replace(base, '')), '/custock')).map(shortPath);
         allowed = hrefs.includes(p);
       }
       t.step(`${p} (${allowed ? 'shown' : 'hidden'})`);
       await go(page, p);
-      await page.waitForTimeout(400);
+      // an old short address goes on to the business first, then a page someone cannot use goes Home
+      const want = allowed ? p : '/admin';
+      for (let i = 0; i < 25 && path(page) !== want; i++) await page.waitForTimeout(200);
+      await page.waitForTimeout(300);
       const landed = path(page);
       if (allowed && landed !== p) problems.push(`${p} is offered but goes to ${landed}`);
       if (!allowed && landed !== '/admin') problems.push(`${p} is not offered but opens (${landed})`);

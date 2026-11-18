@@ -129,7 +129,7 @@ export function CategorySheet({ open, onClose, category, onSaved }: {
               <li key={l}>
                 <label htmlFor={`cat-${l}`} className={`block ${i ? 'row-sep relative' : ''}`}>
                   <span className="field-label">{l === base ? t('categories.name') : t(`categories.nameIn.${l}`)}</span>
-                  <input id={`cat-${l}`} className="field pt-1" maxLength={80} value={names[l] ?? ''} autoFocus={i === 0} autoComplete="off" autoCapitalize="words"
+                  <input id={`cat-${l}`} className="field pt-1" maxLength={80} value={names[l] ?? ''} data-autofocus={i === 0 ? "" : undefined} autoComplete="off" autoCapitalize="words"
                     autoCorrect="off" spellCheck={false} enterKeyHint={i < 2 ? 'next' : 'done'}
                     onBlur={() => setNames((x) => ({ ...x, [l]: cleanLine(x[l] ?? '') }))}
                     placeholder={l === base ? undefined : t('categories.optional')}

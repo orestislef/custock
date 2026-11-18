@@ -32,10 +32,13 @@ interface LinkPayload {
 
 // a page in the staff app. the business (org) and, when it matters, the shop travel along, so a tap
 // opens the right business and shop even when another one was open on that device.
-export function staffPath(path: string, orgId: string | null, shopId?: string | null, extra: Record<string, string | undefined> = {}): string {
+// with the business's slug the business goes into the path (/admin/<slug>/posts/1) and needs no
+// ?org=; without it (an unknown business) the old /admin?org= form, which the app still reads.
+export function staffPath(path: string, orgId: string | null, shopId?: string | null, extra: Record<string, string | undefined> = {}, slug?: string): string {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(extra)) if (v) q.set(k, v);
-  if (orgId) q.set('org', orgId);
+  if (slug && (path === '/admin' || path.startsWith('/admin/'))) path = `/admin/${encodeURIComponent(slug)}${path.slice('/admin'.length)}`;
+  else if (orgId) q.set('org', orgId);
   if (shopId) q.set('shop', shopId);
   const qs = q.toString();
   return qs ? `${path}?${qs}` : path;
@@ -50,7 +53,7 @@ export function pushPath(db: Db, orgId: string | null, customer: boolean, p: Lin
   switch (p.type) {
     case 'post':
       if (customer && slug && p.postId) return `/s/${enc(slug)}/news?post=${enc(p.postId)}`;
-      if (!customer && p.postId) return staffPath(`/admin/posts/${enc(p.postId)}`, orgId);
+      if (!customer && p.postId) return staffPath(`/admin/posts/${enc(p.postId)}`, orgId, null, {}, slug);
       break;
     case 'back_in_stock':
       if (slug && p.productId) return `/s/${enc(slug)}/p/${enc(p.productId)}`;
@@ -59,26 +62,26 @@ export function pushPath(db: Db, orgId: string | null, customer: boolean, p: Lin
     case 'postPublished':
     case 'postScheduled':
     case 'postReturned':
-      if (p.postId) return staffPath(`/admin/posts/${enc(p.postId)}`, orgId);
-      return staffPath('/admin/posts', orgId);
+      if (p.postId) return staffPath(`/admin/posts/${enc(p.postId)}`, orgId, null, {}, slug);
+      return staffPath('/admin/posts', orgId, null, {}, slug);
     case 'countReady':
-      if (p.countId) return staffPath(`/admin/stock/counts/${enc(p.countId)}`, orgId, shop);
-      return staffPath('/admin/stock/counts', orgId, shop);
+      if (p.countId) return staffPath(`/admin/stock/counts/${enc(p.countId)}`, orgId, shop, {}, slug);
+      return staffPath('/admin/stock/counts', orgId, shop, {}, slug);
     case 'transferSent':
     case 'transferReceived':
-      if (p.transferId) return staffPath(`/admin/stock/transfers/${enc(p.transferId)}`, orgId, shop);
-      return staffPath('/admin/stock/transfers', orgId, shop);
+      if (p.transferId) return staffPath(`/admin/stock/transfers/${enc(p.transferId)}`, orgId, shop, {}, slug);
+      return staffPath('/admin/stock/transfers', orgId, shop, {}, slug);
     case 'lowStock': {
       const product = p.variantId && orgId
         ? platform(db).get<{ product_id: string }>('SELECT product_id FROM product_variants WHERE org_id = @o AND id = @v', { o: orgId, v: p.variantId })?.product_id
         : undefined;
-      return product ? staffPath(`/admin/stock/${enc(product)}`, orgId, shop) : staffPath('/admin/stock', orgId, shop, { filter: 'low' });
+      return product ? staffPath(`/admin/stock/${enc(product)}`, orgId, shop, {}, slug) : staffPath('/admin/stock', orgId, shop, { filter: 'low' }, slug);
     }
     case 'inviteAccepted':
-      return staffPath('/admin/team', orgId, null, { member: typeof p.membershipId === 'string' ? p.membershipId : undefined });
+      return staffPath('/admin/team', orgId, null, { member: typeof p.membershipId === 'string' ? p.membershipId : undefined }, slug);
   }
   if (customer && slug) return `/s/${enc(slug)}`;
-  return staffPath('/admin', orgId);
+  return staffPath('/admin', orgId, null, {}, slug);
 }
 
 export interface PushAction { action: string; title: string; url: string }

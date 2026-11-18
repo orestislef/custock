@@ -3,11 +3,10 @@
 // super admins and their invites. every write lands in platform_audit with before and after.
 
 import {
-  FEATURES, uuidv7,
+  FEATURES, uuidv7, type PlatformAuditAction,
   type BusinessCreated, type Feature, type MoneyByCurrency, type OrgControls, type OrgControlsPatch, type PendingInvite,
   type PlatformAuditEntry, type PlatformBusiness, type PlatformBusinessDetail, type PlatformOverview, type PlatformSettings,
-  type PlatformSettingsPatch, type SuperAdmins,
-} from '@custock/core';
+  type PlatformSettingsPatch, type SuperAdmins, RESERVED_SLUGS } from '@custock/core';
 import { randomToken, sha256, type Db } from '@custock/db';
 import { pickLocale } from '@custock/i18n';
 import { ApiProblem, badRequest, notFound } from '../lib/problem';
@@ -27,7 +26,7 @@ type Locale3 = 'en' | 'el' | 'ru';
 export function platformAudit(
   db: Db,
   actorId: string | null,
-  action: string,
+  action: PlatformAuditAction,
   target: { orgId?: string | null; entity?: { type: string; id: string } | null; before?: unknown; after?: unknown } = {},
   now = Date.now(),
 ) {
@@ -189,7 +188,7 @@ export function overview(db: Db, now = Date.now()): PlatformOverview {
 // a free slug for a name, latin from greek and cyrillic
 export function suggestSlug(db: Db, name: string): string {
   const base = slugify(name).slice(0, 36).replace(/-+$/, '') || 'shop';
-  const taken = (s: string) => !!platform(db).get('SELECT 1 FROM organizations WHERE slug = @s', { s });
+  const taken = (s: string) => RESERVED_SLUGS.has(s) || !!platform(db).get('SELECT 1 FROM organizations WHERE slug = @s', { s });
   if (!taken(base)) return base;
   for (let i = 2; i < 1000; i++) if (!taken(`${base}-${i}`)) return `${base}-${i}`;
   return `${base}-${randomToken().slice(0, 6).toLowerCase().replace(/[^a-z0-9]/g, 'x')}`;
@@ -419,7 +418,7 @@ export function removeSuperAdmin(db: Db, actorId: string | null, userId: string,
   platformAudit(db, actorId, 'superadmin.removed', { entity: { type: 'user', id: userId }, before: { email: target.email, role: 'superadmin' }, after: { role: null } }, now);
 }
 
-export function grantSuperAdmin(db: Db, actorId: string | null, userId: string, action: string, now = Date.now()) {
+export function grantSuperAdmin(db: Db, actorId: string | null, userId: string, action: 'superadmin.granted_cli' | 'superadmin.invite_accepted', now = Date.now()) {
   const p = platform(db);
   const u = p.get<{ email: string | null; role: string | null }>('SELECT email, platform_role AS role FROM users WHERE id = @id AND deleted_at IS NULL', { id: userId });
   if (!u) throw notFound('user');

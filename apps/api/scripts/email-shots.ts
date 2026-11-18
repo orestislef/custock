@@ -23,7 +23,7 @@ const server = await new Promise<ReturnType<typeof serve>>((resolve) => {
   const app = { fetch: (req: Request) => handler!.fetch(req) };
   let handler: { fetch: (req: Request) => Response | Promise<Response> } | null = null;
   s = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' }, (info) => {
-    handler = createApp({ db, dev: true, jwtSecret: 'screenshots-only-secret-long-enough', publicWebUrl: 'https://orestislef.gr/custock', apiPublicUrl: `http://127.0.0.1:${info.port}`, corsOrigins: [], rateLimit: false });
+    handler = createApp({ db, dev: true, jwtSecret: 'screenshots-only-secret-long-enough', publicWebUrl: 'https://custock.example.com/custock', apiPublicUrl: `http://127.0.0.1:${info.port}`, corsOrigins: [], rateLimit: false });
     resolve(s);
   });
 });

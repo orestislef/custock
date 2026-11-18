@@ -193,6 +193,9 @@
     outline-offset: 2px;
     border-radius: 6px;
   }
+  /* after a tap or a click no control keeps a ring (safari marks tapped selects, buttons and
+     switches as focus-visible). text fields keep their own inset ring while typing. */
+  html[data-input="pointer"] :focus-visible:not(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea) { outline: none; }
   button { font: inherit; color: inherit; }
 }
 
@@ -328,7 +331,11 @@
   .picker.filled { background: var(--c-fill); color: var(--c-ink); font-weight: 500; }
   .picker.plain { padding: 0; min-height: 44px; border-radius: 8px; }
   .picker select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
-  .picker:has(select:focus-visible) { outline: 3px solid color-mix(in srgb, var(--c-accent) 60%, transparent); outline-offset: 2px; }
+  /* one ring, on the pill, tight to it, and only when the focus came from the keyboard. the select
+     inside never draws its own (that was the second ring), and a tap leaves nothing behind */
+  .picker select:focus, .picker select:focus-visible { outline: none; box-shadow: none; }
+  .picker:has(select:focus-visible) { outline: 2px solid color-mix(in srgb, var(--c-accent) 70%, transparent); outline-offset: 2px; }
+  html:not([data-input="keyboard"]) .picker:has(select:focus-visible) { outline: none; }
   .picker[aria-disabled="true"] { cursor: default; opacity: 0.6; }
 
   /* the open menu. where the browser lets us style it (chromium, appearance: base-select) it sits on
@@ -381,6 +388,7 @@
   .switch input:checked ~ .knob { transform: translateX(20px); }
   .switch input:disabled ~ .track, .switch input:disabled ~ .knob { opacity: 0.45; }
   .switch input:focus-visible ~ .track { outline: 3px solid color-mix(in srgb, var(--c-accent) 60%, transparent); outline-offset: 2px; }
+  html[data-input="pointer"] .switch input:focus-visible ~ .track { outline: none; }
 
   /* checkbox for attestations (not a setting) */
   .check { appearance: none; flex: none; width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--c-ink-3); background: var(--c-surface); display: grid; place-items: center; cursor: pointer; margin: 0; }
@@ -471,14 +479,35 @@
   .table .num { text-align: right; font-variant-numeric: tabular-nums; }
 
   /* sheets */
-  .scrim { position: fixed; inset: 0; z-index: 60; background: var(--c-scrim); animation: fade-in 250ms ease-out; }
+  .scrim { position: fixed; inset: 0; z-index: 60; background: var(--c-scrim); animation: fade-in 250ms ease-out; touch-action: none; overscroll-behavior: contain; }
+  /* on phones the sheet follows the keyboard: --kb is the part of the screen the keyboard covers and
+     --vvh the height left above it (both set from visualViewport in client-kit). a transform moves
+     it, so nothing reflows while the keyboard slides. its own scroll never chains to the page. */
   .sheet {
     position: fixed; z-index: 61; left: 0; right: 0; bottom: 0;
     max-height: 92dvh; overflow: auto;
+    overscroll-behavior: contain;
     background: var(--c-elevated);
     border-radius: var(--r-sheet) var(--r-sheet) 0 0;
     padding: 8px 0 calc(16px + env(safe-area-inset-bottom));
     animation: sheet-in 450ms var(--ease-ios);
+  }
+  .sheet:focus { outline: none; }
+  /* with the keyboard up (data-kb, set from visualViewport in client-kit): the sheet sits right
+     above the keyboard in what is left of the screen, moved by a transform so nothing reflows
+     while the keyboard slides, its buttons stay in reach, and the home indicator's safe area is not
+     needed because the keyboard covers it. with the keyboard down nothing here applies. */
+  .sheet[data-kb] {
+    max-height: calc(var(--vvh, 100dvh) - 12px);
+    transform: translate3d(0, calc(-1 * var(--kb, 0px)), 0);
+    transition: transform 220ms var(--ease-ios), max-height 220ms var(--ease-ios);
+    padding-bottom: 12px;
+  }
+  .sheet[data-kb]:has(> [data-sheet-footer]) { padding-bottom: 0; }
+  .sheet[data-kb] > [data-sheet-footer] {
+    position: sticky; bottom: 0; z-index: 1;
+    background: var(--c-elevated);
+    padding-bottom: 12px;
   }
   .sheet .grabber { width: 36px; height: 5px; border-radius: 3px; background: var(--c-ink-3); opacity: 0.5; margin: 0 auto 8px; }
   @media (min-width: 768px) {
@@ -499,7 +528,7 @@
     position: fixed; z-index: 80; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom));
     transform: translateX(-50%);
     display: flex; align-items: center; gap: 12px;
-    max-width: min(520px, calc(100vw - 32px));
+    max-width: min(520px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)));
     padding: 10px 10px 10px 16px; border-radius: 14px;
     background: var(--c-toast); color: var(--c-on-toast);
     box-shadow: 0 8px 30px rgba(0,0,0,0.25);
@@ -662,6 +691,12 @@
   .code-path { font: 13px/18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
 }
 
+/* while the on screen keyboard is up on a phone (data-kb on <html>, components/ui/keyboard-watch):
+   the floating tab bars step aside so they never sit over the field being typed in, and toasts
+   show above the keyboard instead of behind it */
+html[data-kb] [data-tabbar] { opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(12px); transition: opacity 150ms ease, transform 150ms ease, visibility 0s linear 150ms; }
+html[data-kb] .toast { bottom: calc(var(--kb-page, 0px) + 12px); }
+
 /* sheet buttons: side by side with room between them, equal width, a single one fills the row */
 .sheet-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .sheet-actions > .btn { flex: 1 1 0; min-width: 0; min-height: 50px; justify-content: center; }
@@ -786,3 +821,33 @@
 .cat-tile[aria-current] .cat-tile-name { color: var(--c-accent); font-weight: 600; }
 .cat-tile:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .cat-tile .cat-tile-pic { transition: none; } }
+
+/* side safe areas. in landscape an iphone's dynamic island and rounded corners take the left or
+   right edge (env(safe-area-inset-left/right)); every frame keeps at least its normal padding and
+   never less than the inset, so nothing sits under the island. portrait and wide screens get the
+   normal padding, the insets are 0 there. */
+@utility px-safe-3 { padding-left: max(0.75rem, env(safe-area-inset-left)); padding-right: max(0.75rem, env(safe-area-inset-right)); }
+@utility px-safe-4 { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
+@utility px-safe-5 { padding-left: max(1.25rem, env(safe-area-inset-left)); padding-right: max(1.25rem, env(safe-area-inset-right)); }
+@utility px-safe-6 { padding-left: max(1.5rem, env(safe-area-inset-left)); padding-right: max(1.5rem, env(safe-area-inset-right)); }
+@utility px-safe-8 { padding-left: max(2rem, env(safe-area-inset-left)); padding-right: max(2rem, env(safe-area-inset-right)); }
+@utility pl-safe-3 { padding-left: max(0.75rem, env(safe-area-inset-left)); }
+@utility pr-safe-8 { padding-right: max(2rem, env(safe-area-inset-right)); }
+/* back links sit 8px left of the content edge for optical alignment, unless that would put them
+   under the island: then they line up with the content */
+@utility ml-back { margin-left: calc(-1 * clamp(0px, 0.5rem - env(safe-area-inset-left), 0.5rem)); }
+/* the floating tab bars: 12px from each edge, or clear of the island */
+@utility inset-x-safe-3 { left: max(0.75rem, env(safe-area-inset-left)); right: max(0.75rem, env(safe-area-inset-right)); }
+
+/* focus rings after a tap, everywhere. the base rule above loses to component rules and to the
+   unlayered ones (the date picker, category icons and tiles, the password eye, table headers), so
+   this last word, unlayered and important, keeps every ring away after a tap or a click. text
+   fields keep their own ring while typing; keyboard focus (data-input="keyboard") is untouched. */
+html[data-input="pointer"] :focus-visible:not(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea) {
+  outline: none !important;
+}
+html[data-input="pointer"] .switch input:focus-visible ~ .track { outline: none !important; }
+
+/* signed in on this device: guest pages (front door, sign in, forgot) stay hidden until the
+   session gate sends the person on or shows the page (components/session-gate.tsx) */
+html[data-session] [data-guest] { visibility: hidden; }

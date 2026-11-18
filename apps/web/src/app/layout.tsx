@@ -5,6 +5,8 @@ import { I18nProvider } from '@/lib/i18n-client';
 import { ToastProvider } from '@/components/ui/client-kit';
 import { PwaRoot } from '@/components/pwa/pwa-root';
 import { ReportErrors } from '@/components/report-errors';
+import { InputModality } from '@/components/ui/input-modality';
+import { KeyboardWatch } from '@/components/ui/keyboard-watch';
 import { appIcons } from '@/lib/manifests';
 import './globals.css';
 
@@ -51,6 +53,8 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
           <ToastProvider>{children}</ToastProvider>
           <PwaRoot />
           <ReportErrors />
+          <InputModality />
+          <KeyboardWatch />
         </I18nProvider>
       </body>
     </html>

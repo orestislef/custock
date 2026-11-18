@@ -50,7 +50,7 @@ export function NameRow({ api, name, onSaved }: { api: CustockApi; name: string 
         <form onSubmit={(e) => { e.preventDefault(); void save(); }}>
           <label className="block">
             <span className="t-foot t-2 block mb-1">{t('admin.name')}</span>
-            <input className="field" type="text" autoComplete="name" autoCapitalize="words" enterKeyHint="done" maxLength={80} value={value} onChange={(e) => setValue(e.target.value)} onBlur={() => setValue((v) => cleanLine(v))} autoFocus />
+            <input className="field" type="text" autoComplete="name" autoCapitalize="words" enterKeyHint="done" maxLength={80} value={value} onChange={(e) => setValue(e.target.value)} onBlur={() => setValue((v) => cleanLine(v))} data-autofocus="" />
           </label>
           <p className="t-foot t-2 mt-2 mb-0">{t('admin.nameFoot')}</p>
         </form>

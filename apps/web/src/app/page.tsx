@@ -7,6 +7,7 @@ import { staffAppMetadata } from '@/lib/manifests';
 import { Group, Row, IconTile } from '@/components/ui/kit';
 import { LocaleSwitch } from '@/components/ui/client-kit';
 import { LandingCoach } from '@/components/pwa/landing-coach';
+import { SessionGate } from '@/components/session-gate';
 import { IconBarcode, IconBox, IconGear, IconPeople, IconQr, IconScan, IconTag } from '@/components/ui/icons';
 
 export const metadata: Metadata = { ...staffAppMetadata() };
@@ -21,7 +22,8 @@ async function Landing() {
   const { t } = await getT();
   const base = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
   return (
-    <main className="mx-auto max-w-[520px] px-5 pt-[calc(28px+env(safe-area-inset-top))] pb-[calc(40px+env(safe-area-inset-bottom))] min-h-dvh flex flex-col page-in">
+    <main data-guest className="mx-auto max-w-[520px] px-safe-5 pt-[calc(28px+env(safe-area-inset-top))] pb-[calc(40px+env(safe-area-inset-bottom))] min-h-dvh flex flex-col page-in">
+      <SessionGate />
       <div className="flex justify-end"><LocaleSwitch /></div>
       <div className="flex-1 flex flex-col justify-center py-10">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -45,7 +47,7 @@ async function DevHome() {
   const { t, locale } = await getT();
   const { mode } = await serverApi(locale);
   return (
-    <main className="mx-auto max-w-[560px] px-4 pt-[calc(56px+env(safe-area-inset-top))] pb-12 page-in">
+    <main className="mx-auto max-w-[560px] px-safe-4 pt-[calc(56px+env(safe-area-inset-top))] pb-12 page-in">
       <div className="flex items-center justify-between mb-8">
         <span className="badge badge-gray">{t(mode === 'real' ? 'home.modeReal' : 'home.modeFixtures')}</span>
         <LocaleSwitch />

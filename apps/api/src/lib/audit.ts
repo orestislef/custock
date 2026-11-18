@@ -1,12 +1,12 @@
 // audit log rows and the permissions version bump
 
-import { uuidv7 } from '@custock/core';
+import { uuidv7, type BusinessAuditAction } from '@custock/core';
 import type { Tenant } from './tenant';
 
 export function audit(
   t: Tenant,
   actor: { id: string | null; kind?: 'member' | 'platform_admin' | 'system' | 'customer' },
-  action: string,
+  action: BusinessAuditAction,
   entity: { type: string; id: string } | null,
   before: unknown = null,
   after: unknown = null,

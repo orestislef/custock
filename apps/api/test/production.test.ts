@@ -153,7 +153,7 @@ describe('web push', () => {
     const tr = devOutboxTransport(db, () => {});
     const { id } = tr.send({ channel: 'push', orgId: s.orgId, userId: s.users.eleni, title: 'Count', body: 'ready', payload: { type: 'countReady', countId: 'c1' } });
     const row = db.prepare('SELECT payload FROM dev_outbox WHERE id = ?').get(id) as Json;
-    expect(JSON.parse(row.payload).url).toBe(`http://localhost:3000/custock/admin/stock/counts/c1?org=${s.orgId}`);
+    expect(JSON.parse(row.payload).url).toBe(`http://localhost:3000/custock/admin/lemoni/stock/counts/c1`);
     const silent = tr.send({ channel: 'push', orgId: s.orgId, userId: s.users.eleni, title: '', body: '', payload: { type: 'perms_changed', silent: true } });
     expect(JSON.parse((db.prepare('SELECT payload FROM dev_outbox WHERE id = ?').get(silent.id) as Json).payload).url).toBeUndefined();
     const silentRow = db.prepare('SELECT * FROM dev_outbox WHERE id = ?').get(silent.id) as OutboxRow;
@@ -270,7 +270,7 @@ describe('live channels', () => {
     expect(liveChannels({ CUSTOCK_ALLOW_SENDING: 'yes', CUSTOCK_VAPID_PUBLIC_KEY: vapid.publicKey }, () => true).problems).toHaveLength(2);
     expect(vapidProblems({ publicKey: 'abc', privateKey: vapid.privateKey, subject: 'mailto:a@b.c' })).toHaveLength(1);
     expect(vapidProblems({ ...vapid, subject: 'http://example.com' })).toHaveLength(1);
-    expect(vapidProblems({ ...vapid, subject: 'https://orestislef.gr/custock' })).toEqual([]);
+    expect(vapidProblems({ ...vapid, subject: 'https://custock.example.com/custock' })).toEqual([]);
   });
 
   it('the server refuses a half set mail channel at startup', () => {
@@ -297,7 +297,7 @@ describe('production from nothing', () => {
   beforeAll(() => {
     db = openDb(':memory:');
     migrate(db);
-    app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://orestislef.gr/custock', corsOrigins: [], now: () => clock, rateLimit: false });
+    app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://custock.example.com/custock', corsOrigins: [], now: () => clock, rateLimit: false });
   });
 
   it('the cli creates the business, its roles, the owner and the first shop', async () => {
@@ -357,7 +357,7 @@ describe('production from nothing', () => {
     expect(r.status).toBe(201);
     expect(r.body.emailed).toBe(false);
     expect(r.body.devLink).toBeUndefined();
-    expect(r.body.link).toMatch(/^https:\/\/orestislef\.gr\/custock\/invite\/[A-Za-z0-9_-]{20,}$/);
+    expect(r.body.link).toMatch(/^https:\/\/custock.example.com\/custock\/invite\/[A-Za-z0-9_-]{20,}$/);
     inviteLink = r.body.link;
   });
 
@@ -400,7 +400,7 @@ describe('production from nothing', () => {
     const input = { name: 'Petros', email: 'petros@example.com', locale: 'el', emailNews: true, push: false, over15: true };
     expect((await call('POST', `/v1/public/join/${link.body.code}`, undefined, input)).status).toBe(403);
     const key = 'k'.repeat(40);
-    app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://orestislef.gr/custock', corsOrigins: [], now: () => clock, rateLimit: false, turnstileOff: true, internalKey: key });
+    app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://custock.example.com/custock', corsOrigins: [], now: () => clock, rateLimit: false, turnstileOff: true, internalKey: key });
     const ok = await call('POST', `/v1/public/join/${link.body.code}`, undefined, input, { 'X-Custock-Internal': key, 'X-Custock-Client-Ip': '203.0.113.7' });
     expect(ok.status).toBe(200);
     expect(ok.body).toEqual({ pending: true });
@@ -419,7 +419,7 @@ describe('org slug on join pages, own shelf codes from the web address', () => {
     const db = openDb(':memory:');
     migrate(db);
     seed(db, { passwordHash: hashPassword('custock'), now: clock });
-    const app = createApp({ db, dev: true, jwtSecret: SECRET, publicWebUrl: 'https://orestislef.gr/custock', corsOrigins: [], now: () => clock, rateLimit: false });
+    const app = createApp({ db, dev: true, jwtSecret: SECRET, publicWebUrl: 'https://custock.example.com/custock', corsOrigins: [], now: () => clock, rateLimit: false });
     const call = caller(() => app);
     expect((await call('GET', '/v1/public/join/kif7q2')).body.orgSlug).toBe('lemoni');
     const join = await call('POST', '/v1/public/join/kif7q2', undefined, { name: 'Lia', email: 'lia@example.com', locale: 'en', emailNews: true, push: false, over15: true });
@@ -428,7 +428,7 @@ describe('org slug on join pages, own shelf codes from the web address', () => {
     // a shelf qr printed with this server's address scans as the product inside
     const scan = await call('POST', `/v1/orgs/${(db.prepare("SELECT id FROM organizations WHERE slug = 'lemoni'").get() as Json).id}/scan`,
       (await call('POST', '/v1/auth/login', undefined, { email: 'maria@example.com', password: 'custock' })).body.accessToken,
-      { code: 'https://orestislef.gr/custock/p/5200044170102' });
+      { code: 'https://custock.example.com/custock/p/5200044170102' });
     expect(scan.status).toBe(200);
     expect(scan.body).toMatchObject({ kind: 'gtin', codeNorm: '05200044170102' });
   });

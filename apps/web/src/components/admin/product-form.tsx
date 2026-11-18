@@ -1,13 +1,13 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/admin/org-link';
 
 // create or edit a product. scan or type the barcode, or let us make a shop barcode.
 // vat rates come from the business country. variants and photos by url are sent when the api
 // contract has them (it does now), and always with the sample data.
 
 import { useMemo, useState, useId, cloneElement } from 'react';
-import { useRouter } from 'next/navigation';
+import { useOrgRouter as useRouter } from '@/components/admin/org-link';
 import { cleanLine, featureOn, httpsUrlProblem, LIMITS, ProductInput as ProductInputSchema, type Product, type ProductInput, type StockLevel, type Uom } from '@custock/core';
 import { useAdmin } from './admin-context';
 import { ScanButton } from './scan-button';
@@ -132,7 +132,7 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
         }
         forgetCatalog(org.orgId);
         toast(t('stock.created', { name: p.name }));
-        router.push(`/admin/stock/${p.id}`);
+        router.replace(`/admin/stock/${p.id}`);
       } else {
         const patch: Partial<ProductInput> = {
           name: nameV, brand: brandV || null, description: descV || null, categoryId: cat || null,
@@ -145,7 +145,7 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
         await api.updateProduct(org.orgId, product.id, patch);
         forgetCatalog(org.orgId);
         toast(t('productForm.saved'));
-        router.push(`/admin/stock/${product.id}`);
+        router.replace(`/admin/stock/${product.id}`);
       }
     } catch (e) {
       // the api's field errors go under their fields too

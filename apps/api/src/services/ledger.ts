@@ -12,6 +12,7 @@ import { pushReachableSql } from '../lib/webpush';
 import { enqueue } from '../worker';
 import { variantLabel } from './catalog';
 import { policyIn } from '../lib/policy';
+import { lowThreshold } from '../lib/low-stock';
 
 export const KIND_PERM: Record<string, string> = {
   initial: 'stock.adjust',
@@ -57,6 +58,8 @@ interface VariantRow {
   price_minor: number | null;
   cost_minor: number | null;
   archived: number;
+  uom: string;
+  track_stock: number;
 }
 
 // the price a sale uses: a running offer for this shop, else the shop price, else the base price
@@ -148,7 +151,8 @@ export function recordMovement(ctx: LedgerCtx, input: MovementInput, opts: { int
   }
 
   const variant = t.get<VariantRow>(
-    `SELECT v.id, v.product_id, p.name, v.options, v.price_minor, v.cost_minor, (p.archived_at IS NOT NULL OR v.archived_at IS NOT NULL) AS archived
+    `SELECT v.id, v.product_id, p.name, v.options, v.price_minor, v.cost_minor, (p.archived_at IS NOT NULL OR v.archived_at IS NOT NULL) AS archived,
+            p.uom, p.track_stock
        FROM product_variants v JOIN products p ON p.id = v.product_id WHERE v.org_id = @org AND v.id = @v`,
     { v: m.variantId },
   );
@@ -198,8 +202,8 @@ export function recordMovement(ctx: LedgerCtx, input: MovementInput, opts: { int
   const outcome: Outcome = { status: 'accepted', id: m.id, level: currentLevel(t, m.shopId, m.variantId) };
   const label = (locale: string) => variantLabel(productName(t, variant, locale), variant.options, locale);
 
-  // low stock: once per dip below the reorder point
-  const rp = before.reorderPoint;
+  // low stock: once per dip to the reorder point, or to the few left number when none is set
+  const rp = variant.track_stock ? lowThreshold(before.reorderPoint, org.few_left_threshold, variant.uom) : null;
   if (rp != null) {
     const flag = t.get<{ low_alert_sent_at: number | null }>('SELECT low_alert_sent_at FROM stock_levels WHERE org_id = @org AND shop_id = @shop AND variant_id = @v', { shop: m.shopId, v: m.variantId });
     if (after <= rp && before.onHand > rp && !flag?.low_alert_sent_at) {

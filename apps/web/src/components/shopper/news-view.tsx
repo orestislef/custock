@@ -82,7 +82,7 @@ function PostCard({ item, focused }: { item: FeedItem; focused?: boolean }) {
           <ul className="list mt-4" role="list" style={{ background: 'var(--c-shelf)' }}>
             {p.products.map((x) => (
               <li key={x.variantId}>
-                <Link href={`/s/${slug}/p/${x.productId}`} className="row has-icon">
+                <Link href={`/s/${slug}/p/${x.productId}?from=news`} className="row has-icon">
                   <Photo src={x.imageUrl} alt={x.name} size={40} />
                   <span className="row-main"><span className="row-title block truncate">{x.name}</span></span>
                   {x.offerPriceMinor != null ? (

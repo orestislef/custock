@@ -339,7 +339,8 @@
     "less": "Less: {{name}}",
     "more": "More: {{name}}",
     "from": "{{name}}, from",
-    "to": "{{name}}, to"
+    "to": "{{name}}, to",
+    "type": "{{name}}: {{value}}. Tap to type a number"
   },
   "policyUnit": {
     "count_one": "{{count}}",

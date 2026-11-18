@@ -884,10 +884,17 @@
       "stock.movement_on_archived": "κίνησε απόθεμα αρχειοθετημένου προϊόντος",
       "stock.negative_accepted_offline": "συγχρόνισε πώληση εκτός σύνδεσης κάτω από το μηδέν",
       "stock.transfer_shortage": "κατέγραψε έλλειμμα μεταφοράς",
-      "policies.business_changed": "Άλλαξε όρια της επιχείρησης",
-      "policies.shop_changed": "Άλλαξε όρια καταστήματος",
-      "policies.role_changed": "Άλλαξε όρια ρόλου",
-      "policies.user_changed": "Άλλαξε προσωπικά όρια"
+      "policies.business_changed": "άλλαξε τα όρια της επιχείρησης",
+      "policies.shop_changed": "άλλαξε τα όρια καταστήματος",
+      "policies.role_changed": "άλλαξε τα όρια ρόλου",
+      "policies.user_changed": "άλλαξε τα προσωπικά όρια",
+      "category.created": "πρόσθεσε κατηγορία",
+      "category.updated": "άλλαξε κατηγορία",
+      "category.deleted": "διέγραψε κατηγορία",
+      "variant.archived": "αρχειοθέτησε παραλλαγή",
+      "org.created": "δημιούργησε την επιχείρηση",
+      "shop.created": "πρόσθεσε κατάστημα",
+      "joinlink.created": "έφτιαξε κωδικό QR"
     },
     "aProduct": "ένα προϊόν",
     "s": {
@@ -897,6 +904,32 @@
       "set": "όρισε {{setting}}: {{value}}",
       "withName": "{{actor}} {{verb}}: {{name}}",
       "plain": "{{actor}} {{verb}}"
+    },
+    "thing": {
+      "category": "κατηγορία",
+      "customer": "πελάτη",
+      "member": "μέλος της ομάδας",
+      "invite": "πρόσκληση",
+      "role": "ρόλο",
+      "post": "ανάρτηση",
+      "product": "προϊόν",
+      "variant": "παραλλαγή",
+      "barcode": "barcode",
+      "stock": "απόθεμα",
+      "org": "την επιχείρηση",
+      "shop": "κατάστημα",
+      "joinlink": "κωδικό QR",
+      "policies": "όρια",
+      "business": "επιχείρηση",
+      "owner": "πρόσκληση ιδιοκτήτη",
+      "platform": "ρυθμίσεις πλατφόρμας",
+      "superadmin": "super admin",
+      "other": "κάτι"
+    },
+    "fallback": {
+      "added": "πρόσθεσε {{thing}}",
+      "changed": "άλλαξε {{thing}}",
+      "removed": "αφαίρεσε {{thing}}"
     }
   },
   "outbox": {
@@ -1589,8 +1622,20 @@
       "businessTitle": "Όρια για αυτή την επιχείρηση",
       "businessLead": "Το ανώτατο όριο για το καθένα, και αν μπορεί να το αλλάξει ο ιδιοκτήτης.",
       "ownerCan": "Ο ιδιοκτήτης μπορεί να το αλλάξει",
-      "now": "Τώρα {{value}}"
-    }
+      "now": "Τώρα {{value}}",
+      "value": "Για αυτή την επιχείρηση",
+      "inUse": "Σε χρήση τώρα: {{value}}",
+      "ownerCanOn": "Ο ιδιοκτήτης το βλέπει και το αλλάζει στις Ρυθμίσεις.",
+      "ownerCanOff": "Ο ιδιοκτήτης βλέπει μόνο την τιμή.",
+      "ceiling": {
+        "max": "Ανώτατο επιτρεπτό",
+        "min": "Κατώτατο επιτρεπτό",
+        "require": "Πάντα ενεργό",
+        "allow": "Επιτρέπεται",
+        "window": "Μικρότερες ώρες ησυχίας"
+      }
+    },
+    "continueIn": "Συνέχεια στο {{name}}"
   },
   "platformInvite": {
     "metaTitle": "Πρόσκληση super admin",

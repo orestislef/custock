@@ -151,7 +151,7 @@ export function AccountView() {
                 : alerts.length ? alerts.map((a) => (
                   <li key={a.id} className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties}>
                     <Photo src={a.imageUrl} alt={a.productName} size={44} />
-                    <Link href={`/s/${slug}/p/${a.productId}`} className="row-main hover:no-underline" style={{ color: 'var(--c-ink)' }}>
+                    <Link href={`/s/${slug}/p/${a.productId}?from=me`} className="row-main hover:no-underline" style={{ color: 'var(--c-ink)' }}>
                       <span className="row-title block truncate">{a.productName}</span>
                       {a.shopName ? <span className="row-sub block">{a.shopName}</span> : null}
                     </Link>
@@ -171,7 +171,7 @@ export function AccountView() {
               {saved === null ? <li className="row"><span className="row-main t-2">…</span></li>
                 : saved.length ? saved.map((p) => (
                   <li key={p.id}>
-                    <Link href={`/s/${slug}/p/${p.id}`} className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties}>
+                    <Link href={`/s/${slug}/p/${p.id}?from=me`} className="row has-icon" style={{ '--sep-inset': '72px' } as React.CSSProperties}>
                       <Photo src={p.images[0]?.url} alt={p.name} size={44} />
                       <span className="row-main"><span className="row-title block truncate">{p.name}</span></span>
                       <IconChevronRight size={16} className="chev" />

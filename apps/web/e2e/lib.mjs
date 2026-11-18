@@ -9,7 +9,7 @@ import cfg from './e2e.config.mjs';
 import { dbFile } from './env.mjs';
 
 const require = createRequire(join(cfg.repo, 'package.json'));
-const { chromium } = require('playwright');
+const { chromium, webkit } = require('playwright');
 const Database = require('better-sqlite3');
 
 export const WEB = `http://localhost:${cfg.webPort}${cfg.basePath}`;
@@ -171,17 +171,22 @@ export async function launchBrowser() {
   browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
   return browser;
 }
-export async function closeBrowser() { await browser?.close(); }
+// safari's engine, for the iphone checks (sheets and the keyboard). started on first use only, so
+// a run without those tests needs no webkit install (node node_modules/playwright/cli.js install webkit)
+let safari = null;
+async function webkitBrowser() { return (safari ??= await webkit.launch()); }
+export async function closeBrowser() { await browser?.close(); await safari?.close(); }
 
 // errors seen in pages, for the layout report
 export const pageProblems = [];
 const EXPECTED_FAIL = [/\/v1\/client-errors/, /favicon/, /\/v1\/push\/key/, /status=40[134]/];
 
 // a context like a desktop or a phone. ios gives an iphone safari user agent.
-export async function open(t, { device = 'desktop', ios = false, locale = 'en', scheme = 'light', tokens = null, permissions = [], storage = {} } = {}) {
+export async function open(t, { device = 'desktop', ios = false, engine = 'chromium', locale = 'en', scheme = 'light', tokens = null, permissions = [], storage = {}, viewport = null } = {}) {
   const phone = device === 'phone';
-  const ctx = await browser.newContext({
-    viewport: phone ? cfg.phone : cfg.desktop,
+  const b = engine === 'webkit' ? await webkitBrowser() : browser;
+  const ctx = await b.newContext({
+    viewport: viewport ?? (phone ? cfg.phone : cfg.desktop),
     deviceScaleFactor: phone ? 2 : 1,
     isMobile: phone,
     hasTouch: phone,
@@ -226,7 +231,17 @@ export async function see(page, what, ms = 10_000) {
   return loc;
 }
 
-export const path = (page) => new URL(page.url()).pathname.replace(cfg.basePath, '') || '/';
+// staff pages carry their business (/admin/<slug>/stock/1). most checks are about which page it is,
+// so path() gives the short form (/admin/stock/1); rawPath() is the address as it is.
+const ADMIN_TOP = ['login', 'forgot', 'reset', 'platform'];
+const ADMIN_SECTIONS = ['stock', 'scan', 'customers', 'posts', 'reports', 'team', 'join-links', 'settings', 'audit', 'dev-outbox', 'print'];
+export function shortPath(p) {
+  const m = p.match(/^\/admin\/([^/]+)(\/.*)?$/);
+  if (m && !ADMIN_TOP.includes(m[1]) && !ADMIN_SECTIONS.includes(m[1])) return `/admin${m[2] ?? ''}`;
+  return p;
+}
+export const rawPath = (page) => new URL(page.url()).pathname.replace(cfg.basePath, '') || '/';
+export const path = (page) => shortPath(rawPath(page));
 export const text = (page) => page.evaluate(() => document.body.innerText);
 
 export async function shot(page, name) {

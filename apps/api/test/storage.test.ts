@@ -117,7 +117,7 @@ describe('photos in a bucket', () => {
   let call: ReturnType<typeof caller>;
 
   beforeAll(async () => {
-    app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://orestislef.gr/custock', apiPublicUrl: 'https://orestislef.gr/custock/api', corsOrigins: [], now: () => clock, rateLimit: false, storage: { kind: 's3', s3 }, photoStore: store });
+    app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://custock.example.com/custock', apiPublicUrl: 'https://custock.example.com/custock/api', corsOrigins: [], now: () => clock, rateLimit: false, storage: { kind: 's3', s3 }, photoStore: store });
     call = caller(app, await login(app, 'maria'));
   });
 
@@ -170,7 +170,7 @@ describe('profile photos and the business logo in a bucket', () => {
   let eleni: ReturnType<typeof caller>;
 
   beforeAll(async () => {
-    app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://orestislef.gr/custock', apiPublicUrl: 'https://orestislef.gr/custock/api', corsOrigins: [], now: () => clock, rateLimit: false, storage: { kind: 's3', s3 }, photoStore: store });
+    app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://custock.example.com/custock', apiPublicUrl: 'https://custock.example.com/custock/api', corsOrigins: [], now: () => clock, rateLimit: false, storage: { kind: 's3', s3 }, photoStore: store });
     maria = caller(app, await login(app, 'maria'));
     eleni = caller(app, await login(app, 'eleni'));
   });
@@ -229,14 +229,14 @@ describe('local files on purpose, in production mode', () => {
   const dir = mkdtempSync(join(tmpdir(), 'custock-local-'));
 
   beforeAll(async () => {
-    app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://orestislef.gr/custock', apiPublicUrl: 'https://orestislef.gr/custock/api', corsOrigins: [], now: () => clock, rateLimit: false, storage: { kind: 'local' }, uploadDir: dir });
+    app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://custock.example.com/custock', apiPublicUrl: 'https://custock.example.com/custock/api', corsOrigins: [], now: () => clock, rateLimit: false, storage: { kind: 'local' }, uploadDir: dir });
     call = caller(app, await login(app, 'maria'));
   });
 
   it('upload, then fetch with the type and a long cache', async () => {
     const r = await call('POST', `/v1/orgs/${s.orgId}/uploads/presign`, { purpose: 'product', mime: 'image/png', bytes: png.length });
     expect(r.status).toBe(201);
-    expect(r.body.uploadUrl).toMatch(/^https:\/\/orestislef\.gr\/custock\/api\/v1\/uploads\//);
+    expect(r.body.uploadUrl).toMatch(/^https:\/\/custock.example.com\/custock\/api\/v1\/uploads\//);
     const path = new URL(r.body.uploadUrl).pathname.replace('/custock/api', '');
     expect((await call('PUT', path, png, { 'Content-Type': 'image/png' })).status).toBe(204);
     const res = await app.request(new URL(r.body.publicUrl).pathname.replace('/custock/api', ''));
@@ -256,7 +256,7 @@ describe('local files on purpose, in production mode', () => {
 describe('a local profile photo', () => {
   it('uploads without a business and is served back', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'custock-avatar-'));
-    const app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://orestislef.gr/custock', apiPublicUrl: 'https://orestislef.gr/custock/api', corsOrigins: [], now: () => clock, rateLimit: false, storage: { kind: 'local' }, uploadDir: dir });
+    const app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://custock.example.com/custock', apiPublicUrl: 'https://custock.example.com/custock/api', corsOrigins: [], now: () => clock, rateLimit: false, storage: { kind: 'local' }, uploadDir: dir });
     const call = caller(app, await login(app, 'anna'));
     const r = await call('POST', '/v1/me/uploads/presign', { purpose: 'avatar', mime: 'image/png', bytes: png.length });
     expect(r.status).toBe(201);

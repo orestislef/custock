@@ -12,7 +12,7 @@ export function isUnavailable(e: unknown): boolean {
 export async function Unavailable() {
   const { t } = await getT();
   return (
-    <main className="min-h-dvh grid place-items-center px-6 text-center">
+    <main className="min-h-dvh grid place-items-center px-safe-6 text-center">
       <div className="max-w-[420px] page-in">
         <p className="t-title2 m-0">{t('platform.unavailable.title')}</p>
         <p className="t-body t-2 mt-2 mb-0">{t('platform.unavailable.body')}</p>

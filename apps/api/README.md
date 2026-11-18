@@ -30,7 +30,7 @@ Environment:
 | `PORT` | 8787 | |
 | `CUSTOCK_DB` | `apps/api/data/custock.db` | sqlite file |
 | `CUSTOCK_PUBLIC_WEB_URL` | `http://localhost:3000` | base for join, confirm, invite and unsubscribe links |
-| `CUSTOCK_CORS` | localhost 3000, 8081, 19006 | allowed origins |
+| `CUSTOCK_CORS` | `http://localhost:3000` | allowed origins, comma separated. on a server the web's own origin |
 | `CUSTOCK_WORKER` | on | `0` turns the job loop off |
 | `CUSTOCK_API_URL` | `http://localhost:<PORT>` | the api's own public address, for upload links and files it serves |
 | `CUSTOCK_UPLOAD_DIR` | next to the database, `uploads/` | where dev uploads are stored |
@@ -39,7 +39,11 @@ Environment:
 | `CUSTOCK_TRANSPORT` | `outbox` | `outbox` keeps every message in the database. `live` sends them |
 | `CUSTOCK_ALLOW_SENDING` | | must be `yes` for `live` |
 | `CUSTOCK_VAPID_PUBLIC_KEY`, `CUSTOCK_VAPID_PRIVATE_KEY`, `CUSTOCK_VAPID_SUBJECT` | | web push to the installed web app. `pnpm --filter @custock/api vapid` prints a pair. the subject is `mailto:you@example.com` or an https url. the public key is also served at `GET /v1/push/key`, in any mode |
-| `CUSTOCK_FCM_SERVICE_ACCOUNT` | | path to the Firebase service account json, only for a native app |
+| `CUSTOCK_FCM_SERVICE_ACCOUNT` | | path to a Firebase service account json. optional, the web app uses web push |
+| `CUSTOCK_EMAIL_BUDGET_PER_HOUR` | 300 | emails a whole server sends in an hour. over it, ordinary mail waits; sign in codes, resets and account mail still go, and super admins get one alert |
+| `CUSTOCK_STORAGE_FREE_BYTES`, `CUSTOCK_STORAGE_FREE_WRITES` | 10 GB, 1,000,000 | the photo storage free tier the super admin meter counts against |
+| `CUSTOCK_REV`, `CUSTOCK_BUILT_AT` | | the git revision and build time, set by `deploy/ship.sh`, shown to super admins and in error reports |
+| `CUSTOCK_NEW_PASSWORD` | | read only by the command line, for `create-business --set-password` and `set-password` |
 | `CUSTOCK_SMTP_URL`, `CUSTOCK_MAIL_FROM` | | the mail server and our sender address. Gmail: `smtps://name%40gmail.com:apppassword@smtp.gmail.com:465` (the @ of the user written as `%40`, the 16 letter app password without spaces) and `CUSTOCK_MAIL_FROM=name@gmail.com` |
 
 Running on a server: see [deploy/README.md](../../deploy/README.md).
@@ -161,54 +165,37 @@ against every path.
 
 ## endpoints
 
-All under `/v1`. Errors are `application/problem+json` with a stable `code`.
+All under `/v1`. Errors are `application/problem+json` with a stable `code`. The complete, current
+list is the OpenAPI document `GET /v1/openapi.json`, built from the registered routes (a test fails
+when a route is missing from it). In production only super admins can read it, as the API screen in
+the super admin area; in dev it is public.
 
-Read:
+The main groups:
 
-- auth: `POST /auth/login`, `/auth/otp/request`, `/auth/otp/verify`, `/auth/refresh`, `/auth/logout`
-- me: `GET /me/context`
-- org: `GET /orgs/{org}`, `/orgs/{org}/shops`, `/groups`, `/categories`, `/audit`
-- catalog: `GET /orgs/{org}/products` (`q`, `shopId`, `filter=low|out|negative|waiting`, `categoryId`, `cursor`, `limit`), `/products/{id}`, `POST /scan`, `GET /unknown-scans`, `/movements`, `/shops/{shop}/sync?since=`
-- stock: `GET /orgs/{org}/counts`, `/counts/{id}`, `/transfers`, `/transfers/{id}`
-- customers: `GET /orgs/{org}/customers`, `/customers/{id}`, `/join-links`
-- posts: `GET /orgs/{org}/posts`, `/posts/{id}`
-- team: `GET /orgs/{org}/members`, `/roles`, `/roles/grantable?scopeType=&scopeId=`, `/roles/{id}/impact`, `/invites`
-- reports: `GET /orgs/{org}/reports/dashboard`, `/sales`, `/top-sellers`, `/most-wanted`, `/join-links`, `/shrinkage`
-- customer app: `GET /c/feed`, `/c/offers`, `/c/shops`, `/c/alerts`, `/c/favorites`, `/c/orgs/{slug}/catalog`, `/c/orgs/{slug}/products/{id}`
-- public: `GET /public/join/{code}`, `/public/p/{code}`, `/public/orgs/{slug}/catalog`, `/public/subscription/{token}`
+- auth: login, codes for customers, refresh, logout, forgot and reset password
+- me: context, profile and photo, alert choices, push subscriptions, a test push, email change,
+  export, delete
+- org: settings, shops, groups, categories with icons and photos, audit, limits and options
+- catalog and stock: products, variants, barcodes, scan, movements, counts, transfers, sync
+- customers, QR join links, posts with the approval flow, team, invites and roles, reports
+- uploads: signed slots for product, post, category, logo and profile photos
+- customer app (`/c/*`) and public pages (`/public/*`): join, confirm, shelf product, catalog,
+  unsubscribe, email change undo
+- super admin (`/v1/platform/*`): businesses, owner and super admin invites, feature switches,
+  pauses, limits, storage, errors, server info
+- dev only (`/v1/dev/*`): outbox, run jobs, email previews
 
-Write:
-
-- me: `PATCH /me`, `GET /me/export`, `DELETE /me` (refused for the last owner of a business)
-- org: `PATCH /orgs/{org}`, `PATCH /orgs/{org}/shops/{shop}`
-- catalog: `POST /products`, `PATCH /products/{id}`, `POST /products/{id}/archive`, `PATCH /variants/{v}/price`, `PUT /shops/{shop}/variants/{v}/settings`, `POST /variants/{v}/barcodes`, `POST /barcodes/internal`, `POST /unknown-scans/{id}/resolve`
-- stock: `POST /movements` (a batch, one result per movement), counts (`POST /shops/{shop}/counts`, `PUT /counts/{id}/lines/{v}`, `POST /counts/{id}/submit`, `/apply`, `/cancel`), transfers (`POST /transfers`, `/transfers/{id}/send`, `/receive`, `/cancel`)
-- customers: `POST /customers`, `POST /customers/{id}/notes`, `PUT /customers/{id}/tags`, `POST /customers/{id}/erase`, `POST /join-links`, `PATCH /join-links/{id}`
-- posts: `POST /posts`, `PATCH /posts/{id}`, `DELETE /posts/{id}`, `POST /posts/audience-preview`, `POST /posts/{id}/publish` (publishes, or submits for approval when the caller cannot publish), `/approve`, `/cancel`
-- team: `POST /invites` (returns the accept `link` to share by hand, and `emailed`), `POST /invites/{id}/revoke`, `POST /v1/invites/accept`, `POST /members/{m}/assignments`, `DELETE /members/{m}/assignments/{a}`, `PATCH /members/{m}`, `POST /roles`
-- invite link, no sign in: `GET /v1/invites/{token}` (who invites, to what, and whether the email has an account), `POST /v1/invites/register` (a new person sets a name and password and joins). an email that already has an account gets 409 `account_exists`: sign in, then `POST /v1/invites/accept`
-- shops: `POST /orgs/{org}/shops` (needs `shops.create`), `GET /orgs/{org}/shops?all=1` (every shop, for transfer destinations, needs `stock.transfer.send` somewhere)
-- web push: `GET /v1/push/key`, `POST /v1/me/push-subscriptions` (the browser's subscription, optional `orgId` for one business's home screen app), `DELETE /v1/me/push-subscriptions`
-- customer app: `POST /c/join/{code}`, `POST /c/follow`, `POST /c/unfollow`, `PUT /c/channels`, `POST /c/alerts`, `DELETE /c/alerts/{id}`, `PUT /c/favorites/{product}`
-- public: `POST /public/join/{code}`, `POST /public/confirm`, `POST /public/subscription/{token}`
-- me: `POST /me/email`, `POST /me/email/verify` (email change with a code to the new address)
-- catalog: `DELETE /variants/{v}/barcodes/{id}` (sync reports it as a tombstone)
-- stock: `GET /orgs/{org}/review/negative` (movements accepted offline below zero in strict mode, needs `stock.adjust`)
-- dev only: `GET /v1/dev/outbox`, `POST /v1/dev/run-jobs`
-
-Creates take an `Idempotency-Key` header: the same key from the same user on the same org, method and
-path within 24 hours returns the first answer. Product and post reads return an `ETag`. An edit with a stale `If-Match` gets
-412 `conflict`.
-
-The join page uses a stand in for the bot check: in dev it accepts no token or `dev-turnstile-ok`.
-
-`/reports/sales` returns money per day when the caller may see money, otherwise pieces sold. The
-`X-Series-Unit` header says which.
+Creates take an `Idempotency-Key` header: the same key from the same user on the same org, method
+and path within 24 hours returns the first answer. Product and post reads return an `ETag`. An edit
+with a stale `If-Match` gets 412 `conflict`. `/reports/sales` returns money per day when the caller
+may see money, otherwise pieces sold; the `X-Series-Unit` header says which. In dev the join page's
+bot check accepts no token or `dev-turnstile-ok`.
 
 ## browsing the api
 
 `GET /v1/openapi.json` is an OpenAPI 3.1 document built from the registered routes and the zod
-contract (`z.toJSONSchema`). Paste the url into any OpenAPI viewer.
+contract (`z.toJSONSchema`), with the access, permissions and error codes of each route. In dev
+paste the url into any OpenAPI viewer; in production super admins read it in the API screen.
 
 ## sign in: local or the real login server
 
@@ -238,16 +225,14 @@ one line per channel. `CUSTOCK_ALLOW_SENDING=yes` is needed for any of it.
 
 What a message carries:
 
-- push: the shop or business as title, the post title (or the back in stock line) in the reader's
-  language, the cover image, `custock://post/<id>` or `custock://product/<id>` as the deep link,
-  the org as the iOS thread id so the lock screen groups per business. Permission changes go as
-  silent data pushes.
-- web push: json `{ title, body, url, tag, type, orgId, image }` for the service worker. `url` is
-  the page a tap opens under `CUSTOCK_PUBLIC_WEB_URL`: `/s/<slug>?post=<id>` for a post,
-  `/s/<slug>/p/<product>` for back in stock, `/admin/posts/<id>`, `/admin/stock/counts/<id>`,
-  `/admin/stock/transfers/<id>`, `/admin/stock/<product>` (low stock), `/admin/team` for staff.
-  TTL 12 hours for staff alerts (urgency high), 2 days for posts, 3 for back in stock, and a topic
-  so a phone that was offline only gets the newest of the same message.
+- web push: json `{ title, body, url, tag, type, orgId, icon, image, actions }` for the service
+  worker. `url` is the exact page a tap opens under `CUSTOCK_PUBLIC_WEB_URL` (the post, the product,
+  the transfer, the count to review, the post to approve, the team member, the error); the web signs
+  in first and switches to the right business when needed. The icon is the business's own, the
+  picture the post or product photo where the platform shows one. TTL 12 hours for staff alerts
+  (urgency high), 2 days for posts, 3 for back in stock, and a topic so a phone that was offline only
+  gets the newest of the same message.
+- FCM (optional): the same title, text, picture and https link.
 - email: "Lemoni Kifisia via Custock" as the sender name with our address, reply-to the shop,
   `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, the unsubscribe link
   in the footer, `Content-Language` set to the reader's language.
@@ -255,7 +240,10 @@ What a message carries:
 ## photos and uploads
 
 `POST /orgs/{org}/uploads/presign` with `{ purpose, mime, bytes }` returns a signed upload slot:
-jpeg, png or webp, up to 5 MB, valid 10 minutes, needs the permission of the thing it is for. The
+jpeg, png or webp, up to the size the super admin allows (5 MB by default, 1 MB for logos,
+profile and category photos), valid 10 minutes, at most 30 slots a person an hour, needs the
+permission of the thing it is for. A profile photo uses `POST /v1/me/uploads/presign`. A file counts
+toward storage once it is attached; slots nobody used are purged after an hour. The
 browser PUTs the file to `uploadUrl` with exactly the `headers` it got, then uses `publicUrl` in
 `imageUrls` or `coverUrl`. Where the file goes depends on `CUSTOCK_STORAGE`, one line at startup says
 which:
@@ -346,22 +334,35 @@ serves the sales queries.
 
 ## the worker
 
-The server runs a job loop every 5 seconds. Jobs live in the `jobs` table:
+The server runs a job loop every 5 seconds inside the same process, no cron on the host. Jobs live
+in the `jobs` table:
 
 - `send_post`: snapshots the audience into `deliveries`, one row per customer per channel, with a
-  reason when skipped (no consent, no device, cap reached, suppressed). Pushes in quiet hours are
-  held until they end. Scheduled posts run at their time.
-- `send_deliveries`: sends through the dev transport in each recipient's language, with an
+  reason when skipped (no consent, no device, cap reached, suppressed, feature off). Pushes in quiet
+  hours wait until they end. Scheduled posts run at their time.
+- `send_deliveries`: writes each message to the outbox in the recipient's language, with an
   unsubscribe link and one click headers on emails. Back in stock alerts go out the same way.
+- in live mode the outbox is drained through the channels that are on, inside the email budget and
+  the platform pauses.
 - `rollup_day`: rebuilds `daily_shop_stats` for the last three days, once a day.
+- housekeeping: sent outbox rows lose their body and go after 30 days, expired links are removed
+  from waiting rows, unused upload slots after an hour, unconfirmed signups and errors after 30 days.
 
 ## limits
 
-- per ip: 20 auth calls and 120 public calls a minute.
-- per email: 5 wrong passwords in 15 minutes lock login for 15 minutes. 5 codes an hour. 5 wrong
-  codes in 15 minutes lock codes for 15 minutes. 3 join confirmations an hour per business.
-- bodies up to 1 MB, lists and free text have maximum lengths in the shared contract.
-- a 500 never says what broke, the details go to the server log with the request id.
+Most of these are values in the policy engine below, so a super admin can change them within safe
+bounds. The defaults:
+
+- per ip: 20 auth calls and 120 public calls a minute, counted per route, not per raw path.
+- sign in: wrong passwords and codes are counted per email and ip. After 5 the same address and ip
+  waits 15 minutes; many failures for one email from anywhere slow each try down instead of locking
+  the account, so nobody can lock someone else out. A password reset clears it.
+- codes: 5 an hour per address and ip, 20 per address, 30 per ip. Forgot password has its own.
+- joining: 10 an hour per ip, 120 an hour per QR link, 3 confirmations an hour per business and email.
+- emails: the hourly budget above.
+- bodies up to 1 MB; every field has the maximum length of the shared validation rules.
+- a 500 never says what broke; the details go to the server log with the request id and to the
+  super admin error log, scrubbed of personal data.
 
 ## rules the code keeps
 
@@ -373,7 +374,7 @@ The server runs a job loop every 5 seconds. Jobs live in the `jobs` table:
   movement id is the idempotency key. Negative stock follows the org policy, and a movement older
   than two minutes counts as made offline and is accepted with an audit row.
 - back in stock fires only on receive, transfer in and return, once per alert. Low stock fires once
-  per dip below the reorder point.
+  per dip to or below the reorder point, or the business's few left number when the shop has none.
 - delegation: scope, ceiling, rank, no self service, and at least one owner, checked on every
   invite, assignment, member change and role edit. a member's status is judged at every scope they
   hold. an invite never brings back the old roles of a suspended or removed member.
@@ -385,7 +386,9 @@ The server runs a job loop every 5 seconds. Jobs live in the `jobs` table:
 - status changes (count apply, transfer send and receive, publish, approve, cancel, invite accept,
   confirm) are one shot: the update only happens from the expected status.
 - held and queued messages are checked again when they go out: consent, following, suppression.
-- unconfirmed signups are erased after 30 days by the nightly job.
+- unconfirmed signups are erased after 30 days.
+- people see only what they can do: a switched off feature or a missing right is simply not offered
+  by the web, and the api refuses it anyway.
 
 ## Limits and options (the policy engine)
 

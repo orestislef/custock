@@ -343,7 +343,8 @@
     "less": "Меньше: {{name}}",
     "more": "Больше: {{name}}",
     "from": "{{name}}, с",
-    "to": "{{name}}, до"
+    "to": "{{name}}, до",
+    "type": "{{name}}: {{value}}. Нажмите, чтобы ввести число"
   },
   "policyUnit": {
     "count_one": "{{count}}",

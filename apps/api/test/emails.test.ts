@@ -17,7 +17,7 @@ import { runJobs } from '../src/worker';
 type Json = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const SECRET = 'email-test-secret-that-is-long-enough-1';
-const WEB = 'https://orestislef.gr/custock';
+const WEB = 'https://custock.example.com/custock';
 const clock = Date.now();
 
 function caller(app: () => App) {
@@ -190,7 +190,7 @@ describe('emails from the api', () => {
     await call('POST', '/v1/public/join/kif7q2', undefined, { name: 'Mira', email: 'mira@example.com', locale: 'en', emailNews: true, push: false, over15: true });
     const join = last("to_address = 'mira@example.com'");
     expect(join.title).toContain('Confirm you want news from');
-    expect(join.html).toMatch(/href="https:\/\/orestislef\.gr\/custock\/confirm\/[^"]+"/);
+    expect(join.html).toMatch(/href="https:\/\/custock.example.com\/custock\/confirm\/[^"]+"/);
     await call('POST', '/v1/me/email', tokens.maria, { email: 'maria.new@example.com', password: 'custock' });
     expect(last("to_address = 'maria.new@example.com'").html).toMatch(/user-select:all;">\d{6}<\/span>/);
   });
@@ -209,9 +209,9 @@ describe('emails from the api', () => {
     expect(row).toBeTruthy();
     expect(row.html).toMatch(/\/s\/lemoni\/p\/[0-9a-f-]{36}/);
     expect(row.html).toContain(`${WEB}/s/lemoni/news?post=${post.body.id}`);
-    expect(row.html).toMatch(/href="https:\/\/orestislef\.gr\/custock\/unsubscribe\/[^"]+"/);
+    expect(row.html).toMatch(/href="https:\/\/custock.example.com\/custock\/unsubscribe\/[^"]+"/);
     const raw = (await rawMail(row)).replace(/\r\n[ \t]+/g, ' ');
-    expect(raw).toMatch(/^List-Unsubscribe: <https:\/\/orestislef\.gr\/custock\/unsubscribe\/[^>]+>$/m);
+    expect(raw).toMatch(/^List-Unsubscribe: <https:\/\/custock.example.com\/custock\/unsubscribe\/[^>]+>$/m);
     expect(raw).toMatch(/^List-Unsubscribe-Post: List-Unsubscribe=One-Click$/m);
   });
 

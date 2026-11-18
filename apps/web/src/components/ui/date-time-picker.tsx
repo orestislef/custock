@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Sheet } from '@/components/ui/client-kit';
+import { lockPage, Sheet, unlockPage } from '@/components/ui/client-kit';
 import { IconCalendar, IconChevronLeft, IconChevronRight, IconClose } from '@/components/ui/icons';
 import { intlLocale } from '@/lib/format';
 import { useLocale, useT } from '@/lib/i18n-client';
@@ -500,6 +500,9 @@ function Popover({ anchor, onDismiss, onEscape, label, children }: { anchor: Rea
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('pointerdown', onDown, true); document.removeEventListener('keydown', onKey); };
   }, [anchor, onDismiss, onEscape]);
+
+  // the page behind stays put while the popover is open, like behind a sheet
+  useEffect(() => { lockPage(); return () => unlockPage(); }, []);
 
   if (typeof document === 'undefined') return null;
   return createPortal(

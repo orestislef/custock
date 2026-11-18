@@ -944,10 +944,17 @@
       "stock.movement_on_archived": "провёл движение по архивному товару",
       "stock.negative_accepted_offline": "синхронизировал офлайн-продажу ниже нуля",
       "stock.transfer_shortage": "записал недостачу при перемещении",
-      "policies.business_changed": "Изменены лимиты бизнеса",
-      "policies.shop_changed": "Изменены лимиты магазина",
-      "policies.role_changed": "Изменены лимиты роли",
-      "policies.user_changed": "Изменены личные лимиты"
+      "policies.business_changed": "изменил лимиты компании",
+      "policies.shop_changed": "изменил лимиты магазина",
+      "policies.role_changed": "изменил лимиты роли",
+      "policies.user_changed": "изменил личные лимиты",
+      "category.created": "добавил категорию",
+      "category.updated": "изменил категорию",
+      "category.deleted": "удалил категорию",
+      "variant.archived": "убрал вариант в архив",
+      "org.created": "создал компанию",
+      "shop.created": "добавил магазин",
+      "joinlink.created": "создал QR-код"
     },
     "aProduct": "товар",
     "s": {
@@ -957,6 +964,32 @@
       "set": "установил {{setting}}: {{value}}",
       "withName": "{{actor}} {{verb}}: {{name}}",
       "plain": "{{actor}} {{verb}}"
+    },
+    "thing": {
+      "category": "категорию",
+      "customer": "клиента",
+      "member": "сотрудника",
+      "invite": "приглашение",
+      "role": "роль",
+      "post": "публикацию",
+      "product": "товар",
+      "variant": "вариант",
+      "barcode": "штрихкод",
+      "stock": "остатки",
+      "org": "компанию",
+      "shop": "магазин",
+      "joinlink": "QR-код",
+      "policies": "лимиты",
+      "business": "компанию",
+      "owner": "приглашение владельцу",
+      "platform": "настройки платформы",
+      "superadmin": "суперадмина",
+      "other": "данные"
+    },
+    "fallback": {
+      "added": "добавил {{thing}}",
+      "changed": "изменил {{thing}}",
+      "removed": "удалил {{thing}}"
     }
   },
   "outbox": {
@@ -1693,8 +1726,20 @@
       "businessTitle": "Лимиты этого бизнеса",
       "businessLead": "Верхняя граница каждого лимита и может ли владелец его менять.",
       "ownerCan": "Владелец может менять",
-      "now": "Сейчас {{value}}"
-    }
+      "now": "Сейчас {{value}}",
+      "value": "Для этого бизнеса",
+      "inUse": "Сейчас: {{value}}",
+      "ownerCanOn": "Владелец видит и меняет это в Настройках.",
+      "ownerCanOff": "Владелец видит только значение.",
+      "ceiling": {
+        "max": "Наибольшее допустимое",
+        "min": "Наименьшее допустимое",
+        "require": "Всегда включено",
+        "allow": "Разрешено",
+        "window": "Самые короткие тихие часы"
+      }
+    },
+    "continueIn": "Продолжить в {{name}}"
   },
   "platformInvite": {
     "metaTitle": "Приглашение супер-админа",

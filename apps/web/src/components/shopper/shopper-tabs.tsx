@@ -21,7 +21,7 @@ export function ShopperTabs() {
     { href: `${home}/me`, key: 'you', icon: IconUser, active: pathname.startsWith(`${home}/me`) },
   ];
   return (
-    <nav aria-label={t('shopper.tabsLabel')} className="glass fixed z-30 left-3 right-3 mx-auto flex justify-around rounded-[28px] px-1 max-w-[460px]"
+    <nav data-tabbar="" aria-label={t('shopper.tabsLabel')} className="glass fixed z-30 inset-x-safe-3 mx-auto flex justify-around rounded-[28px] px-1 max-w-[460px]"
       style={{ bottom: 'calc(10px + env(safe-area-inset-bottom))', height: 62, boxShadow: '0 8px 30px rgba(0,0,0,0.12), 0 0 0 0.5px var(--c-line)' }}>
       {tabs.map((tab) => {
         const Icon = tab.icon;

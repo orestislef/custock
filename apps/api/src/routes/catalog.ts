@@ -9,6 +9,7 @@ import { notFound } from '../lib/problem';
 import { clampLimit, decodeCursor, page } from '../lib/tenant';
 import { loadProducts, variantLabel } from '../services/catalog';
 import { searchClause } from '../services/search';
+import { lowSql } from '../lib/low-stock';
 
 export function catalogRoutes(app: Hono<AppEnv>) {
   app.get('/v1/orgs/:org/products', (c) => {
@@ -36,7 +37,8 @@ export function catalogRoutes(app: Hono<AppEnv>) {
       WHERE v.product_id = p.id AND v.archived_at IS NULL AND l.shop_id IN (SELECT value FROM json_each(@shops)) AND ${cond})`;
     switch (q.filter) {
       case 'low':
-        where.push(levelExists('l.on_hand > 0 AND l.on_hand <= coalesce(ss.reorder_point, -1)'));
+        where.push(levelExists(lowSql()));
+        named.fewLeft = orgOf(c).org.few_left_threshold;
         break;
       case 'out':
         // a shop where it never arrived counts as out too, the same way the product page shows 0

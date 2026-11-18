@@ -339,7 +339,8 @@
     "less": "Λιγότερο: {{name}}",
     "more": "Περισσότερο: {{name}}",
     "from": "{{name}}, από",
-    "to": "{{name}}, έως"
+    "to": "{{name}}, έως",
+    "type": "{{name}}: {{value}}. Πατήστε για να γράψετε αριθμό"
   },
   "policyUnit": {
     "count_one": "{{count}}",

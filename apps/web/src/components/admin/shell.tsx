@@ -3,8 +3,8 @@
 // the admin frame: a sidebar on wide screens, a floating tab bar on phones, and a translucent
 // toolbar with the business and shop switcher. sections exist only with the permission behind them.
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import Link from '@/components/admin/org-link';
+import { useSectionPath as usePathname } from '@/components/admin/org-link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { featureOn, type Feature } from '@custock/core';
 import { useAdmin } from './admin-context';
@@ -36,7 +36,7 @@ type Section = 'main' | 'business' | 'dev';
 type NavItem = { href: string; key: string; icon: (p: { filled?: boolean; size?: number }) => ReactNode; show: boolean; section: Section; children?: { href: string; key: string; show: boolean }[] };
 
 export function useNav(): NavItem[] {
-  const { can, org } = useAdmin();
+  const { can, org, transfersPossible } = useAdmin();
   // a feature the super admin switched off for this business takes its screens away
   const anyShop = (perm: string) => org.orgPerms.includes(perm) || org.shops.some((s) => s.perms.includes(perm)) || org.anyPerms.includes(perm);
   const on = (f: Feature) => featureOn(org, f);
@@ -46,7 +46,7 @@ export function useNav(): NavItem[] {
       href: '/admin/stock', key: 'stock', icon: IconBox, show: anyShop('stock.view') || anyShop('products.view'), section: 'main',
       children: [
         { href: '/admin/stock/counts', key: 'counts', show: on('counts') && (anyShop('stock.count') || anyShop('stock.count.approve')) },
-        { href: '/admin/stock/transfers', key: 'transfers', show: on('transfers') && (anyShop('stock.transfer.send') || anyShop('stock.transfer.receive')) },
+        { href: '/admin/stock/transfers', key: 'transfers', show: on('transfers') && transfersPossible && (anyShop('stock.transfer.send') || anyShop('stock.transfer.receive')) },
         { href: '/admin/stock/categories', key: 'categories', show: can('categories.manage', null) },
       ],
     },
@@ -124,10 +124,10 @@ export function Shell({ children }: { children: ReactNode }) {
   const dev = nav.filter((i) => i.section === 'dev');
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[260px_1fr]">
+    <div className="min-h-dvh md:grid md:grid-cols-[calc(260px+env(safe-area-inset-left))_1fr]">
       <a href="#main" className="skip-link t-sub">{t('admin.skip')}</a>
       {/* sidebar */}
-      <aside className="hidden md:flex flex-col sticky top-0 h-dvh px-3 pt-5 pb-4 overflow-y-auto" style={{ background: 'var(--c-shelf)', borderRight: '0.5px solid var(--c-line)' }}>
+      <aside className="hidden md:flex flex-col sticky top-0 h-dvh pr-3 pl-safe-3 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] overflow-y-auto" style={{ background: 'var(--c-shelf)', borderRight: '0.5px solid var(--c-line)' }}>
         <div className="px-3 mb-5">
           <p className="t-cap t-2 m-0">{t('admin.business')}</p>
           {superadmin ? (
@@ -172,7 +172,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="min-w-0 flex flex-col">
         {/* toolbar */}
         <header className="bar" data-toolbar>
-          <div className="flex items-center gap-2 h-[52px] px-4 md:px-8" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <div className="flex items-center gap-2 h-[52px] px-safe-4 md:pl-8 md:pr-safe-8" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
             {me.orgs.length > 1 ? (
               <button type="button" className="md:hidden t-headline inline-flex items-center gap-1 border-0 bg-transparent p-0 max-w-[45%]" onClick={() => setOrgsOpen(true)} aria-label={t('platform.switchBusiness')}>
                 <span className="truncate">{org.name}</span><IconChevronDown size={14} className="flex-none t-2" />
@@ -189,14 +189,14 @@ export function Shell({ children }: { children: ReactNode }) {
           {!online ? <p className="offline-line m-0" role="status"><IconWifiOff size={16} className="flex-none" />{t('offline.line')}</p> : null}
         </header>
 
-        <main id="main" tabIndex={-1} className="outline-none flex-1 px-4 md:px-8 pb-[calc(110px+env(safe-area-inset-bottom))] md:pb-12 w-full max-w-[1200px]">
+        <main id="main" tabIndex={-1} className="outline-none flex-1 px-safe-4 md:pl-8 md:pr-safe-8 pb-[calc(110px+env(safe-area-inset-bottom))] md:pb-12 w-full max-w-[1200px]">
           <PlatformBanners me={me} t={t} />
           {routeOff && !featureOn(org, routeOff) ? <GoHome /> : children}
         </main>
       </div>
 
       {/* phone tab bar, floating glass */}
-      <nav aria-label={t('admin.nav')} className="glass md:hidden fixed z-30 left-3 right-3 flex justify-around rounded-[28px] px-1"
+      <nav data-tabbar="" aria-label={t('admin.nav')} className="glass md:hidden fixed z-30 inset-x-safe-3 flex justify-around rounded-[28px] px-1"
         style={{ bottom: 'calc(10px + env(safe-area-inset-bottom))', height: 62, boxShadow: '0 8px 30px rgba(0,0,0,0.12), 0 0 0 0.5px var(--c-line)' }}>
         {tabs.map((item) => {
           const active = isActive(pathname, item.href);
@@ -340,7 +340,7 @@ export function Page({ title, subtitle, actions, back, phoneAction, children }: 
   }, [title]);
   return (
     <div className="page-in">
-      {back ? <Link href={back.href} className="inline-flex items-center min-h-[44px] -ml-2 mt-1 t-body"><IconChevronLeft size={24} />{back.label}</Link> : null}
+      {back ? <Link href={back.href} className="inline-flex items-center min-h-[44px] ml-back mt-1 t-body"><IconChevronLeft size={24} />{back.label}</Link> : null}
       <div className={`flex items-end gap-3 ${back ? 'pt-0' : 'pt-2'} pb-5 flex-wrap`}>
         <div className="flex-1 min-w-[200px]">
           <h1 ref={ref} className="t-large m-0">{title}</h1>

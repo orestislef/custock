@@ -29,7 +29,7 @@ export default async function OffersPage({ params }: PageProps<'/s/[org]/offers'
       {!all ? (
         <FollowerCatalog offersOnly />
       ) : items.length ? (
-        <CatalogGrid items={items} t={t} locale={locale} hrefFor={(p) => `/s/${org}/p/${p.id}`} />
+        <CatalogGrid items={items} t={t} locale={locale} hrefFor={(p) => `/s/${org}/p/${p.id}?from=offers`} />
       ) : (
         <Empty icon={<IconTag size={40} />} title={t('offers.emptyTitle')} body={t('offers.emptyBody')}
           action={info.joinCode ? <Link href={`/j/${info.joinCode}`} className="btn btn-primary">{t('offers.join', { org: info.name })}</Link> : undefined} />

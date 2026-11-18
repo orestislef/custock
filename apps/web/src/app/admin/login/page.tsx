@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { SessionGate } from '@/components/session-gate';
 import { useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LoginApi } from '@/components/admin/admin-context';
@@ -52,7 +53,8 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col px-4" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <main data-guest className="min-h-dvh flex flex-col px-safe-4" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <SessionGate honorNext />
       <div className="w-full max-w-[400px] mx-auto flex justify-end pt-3"><LocaleSwitch /></div>
       <div className="flex-1 grid place-items-center py-8">
       <div className="w-full max-w-[400px] page-in">

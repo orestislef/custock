@@ -2,6 +2,15 @@
 // query decides), Light or Dark set data-theme on <html>. chosen in the account sheet, stored on
 // this device only. kept in step with src/lib/appearance.ts. an external file so the page needs no
 // inline script under the content security policy.
+// a session on this device: the front door and the sign in pages stay blank until the app has
+// decided where to go (components/session-gate.tsx), so a signed in person never sees them flash
+(function () {
+  try {
+    var raw = localStorage.getItem('custock.tokens');
+    if (raw && JSON.parse(raw).refreshToken) document.documentElement.setAttribute('data-session', '1');
+  } catch (e) {}
+})();
+
 (function () {
   var KEY = 'custock.appearance';
   var COLORS = { light: '#F3F3F0', dark: '#0F0F12' };

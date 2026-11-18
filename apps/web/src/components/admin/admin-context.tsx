@@ -15,6 +15,8 @@ import { resetCatalogSync } from '@/lib/catalog-cache';
 import { wipeLocal } from '@/lib/outbox';
 import { disablePush } from '@/lib/push';
 import { setDisplayTimeZone } from '@/lib/format';
+import { adminLocation, orgPath } from '@/lib/admin-path';
+import { OrgSlugCtx } from './org-link';
 
 interface AdminState {
   api: CustockApi;
@@ -33,6 +35,8 @@ interface AdminState {
   superadmin: boolean;
   // switch to another business the person can open (a super admin: any business)
   openOrg: (orgId: string, to?: string) => void;
+  // transfers make sense: the business has a second shop (or we cannot tell, then they stay)
+  transfersPossible: boolean;
 }
 
 const Ctx = createContext<AdminState | null>(null);
@@ -93,7 +97,7 @@ function getApi(): CustockApi {
   return browserApi;
 }
 
-interface Loaded { me: MeContext; orgId: string | null; settings: OrgSettings | null; shops: Shop[]; shopId: string | null }
+interface Loaded { me: MeContext; orgId: string | null; settings: OrgSettings | null; shops: Shop[]; shopId: string | null; businessShops?: number | null }
 
 const ORG_KEY = 'custock.org';
 
@@ -115,7 +119,12 @@ function dropLinkParams() {
   window.history.replaceState(window.history.state, '', `${u.pathname}${u.search}${u.hash}`);
 }
 
-function pickOrg(me: MeContext) {
+function pickOrg(me: MeContext, urlSlug: string | null) {
+  // the address names the business (/admin/<slug>/...): that one, remembered for /admin
+  if (urlSlug) {
+    const named = me.orgs.find((o) => o.slug === urlSlug);
+    if (named) { localStorage.setItem(ORG_KEY, named.orgId); return named; }
+  }
   const wanted = linkTarget().org;
   if (wanted) {
     const hit = me.orgs.find((o) => o.orgId === wanted);
@@ -125,9 +134,9 @@ function pickOrg(me: MeContext) {
   return me.orgs.find((o) => o.orgId === saved) ?? (me.platformRole === 'superadmin' ? me.orgs.find((o) => !o.platformAccess) : me.orgs[0]);
 }
 
-async function loadSession(api: CustockApi): Promise<Loaded> {
+async function loadSession(api: CustockApi, urlSlug: string | null): Promise<Loaded> {
   const me = await api.me();
-  const org = pickOrg(me);
+  const org = pickOrg(me, urlSlug);
   if (!org) return { me, orgId: null, settings: null, shops: [], shopId: null };
   session.versions.set(org.orgId, org.permsVersion);
   // a paused business refuses its own calls. its people get the paused screen, so nothing else loads
@@ -136,7 +145,14 @@ async function loadSession(api: CustockApi): Promise<Loaded> {
     if ((e as { code?: string }).code === 'org_suspended') return [] as Shop[];
     throw e;
   };
-  const [settings, shops] = await Promise.all([api.orgSettings(org.orgId).catch(() => null), api.shops(org.orgId).catch(paused)]);
+  // how many shops the whole business has: transfers need a second one. only people who may send
+  // can list every shop; for the rest it stays unknown and transfers keep showing (they may receive)
+  const canSend = org.orgPerms.includes('stock.transfer.send') || org.shops.some((x) => x.perms.includes('stock.transfer.send'));
+  const [settings, shops, businessShops] = await Promise.all([
+    api.orgSettings(org.orgId).catch(() => null),
+    api.shops(org.orgId).catch(paused),
+    canSend ? api.shops(org.orgId, { all: true }).then((x) => x.length, () => null) : Promise.resolve(null),
+  ]);
   const mine = new Set(org.shops.map((x) => x.shopId));
   const linked = linkTarget().shop;
   if (linked && mine.has(linked)) localStorage.setItem('custock.shop', linked);
@@ -144,7 +160,7 @@ async function loadSession(api: CustockApi): Promise<Loaded> {
   const shopId = saved === 'all' && org.shops.length > 1 ? null
     : saved && mine.has(saved) ? saved
     : org.shops.length === 1 ? org.shops[0]!.shopId : null;
-  return { me, orgId: org.orgId, settings, shops: shops.filter((x) => mine.has(x.id)), shopId };
+  return { me, orgId: org.orgId, settings, shops: shops.filter((x) => mine.has(x.id)), shopId, businessShops };
 }
 
 export function AdminProvider({ children }: { children: ReactNode }) {
@@ -155,6 +171,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<Loaded | null>(null);
   const [version, setVersion] = useState(0);
   const [failed, setFailed] = useState(false);
+  const loc = adminLocation(pathname);
   // pages that work signed out: sign in, forgot password and the reset link
   const isLogin = pathname === '/admin/login' || pathname === '/admin/forgot' || pathname.startsWith('/admin/reset/');
   useEffect(() => { session.locale = locale; }, [locale]);
@@ -175,7 +192,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       if (!loadTokens()) { toLogin(); return; }
       try {
         const wanted = linkTarget().org;
-        const loaded = await loadSession(getApi());
+        const loaded = await loadSession(getApi(), adminLocation(window.location.pathname.slice(basePath.length) || '/').slug);
         if (!alive) return;
         // a link to a business this person no longer works for: home, quietly
         if (wanted && !loaded.me.orgs.some((o) => o.orgId === wanted)) {
@@ -198,6 +215,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     return () => { alive = false; };
   }, [isLogin, router, version]);
 
+  const loadedSlug = state?.me.orgs.find((o) => o.orgId === state.orgId)?.slug ?? null;
+  const slugKnown = !!loc.slug && !!state?.me.orgs.some((o) => o.slug === loc.slug);
+  useEffect(() => {
+    if (state && loc.slug && slugKnown && loc.slug !== loadedSlug) { setState(null); setVersion((v) => v + 1); }
+  }, [state, loc.slug, slugKnown, loadedSlug]);
+
   const setShopId = useCallback((id: string | null) => {
     setState((s) => (s ? { ...s, shopId: id } : s));
     localStorage.setItem('custock.shop', id ?? 'all');
@@ -206,10 +229,11 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const openOrg = useCallback((orgId: string, to = '/admin') => {
     localStorage.setItem(ORG_KEY, orgId);
     localStorage.removeItem('custock.shop');
+    const slug = state?.me.orgs.find((o) => o.orgId === orgId)?.slug ?? null;
     setState(null);
     setVersion((v) => v + 1);
-    router.push(to);
-  }, [router]);
+    router.push(orgPath(to, slug));
+  }, [router, state]);
 
   const logout = useCallback(async () => {
     // nothing of this person stays on the device: no push to it, no saved stock work, no catalog copy
@@ -242,7 +266,15 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     }
     return <NoOrg t={t} onLogout={logout} />;
   }
-  if (onPlatform && !superadmin) return <Redirect to="/admin" />;
+  if (onPlatform && !superadmin) return <Redirect to={`/admin/${org.slug}`} />;
+  // /admin alone, and the old short addresses (/admin/stock/1): on to the business in the address
+  if (!onPlatform && !loc.slug) {
+    const search = typeof window === 'undefined' ? '' : window.location.search;
+    return <Redirect to={loc.legacy ? orgPath(`${loc.section}${search}`, org.slug) : `/admin/${org.slug}`} />;
+  }
+  // a business this person cannot open: their own home, quietly
+  // another of this person's businesses in the address: it loads (see the effect above)
+  if (loc.slug && loc.slug !== org.slug) return slugKnown ? <Splash /> : <Redirect to={`/admin/${org.slug}`} />;
   // a paused business: its people see a calm screen. a super admin still gets in
   if (org.suspended && !superadmin) {
     return <Paused t={t} name={org.name} others={state.me.orgs.filter((o) => o.orgId !== org.orgId && !o.suspended)} onOpen={openOrg} onLogout={logout} />;
@@ -254,10 +286,13 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     api: getApi(), me: state.me, org, settings: state.settings, shops: state.shops, shopId: state.shopId, setShopId,
     can: (perm, s) => canFn(org, perm, s === undefined ? state.shopId : s),
     refresh, logout, t, locale, superadmin, openOrg,
+    transfersPossible: state.businessShops == null || state.businessShops > 1,
   };
   return (
     <PlatformCtx.Provider value={platformValue}>
-      <Ctx.Provider value={value}>{children}</Ctx.Provider>
+      <OrgSlugCtx.Provider value={onPlatform ? null : org.slug}>
+        <Ctx.Provider value={value}>{children}</Ctx.Provider>
+      </OrgSlugCtx.Provider>
     </PlatformCtx.Provider>
   );
 }
@@ -270,7 +305,7 @@ function Redirect({ to }: { to: string }) {
 
 function Paused({ t, name, others, onOpen, onLogout }: { t: TFunction; name: string; others: OrgAccess[]; onOpen: (id: string) => void; onLogout: () => void }) {
   return (
-    <div className="min-h-dvh grid place-items-center px-6 text-center">
+    <div className="min-h-dvh grid place-items-center px-safe-6 text-center">
       <div className="max-w-[420px] page-in">
         <p className="t-title2 m-0">{t('platform.paused.title')}</p>
         <p className="t-body t-2 mt-2 mb-0">{name}</p>
@@ -297,7 +332,7 @@ function Splash() {
 
 function NoOrg({ t, onLogout }: { t: TFunction; onLogout: () => void }) {
   return (
-    <div className="min-h-dvh grid place-items-center px-6 text-center">
+    <div className="min-h-dvh grid place-items-center px-safe-6 text-center">
       <div>
         <p className="t-title2 m-0">{t('admin.noOrgTitle')}</p>
         <p className="t-body t-2 mt-2">{t('admin.noOrgBody')}</p>
@@ -309,7 +344,7 @@ function NoOrg({ t, onLogout }: { t: TFunction; onLogout: () => void }) {
 
 function Retry({ t, onRetry }: { t: TFunction; onRetry: () => void }) {
   return (
-    <div className="min-h-dvh grid place-items-center px-6 text-center">
+    <div className="min-h-dvh grid place-items-center px-safe-6 text-center">
       <div>
         <p className="t-title3 m-0">{t('admin.offlineTitle')}</p>
         <p className="t-body t-2 mt-2">{t('admin.offlineBody')}</p>

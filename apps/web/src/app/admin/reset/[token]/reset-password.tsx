@@ -75,7 +75,7 @@ export function ResetPassword({ token }: { token: string }) {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col px-4" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <main className="min-h-dvh flex flex-col px-safe-4" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="w-full max-w-[400px] mx-auto flex justify-end pt-3"><LocaleSwitch /></div>
       <div className="flex-1 grid place-items-center py-8">
         <div className="w-full max-w-[400px] page-in">

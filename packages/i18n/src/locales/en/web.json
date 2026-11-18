@@ -884,10 +884,17 @@
       "stock.movement_on_archived": "moved stock of an archived product",
       "stock.negative_accepted_offline": "synced an offline sale below zero",
       "stock.transfer_shortage": "recorded a transfer shortage",
-      "policies.business_changed": "Changed business limits",
-      "policies.shop_changed": "Changed shop limits",
-      "policies.role_changed": "Changed role limits",
-      "policies.user_changed": "Changed personal limits"
+      "policies.business_changed": "changed business limits",
+      "policies.shop_changed": "changed shop limits",
+      "policies.role_changed": "changed role limits",
+      "policies.user_changed": "changed personal limits",
+      "category.created": "added a category",
+      "category.updated": "changed a category",
+      "category.deleted": "deleted a category",
+      "variant.archived": "archived a variant",
+      "org.created": "set up the business",
+      "shop.created": "added a shop",
+      "joinlink.created": "made a QR code"
     },
     "aProduct": "a product",
     "s": {
@@ -897,6 +904,32 @@
       "set": "set {{setting}} to {{value}}",
       "withName": "{{actor}} {{verb}}: {{name}}",
       "plain": "{{actor}} {{verb}}"
+    },
+    "thing": {
+      "category": "a category",
+      "customer": "a customer",
+      "member": "a team member",
+      "invite": "an invite",
+      "role": "a role",
+      "post": "a post",
+      "product": "a product",
+      "variant": "a variant",
+      "barcode": "a barcode",
+      "stock": "stock",
+      "org": "the business",
+      "shop": "a shop",
+      "joinlink": "a QR code",
+      "policies": "limits",
+      "business": "a business",
+      "owner": "an owner invite",
+      "platform": "platform settings",
+      "superadmin": "a super admin",
+      "other": "something"
+    },
+    "fallback": {
+      "added": "added {{thing}}",
+      "changed": "changed {{thing}}",
+      "removed": "removed {{thing}}"
     }
   },
   "outbox": {
@@ -1589,8 +1622,20 @@
       "businessTitle": "Limits for this business",
       "businessLead": "The ceiling for each limit, and whether the owner may change it.",
       "ownerCan": "Owner can change it",
-      "now": "Now {{value}}"
-    }
+      "now": "Now {{value}}",
+      "value": "For this business",
+      "inUse": "In use now: {{value}}",
+      "ownerCanOn": "The owner sees and changes it in Settings.",
+      "ownerCanOff": "The owner sees the value only.",
+      "ceiling": {
+        "max": "Highest allowed",
+        "min": "Lowest allowed",
+        "require": "Always on",
+        "allow": "Allowed",
+        "window": "Shortest quiet hours"
+      }
+    },
+    "continueIn": "Continue in {{name}}"
   },
   "platformInvite": {
     "metaTitle": "Super admin invite",

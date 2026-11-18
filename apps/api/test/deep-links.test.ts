@@ -61,22 +61,22 @@ describe('where a notification takes you', () => {
     const k = s.shops.kifisia;
     expect(staffPath('/admin', o)).toBe(`/admin?org=${o}`);
     expect(staffPath('/admin/stock', o, k, { filter: 'low' })).toBe(`/admin/stock?filter=low&org=${o}&shop=${k}`);
-    expect(pushPath(db, o, false, { type: 'approvalNeeded', postId: 'p1' })).toBe(`/admin/posts/p1?org=${o}`);
-    expect(pushPath(db, o, false, { type: 'postPublished', postId: 'p1' })).toBe(`/admin/posts/p1?org=${o}`);
-    expect(pushPath(db, o, false, { type: 'postReturned', postId: 'p1' })).toBe(`/admin/posts/p1?org=${o}`);
-    expect(pushPath(db, o, false, { type: 'countReady', countId: 'c1', shopId: k })).toBe(`/admin/stock/counts/c1?org=${o}&shop=${k}`);
-    expect(pushPath(db, o, false, { type: 'transferSent', transferId: 't1', shopId: k })).toBe(`/admin/stock/transfers/t1?org=${o}&shop=${k}`);
-    expect(pushPath(db, o, false, { type: 'transferReceived', transferId: 't1', shopId: k })).toBe(`/admin/stock/transfers/t1?org=${o}&shop=${k}`);
+    expect(pushPath(db, o, false, { type: 'approvalNeeded', postId: 'p1' })).toBe(`/admin/lemoni/posts/p1`);
+    expect(pushPath(db, o, false, { type: 'postPublished', postId: 'p1' })).toBe(`/admin/lemoni/posts/p1`);
+    expect(pushPath(db, o, false, { type: 'postReturned', postId: 'p1' })).toBe(`/admin/lemoni/posts/p1`);
+    expect(pushPath(db, o, false, { type: 'countReady', countId: 'c1', shopId: k })).toBe(`/admin/lemoni/stock/counts/c1?shop=${k}`);
+    expect(pushPath(db, o, false, { type: 'transferSent', transferId: 't1', shopId: k })).toBe(`/admin/lemoni/stock/transfers/t1?shop=${k}`);
+    expect(pushPath(db, o, false, { type: 'transferReceived', transferId: 't1', shopId: k })).toBe(`/admin/lemoni/stock/transfers/t1?shop=${k}`);
     const low = pushPath(db, o, false, { type: 'lowStock', variantId: s.variants['p-mastiha'], shopId: k });
-    expect(low.startsWith('/admin/stock/')).toBe(true);
-    expect(low.endsWith(`?org=${o}&shop=${k}`)).toBe(true);
-    expect(pushPath(db, o, false, { type: 'lowStock', variantId: 'gone', shopId: k })).toBe(`/admin/stock?filter=low&org=${o}&shop=${k}`);
-    expect(pushPath(db, o, false, { type: 'inviteAccepted', membershipId: 'm1' })).toBe(`/admin/team?member=m1&org=${o}`);
+    expect(low.startsWith('/admin/lemoni/stock/')).toBe(true);
+    expect(low.endsWith(`?shop=${k}`)).toBe(true);
+    expect(pushPath(db, o, false, { type: 'lowStock', variantId: 'gone', shopId: k })).toBe(`/admin/lemoni/stock?filter=low&shop=${k}`);
+    expect(pushPath(db, o, false, { type: 'inviteAccepted', membershipId: 'm1' })).toBe(`/admin/lemoni/team?member=m1`);
     // customers land on the business's own pages
     expect(pushPath(db, o, true, { type: 'post', postId: 'p1' })).toBe('/s/lemoni/news?post=p1');
     expect(pushPath(db, o, true, { type: 'back_in_stock', productId: 'pr1' })).toBe('/s/lemoni/p/pr1');
     expect(pushPath(db, o, true, {})).toBe('/s/lemoni');
-    expect(pushPath(db, o, false, {})).toBe(`/admin?org=${o}`);
+    expect(pushPath(db, o, false, {})).toBe(`/admin/lemoni`);
   });
 
   it('a post waiting for approval opens its approval view, and its author hears what happened', async () => {
@@ -87,12 +87,12 @@ describe('where a notification takes you', () => {
     expect(sent.body.status).toBe('pending_approval');
     // the approvers, not the author
     const asked = pushFor('nikos', 'approvalNeeded');
-    expect(asked?.url).toBe(`${WEB}/admin/posts/${id}?org=${s.orgId}`);
+    expect(asked?.url).toBe(`${WEB}/admin/lemoni/posts/${id}`);
     expect(asked?.actions?.[0]?.url).toBe(asked?.url);
     expect(pushFor('maria', 'approvalNeeded')).toBeUndefined();
     expect((await call('POST', `${org()}/posts/${id}/approve`, 'nikos')).status).toBe(200);
     const told = pushFor('maria', 'postPublished');
-    expect(told?.url).toBe(`${WEB}/admin/posts/${id}?org=${s.orgId}`);
+    expect(told?.url).toBe(`${WEB}/admin/lemoni/posts/${id}`);
     expect(told?.body).toContain('Νέο λάδι');
     expect(pushFor('nikos', 'postPublished')).toBeUndefined();
   });
@@ -101,26 +101,26 @@ describe('where a notification takes you', () => {
     const id = (await call('POST', `${org()}/posts`, 'maria', post('Δεύτερο'))).body.id as string;
     await call('POST', `${org()}/posts/${id}/publish`, 'maria');
     expect((await call('POST', `${org()}/posts/${id}/cancel`, 'eleni')).body.status).toBe('cancelled');
-    expect(pushFor('maria', 'postReturned')?.url).toBe(`${WEB}/admin/posts/${id}?org=${s.orgId}`);
+    expect(pushFor('maria', 'postReturned')?.url).toBe(`${WEB}/admin/lemoni/posts/${id}`);
   });
 
   it('a count sent for review opens that count in its shop', async () => {
     const count = (await call('POST', `${org()}/shops/${s.shops.kifisia}/counts`, 'dimitris', { kind: 'partial' })).body;
     await call('PUT', `${org()}/counts/${count.id}/lines/${s.variants['p-candle']}`, 'dimitris', { countedQty: 1 });
     expect((await call('POST', `${org()}/counts/${count.id}/submit`, 'dimitris')).body.status).toBe('review');
-    expect(pushFor('maria', 'countReady')?.url).toBe(`${WEB}/admin/stock/counts/${count.id}?org=${s.orgId}&shop=${s.shops.kifisia}`);
+    expect(pushFor('maria', 'countReady')?.url).toBe(`${WEB}/admin/lemoni/stock/counts/${count.id}?shop=${s.shops.kifisia}`);
   });
 
   it('a transfer opens in the receiving shop, and the sending shop hears it arrived short', async () => {
     const tahini = s.variants['p-tahini']!;
     const tr = (await call('POST', `${org()}/transfers`, 'nikos', { fromShopId: s.shops.marousi, toShopId: s.shops.kifisia, lines: [{ variantId: tahini, qty: 4 }] })).body;
     await call('POST', `${org()}/transfers/${tr.id}/send`, 'nikos');
-    expect(pushFor('dimitris', 'transferSent')?.url).toBe(`${WEB}/admin/stock/transfers/${tr.id}?org=${s.orgId}&shop=${s.shops.kifisia}`);
+    expect(pushFor('dimitris', 'transferSent')?.url).toBe(`${WEB}/admin/lemoni/stock/transfers/${tr.id}?shop=${s.shops.kifisia}`);
     const got = await call('POST', `${org()}/transfers/${tr.id}/receive`, 'dimitris', { lines: [{ variantId: tahini, qtyReceived: 3 }] });
     expect(got.body.status).toBe('received');
     // people who can send from the sending shop, never the receiver, never staff without that right
     const back = pushFor('eleni', 'transferReceived');
-    expect(back?.url).toBe(`${WEB}/admin/stock/transfers/${tr.id}?org=${s.orgId}&shop=${s.shops.marousi}`);
+    expect(back?.url).toBe(`${WEB}/admin/lemoni/stock/transfers/${tr.id}?shop=${s.shops.marousi}`);
     expect(back?.body).toContain('3');
     expect(back?.body).toContain('1');
     const told = pushesOf('transferReceived');
