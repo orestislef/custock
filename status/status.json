@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-18T18:00:00+02:00",
-  "overall": 97,
+  "updated": "2026-11-18T21:00:00+02:00",
+  "overall": 98,
   "areas": [
     {
       "key": "thinking",
@@ -34,13 +34,13 @@
       "name": "Backend (permissions engine, database, API)",
       "percent": 98,
       "state": "building",
-      "note": "334 api tests. Reports skip undone sales, shop and offer prices on sales, the super admin views load in a few queries (overview 561 ms to 104 ms, business list 310 ms to 26 ms)."
+      "note": "365 api tests. Nightly stock check against the ledger, hard bounces stop, restarts never double a message, sign out other devices, safe retries and optimistic saves."
     },
     {
       "name": "Web app for phone and desktop",
-      "percent": 97,
+      "percent": 98,
       "state": "building",
-      "note": "Bug hunt fixes across stock, scanning, customers, settings and navigation. Every screen checked in Greek and Russian at 320 px and up, light and dark."
+      "note": "About 40 percent lighter pages: only the visitor's language loads. Long lists load as you scroll, drafts survive an expired session, a dropped network says so, the open app updates itself cleanly after a deploy."
     },
     {
       "name": "Production server",
@@ -56,9 +56,9 @@
     },
     {
       "name": "Testing",
-      "percent": 92,
+      "percent": 95,
       "state": "building",
-      "note": "195 end to end tests passing on desktop and phone sizes with the iPhone engine, plus a quality check for leftover English, cut text and contrast. A second round of bug hunting is running."
+      "note": "Two bug hunt rounds, over 70 bugs fixed. 210 end to end tests green on desktop and phone sizes with the iPhone engine, every edge case from the planning notes covered by a test."
     }
   ],
   "log": [
@@ -161,6 +161,10 @@
     {
       "at": "2026-11-18T18:00:00+02:00",
       "text": "First bug hunt: 37 bugs fixed across stock, customers, super admin, languages and accessibility, security and speed. 195 end to end tests green."
+    },
+    {
+      "at": "2026-11-18T21:00:00+02:00",
+      "text": "Second bug hunt: edge cases, real life timing (two people, two devices, offline, expiry, deploys, clock changes) and a big busy business. Pages about 40 percent lighter. 210 end to end tests green."
     }
   ],
   "screens": [
