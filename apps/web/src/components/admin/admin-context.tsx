@@ -171,7 +171,11 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<Loaded | null>(null);
   const [version, setVersion] = useState(0);
   const [failed, setFailed] = useState(false);
+  // set when a link named a business this person is not in: their own home wins over the section
+  const [goHome, setGoHome] = useState(false);
   const loc = adminLocation(pathname);
+  // inside a business again: the flag has done its job (adjusted while rendering, not in an effect)
+  if (goHome && loc.slug) setGoHome(false);
   // pages that work signed out: sign in, forgot password and the reset link
   const isLogin = pathname === '/admin/login' || pathname === '/admin/forgot' || pathname.startsWith('/admin/reset/');
   useEffect(() => { session.locale = locale; }, [locale]);
@@ -197,8 +201,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         // a link to a business this person no longer works for: home, quietly
         if (wanted && !loaded.me.orgs.some((o) => o.orgId === wanted)) {
           dropLinkParams();
+          setGoHome(true);
           setState(loaded); setFailed(false);
-          router.replace('/admin');
           return;
         }
         dropLinkParams();
@@ -217,9 +221,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const loadedSlug = state?.me.orgs.find((o) => o.orgId === state.orgId)?.slug ?? null;
   const slugKnown = !!loc.slug && !!state?.me.orgs.some((o) => o.slug === loc.slug);
-  useEffect(() => {
-    if (state && loc.slug && slugKnown && loc.slug !== loadedSlug) { setState(null); setVersion((v) => v + 1); }
-  }, [state, loc.slug, slugKnown, loadedSlug]);
+  // another of this person's businesses in the address: load that one (adjusted while rendering)
+  if (state && loc.slug && slugKnown && loc.slug !== loadedSlug) { setState(null); setVersion((v) => v + 1); }
 
   const setShopId = useCallback((id: string | null) => {
     setState((s) => (s ? { ...s, shopId: id } : s));
@@ -270,10 +273,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   // /admin alone, and the old short addresses (/admin/stock/1): on to the business in the address
   if (!onPlatform && !loc.slug) {
     const search = typeof window === 'undefined' ? '' : window.location.search;
-    // a link naming a business this person is not in goes to their own home, not to that section
-    const wanted = linkTarget().org;
-    const strange = !!wanted && !state.me.orgs.some((o) => o.orgId === wanted);
-    return <Redirect to={loc.legacy && !strange ? orgPath(`${loc.section}${search}`, org.slug) : `/admin/${org.slug}`} />;
+    return <Redirect to={loc.legacy && !goHome ? orgPath(`${loc.section}${search}`, org.slug) : `/admin/${org.slug}`} />;
   }
   // a business this person cannot open: their own home, quietly
   // another of this person's businesses in the address: it loads (see the effect above)
