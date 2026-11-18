@@ -11,7 +11,10 @@ import webpush from 'web-push';
 import { isPushServiceEndpoint } from '@custock/core';
 import type { Db } from '@custock/db';
 import { parseJson, platform } from './tenant';
+import { sendGate } from './platform-access';
+import { ACCOUNT_SAFETY_MAIL } from './account-safety';
 import { buildWebPush, subscriptionsFor, vapidProblems, type VapidConfig } from './webpush';
+import { captureError } from './errors';
 
 export interface OutboxRow {
   id: string;
@@ -233,6 +236,16 @@ export async function drainOutbox(db: Db, sender: LiveSender, now: number, limit
   let sent = 0;
   let failed = 0;
   for (const row of rows) {
+    // a platform pause holds the message, a paused business or a switched off channel drops it
+    const held = sendGate(db, row.channel, row.org_id);
+    // account safety mail (forgot password) goes out during a platform wide email pause too
+    const safety = row.channel === 'email' && ACCOUNT_SAFETY_MAIL.has(String(parseJson<{ type?: string }>(row.payload, {}).type));
+    const gate = held === 'hold' && safety ? null : held;
+    if (gate === 'hold') continue;
+    if (gate) {
+      p.run('UPDATE dev_outbox SET attempts = 5, last_error = @e WHERE id = @id', { e: gate, id: row.id });
+      continue;
+    }
     try {
       if (row.channel === 'email' && row.to_address && sender.email) {
         await sender.email(row);
@@ -273,6 +286,7 @@ export async function drainOutbox(db: Db, sender: LiveSender, now: number, limit
     } catch (err) {
       p.run('UPDATE dev_outbox SET attempts = attempts + 1, last_error = @e WHERE id = @id', { e: String(err).slice(0, 500), id: row.id });
       failed++;
+      captureError(db, { kind: 'send', error: err, route: `send ${row.channel}`, orgId: row.org_id }, { now });
     }
   }
   return { sent, failed };

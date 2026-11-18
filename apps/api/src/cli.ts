@@ -5,11 +5,20 @@
 //   node --import tsx apps/api/src/cli.ts invite-owner --org lemoni --email eleni@example.com [--locale el]
 //   node --import tsx apps/api/src/cli.ts add-shop --org lemoni --name "Marousi" [--city ...]
 //   node --import tsx apps/api/src/cli.ts set-password --email eleni@example.com
+//   node --import tsx apps/api/src/cli.ts add-join-link --org lemoni
+//   node --import tsx apps/api/src/cli.ts make-superadmin --email me@example.com
+//   node --import tsx apps/api/src/cli.ts remove-superadmin --email someone@example.com
+//   node --import tsx apps/api/src/cli.ts delete-business --slug test --confirm test
+//     (only a business without products, customers, posts or stock movements)
+//   node --import tsx apps/api/src/cli.ts delete-business --slug test --confirm test --everything
+//     (everything in it, its photos, and the accounts of people who were only there)
 //
 // create-business makes the owner one of two ways. --invite (the default when mail is live): an
 // owner invite, emailed and printed, and the owner sets name and password from the link.
 // --set-password (the default otherwise): the account is made now, the password comes from
 // CUSTOCK_NEW_PASSWORD, or from stdin with --password-stdin, otherwise a random one is printed once.
+// every business gets a join link for the whole business (the shop page's Join) once it has an
+// owner account. add-join-link makes it for a business set up before that existed.
 // in docker: docker exec -it custock node --import tsx apps/api/src/cli.ts ...
 // the database is CUSTOCK_DB (the same file the api uses).
 
@@ -19,7 +28,9 @@ import { DEFAULT_DB_PATH, hashPassword, migrate, openDb, type Db } from '@custoc
 import { setEmailAssetBase } from './email/layout';
 import { liveChannels } from './lib/live';
 import { platform } from './lib/tenant';
-import { addShop, BootstrapError, createBusiness, inviteOwner } from './services/bootstrap';
+import { addShop, BootstrapError, createBusiness, ensureDefaultJoinLink, firstOwner, inviteOwner } from './services/bootstrap';
+import { deleteBusinessEverything, deleteEmptyBusiness, grantSuperAdmin, removeSuperAdmin } from './services/platform';
+import { s3Store, storageFromEnv } from './lib/storage';
 
 export const MIN_PASSWORD = 10;
 
@@ -157,8 +168,62 @@ export async function runCli(db: Db, argv: string[], io: CliIo): Promise<number>
       if (generated) io.out(`password (shown once): ${password}`);
       return 0;
     }
+    case 'add-join-link': {
+      const slug = str(flags, 'org')!;
+      const org = platform(db).get<{ id: string }>('SELECT id FROM organizations WHERE slug = @s', { s: slug });
+      if (!org) throw new BootstrapError(`no business with the slug ${slug}`);
+      const owner = firstOwner(db, org.id);
+      if (!owner) throw new BootstrapError('the business has no owner account yet, the link is made when the owner accepts the invite');
+      const code = ensureDefaultJoinLink(db, org.id, owner);
+      const web = (io.env.CUSTOCK_PUBLIC_WEB_URL ?? '').replace(/\/$/, '');
+      io.out(code ? `join link for ${slug}: ${web}/j/${code}` : `${slug} already has a join link for the whole business`);
+      return 0;
+    }
+    case 'make-superadmin': {
+      // the first super admin, or a way back in. later ones can also be invited from the app
+      const email = str(flags, 'email')!.toLowerCase();
+      const user = platform(db).get<{ id: string; role: string | null }>('SELECT id, platform_role AS role FROM users WHERE email = @e AND deleted_at IS NULL', { e: email });
+      if (!user) throw new BootstrapError(`no account for ${email}, it has to exist first (sign up from an invite, or create-business --set-password)`);
+      if (user.role === 'superadmin') {
+        io.out(`${email} is already a super admin`);
+        return 0;
+      }
+      grantSuperAdmin(db, null, user.id, 'superadmin.granted_cli');
+      io.out(`${email} is now a super admin: every business, from /admin/platform`);
+      return 0;
+    }
+    case 'remove-superadmin': {
+      const email = str(flags, 'email')!.toLowerCase();
+      const user = platform(db).get<{ id: string }>("SELECT id FROM users WHERE email = @e AND deleted_at IS NULL AND platform_role = 'superadmin'", { e: email });
+      if (!user) throw new BootstrapError(`${email} is not a super admin`);
+      try {
+        removeSuperAdmin(db, null, user.id);
+      } catch (e) {
+        if (e instanceof Error && (e as { code?: string }).code === 'last_superadmin') throw new BootstrapError('the last super admin stays, make another one first');
+        throw e;
+      }
+      io.out(`${email} is no longer a super admin`);
+      return 0;
+    }
+    case 'delete-business': {
+      const slug = str(flags, 'slug')!;
+      if (str(flags, 'confirm', false) !== slug) throw new BootstrapError(`type the slug again to confirm: --confirm ${slug}`);
+      const org = platform(db).get<{ id: string; name: string }>('SELECT id, name FROM organizations WHERE slug = @s', { s: slug });
+      if (!org) throw new BootstrapError(`no business with the slug ${slug}`);
+      if (flags.everything) {
+        // everything in it, its photos in the bucket and the accounts of people who were only there
+        const storage = storageFromEnv(io.env as NodeJS.ProcessEnv, false, '');
+        const store = storage.setting.kind === 's3' ? s3Store(storage.setting.s3) : null;
+        const r = await deleteBusinessEverything(db, org.id, null, { removeObject: store ? (k) => store.remove(k) : undefined, log: io.out });
+        io.out(`${r.accountsClosed} accounts closed, ${Object.values(r.rows).reduce((a, b) => a + b, 0)} rows, ${r.objects} photos`);
+        return 0;
+      }
+      const r = deleteEmptyBusiness(db, org.id);
+      io.out(`deleted ${org.name} (${slug}), ${r.removedRows} rows`);
+      return 0;
+    }
     default:
-      io.out('commands: create-business, invite-owner, add-shop, set-password (see the top of apps/api/src/cli.ts)');
+      io.out('commands: create-business, invite-owner, add-shop, set-password, add-join-link, make-superadmin, remove-superadmin, delete-business (see the top of apps/api/src/cli.ts)');
       return command ? 2 : 0;
   }
 }

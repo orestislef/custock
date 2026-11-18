@@ -23,14 +23,16 @@ export interface S3Config {
 
 export type StorageSetting = { kind: 'local' } | { kind: 's3'; s3: S3Config } | { kind: 'off' };
 
-const PLURAL: Record<UploadPurpose, string> = { product: 'products', post: 'posts', logo: 'logos', shop: 'shops' };
+const FOLDER: Record<UploadPurpose, string> = { product: 'products', post: 'posts', logo: 'logo', shop: 'shops', avatar: 'avatar' };
 
-// orgs/<org>/products/<uuid>.webp, as in thinking/13
-export function objectKey(orgId: string, purpose: UploadPurpose, fileId: string, ext: string): string {
-  return `orgs/${orgId}/${PLURAL[purpose]}/${fileId}.${ext}`;
+// orgs/<org>/products/<uuid>.webp, as in thinking/13. a profile photo belongs to the person, not
+// to a business: users/<user>/avatar/<uuid>.webp, with the user id where the org id would be
+export function objectKey(ownerId: string, purpose: UploadPurpose, fileId: string, ext: string): string {
+  if (purpose === 'avatar') return `users/${ownerId}/avatar/${fileId}.${ext}`;
+  return `orgs/${ownerId}/${FOLDER[purpose]}/${fileId}.${ext}`;
 }
 
-export const OBJECT_KEY = /^orgs\/[0-9a-f-]{36}\/(products|posts|logos|shops)\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+export const OBJECT_KEY = /^(orgs\/[0-9a-f-]{36}\/(products|posts|logo|logos|shops)|users\/[0-9a-f-]{36}\/avatar)\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
 
 // ---------------------------------------------------------------- SigV4 query signing
 
@@ -121,7 +123,8 @@ export interface PhotoStore {
 
 export const OBJECT_CACHE = 'public, max-age=31536000, immutable';
 
-export function s3Store(s3: S3Config, fetchImpl: typeof fetch = (...a) => fetch(...a)): PhotoStore {
+// onError hears about deletes that failed (lib/errors.ts records them), the call itself never throws
+export function s3Store(s3: S3Config, fetchImpl: typeof fetch = (...a) => fetch(...a), onError?: (err: unknown, storageKey: string) => void): PhotoStore {
   const base = s3.publicUrl.replace(/\/$/, '');
   return {
     kind: 's3',
@@ -135,9 +138,12 @@ export function s3Store(s3: S3Config, fetchImpl: typeof fetch = (...a) => fetch(
     async remove(storageKey) {
       if (!OBJECT_KEY.test(storageKey)) return;
       try {
-        await fetchImpl(signed(s3, storageKey, 'DELETE', new Date(), 60), { method: 'DELETE', signal: AbortSignal.timeout(10_000) });
-      } catch {
+        const res = await fetchImpl(signed(s3, storageKey, 'DELETE', new Date(), 60), { method: 'DELETE', signal: AbortSignal.timeout(10_000) });
+        // 404 means it is already gone, which is what we wanted
+        if (res && !res.ok && res.status !== 404) onError?.(new Error(`storage delete answered HTTP ${res.status}`), storageKey);
+      } catch (err) {
         // a leftover object costs a few kilobytes, a failed request must not
+        onError?.(err, storageKey);
       }
     },
   };

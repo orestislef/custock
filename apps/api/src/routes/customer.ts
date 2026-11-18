@@ -8,6 +8,7 @@ import type { AppEnv, OrgRow } from '../types';
 import { cfgOf, loadTopology, nowOf, ORG_COLUMNS, readerLocale, requireAuth } from '../lib/context';
 import { forbidden, notFound } from '../lib/problem';
 import { decodeCursor, page, platform, Tenant, clampLimit } from '../lib/tenant';
+import { customerPagesOpen } from '../lib/platform-access';
 import { loadPosts, postShops } from '../services/posts';
 import { storefrontProducts } from '../services/storefront';
 import { searchClause } from '../services/search';
@@ -32,7 +33,8 @@ export function followingOf(db: Db, userId: string): Following[] {
   const out: Following[] = [];
   for (const [orgId, customerIds] of byOrg) {
     const org = p.get<OrgRow>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE id = @id AND archived_at IS NULL`, { id: orgId });
-    if (!org) continue;
+    // a paused business, or one whose customer pages are off, drops out of the customer app
+    if (!org || !customerPagesOpen(db, orgId)) continue;
     const t = new Tenant(db, orgId);
     const { topology, shopNames } = loadTopology(db, orgId);
     const subs = t.all<{ scope_type: Subscription['scopeType']; scope_id: string; status: Subscription['status'] }>(

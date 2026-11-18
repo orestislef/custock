@@ -8,6 +8,7 @@ import { formatMoney } from '@custock/core';
 import { translator, type AppLocale } from '@custock/i18n';
 import type { RenderedEmail } from './layout';
 import { backInStockEmail, changeCodeEmail, emailChangedEmail, inviteEmail, joinConfirmEmail, otpEmail, ownerInviteEmail, postEmail, type EmailKind } from './messages';
+import { passwordChangedEmail, passwordResetEmail } from './account';
 
 let images: Record<string, string> | null = null;
 function image(key: string): string | null {
@@ -58,6 +59,10 @@ export function sampleEmail(kind: EmailKind, locale: AppLocale, web: string, opt
       return joinConfirmEmail(locale, { name: x.name, scope: x.shop, url: `${web}/confirm/sample-token` }, opts);
     case 'invite':
       return inviteEmail(locale, { inviter: x.inviter, org: 'Lemoni', role, scope: x.shop, url: `${web}/invite/sample-token` }, opts);
+    case 'passwordReset':
+      return passwordResetEmail(locale, { email: 'eleni@example.com', url: `${web}/admin/reset/sample-reset-token` }, opts);
+    case 'passwordChanged':
+      return passwordChangedEmail(locale, { email: 'eleni@example.com', url: `${web}/admin/forgot` }, opts);
     case 'ownerInvite':
       return ownerInviteEmail(locale, { org: 'Lemoni', url: `${web}/invite/sample-owner-token` }, opts);
     case 'backInStock':

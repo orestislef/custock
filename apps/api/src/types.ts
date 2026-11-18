@@ -81,6 +81,8 @@ export interface OrgContext {
   assignments: AccessAssignment[];
   shopNames: Record<string, string>;
   groupNames: Record<string, string>;
+  // a super admin who is not a member: every permission at org scope through the platform role
+  viaPlatform?: boolean;
 }
 
 export type AppEnv = {

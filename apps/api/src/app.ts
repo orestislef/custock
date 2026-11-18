@@ -7,6 +7,7 @@ import type { AppEnv, Config } from './types';
 import { localeMiddleware, orgContext, requireAuth } from './lib/context';
 import { ApiProblem } from './lib/problem';
 import { authRoutes } from './routes/auth';
+import { passwordResetRoutes } from './routes/password-reset';
 import { catalogRoutes } from './routes/catalog';
 import { customerRoutes as customerAppRoutes } from './routes/customer';
 import { customerRoutes } from './routes/customers';
@@ -22,12 +23,15 @@ import { peopleWriteRoutes } from './routes/people-writes';
 import { devRoutes } from './routes/dev';
 import { stockExtraRoutes } from './routes/stock-extra';
 import { MAX_UPLOAD_BYTES, uploadRoutes } from './routes/uploads';
-import { buildOpenApi } from './openapi';
+import { platformDevRoutes } from './routes/platform-dev';
 import { setBucketBase, setFileBase } from './services/catalog';
 import { setWebBase } from './lib/webpush';
 import { pushRoutes } from './routes/push';
+import { platformGuards, platformRoutes } from './routes/platform';
 import { emailRoutes } from './routes/email';
 import { setEmailAssetBase } from './email/layout';
+import { captureServerErrors, setErrorWebBase } from './lib/errors';
+import { errorRoutes } from './routes/errors';
 
 export function createApp(cfg: Config) {
   const app = new Hono<AppEnv>();
@@ -39,6 +43,8 @@ export function createApp(cfg: Config) {
     c.header('X-Request-Id', id);
     await next();
   });
+  // every 5xx, thrown or returned, lands in the error tracker (lib/errors.ts)
+  app.use('*', captureServerErrors);
   app.use(
     '*',
     cors({
@@ -57,6 +63,7 @@ export function createApp(cfg: Config) {
   setEmailAssetBase(cfg.apiPublicUrl);
   setBucketBase(cfg.storage?.kind === 's3' ? cfg.storage.s3.publicUrl : null);
   setWebBase(cfg.publicWebUrl);
+  setErrorWebBase(cfg.publicWebUrl);
   // shelf qr codes printed with our own web address scan as the product inside them
   setOwnDomains(ownDomainsFor(cfg.publicWebUrl, ...(cfg.ownDomains ?? [])));
   app.use('*', localeMiddleware);
@@ -66,8 +73,11 @@ export function createApp(cfg: Config) {
   app.use('/v1/me/*', requireAuth);
   app.use('/v1/orgs/:org', requireAuth, orgContext);
   app.use('/v1/orgs/:org/*', requireAuth, orgContext);
+  // what a super admin decided (features, paused businesses, limits, platform pauses), before every route
+  platformGuards(app);
 
   authRoutes(app);
+  passwordResetRoutes(app);
   orgRoutes(app);
   catalogRoutes(app);
   customerRoutes(app);
@@ -85,9 +95,12 @@ export function createApp(cfg: Config) {
   stockExtraRoutes(app);
   uploadRoutes(app);
   pushRoutes(app);
+  platformRoutes(app);
+  errorRoutes(app);
 
-  let openapi: Record<string, unknown> | null = null;
-  app.get('/v1/openapi.json', (c) => c.json((openapi ??= buildOpenApi(app))));
+  // the api description (super admins only in production) and the state of this server. last, so
+  // the description sees every route above
+  platformDevRoutes(app);
 
   app.notFound((c) => c.json(new ApiProblem(404, 'not_found', `${c.req.method} ${c.req.path}`).toJSON(), 404));
 

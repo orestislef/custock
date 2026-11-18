@@ -5,8 +5,8 @@ import { formatMoney, intlLocale } from '@custock/core';
 import { pickLocale, translator, type AppLocale } from '@custock/i18n';
 import { renderEmail, type EmailProduct, type RenderedEmail } from './layout';
 
-export type EmailKind = 'otp' | 'joinConfirm' | 'invite' | 'ownerInvite' | 'changeCode' | 'emailChanged' | 'post' | 'backInStock';
-export const EMAIL_KINDS: readonly EmailKind[] = ['otp', 'joinConfirm', 'invite', 'ownerInvite', 'changeCode', 'emailChanged', 'post', 'backInStock'];
+export type EmailKind = 'otp' | 'joinConfirm' | 'invite' | 'ownerInvite' | 'changeCode' | 'emailChanged' | 'post' | 'backInStock' | 'passwordReset' | 'passwordChanged';
+export const EMAIL_KINDS: readonly EmailKind[] = ['otp', 'joinConfirm', 'invite', 'ownerInvite', 'changeCode', 'emailChanged', 'post', 'backInStock', 'passwordReset', 'passwordChanged'];
 
 type Locale = AppLocale | string | null | undefined;
 const tr = (locale: Locale) => {
@@ -65,10 +65,10 @@ function business(t: ReturnType<typeof translator>, sender: string, extra: strin
   return { lines: [sender, ...extra, t('email.layout.sentWith')] };
 }
 
-export function joinConfirmEmail(locale: Locale, p: { name: string; scope: string; url: string }, opts?: { forceDark?: boolean }): RenderedEmail {
+export function joinConfirmEmail(locale: Locale, p: { name: string; scope: string; url: string; logoUrl?: string | null }, opts?: { forceDark?: boolean }): RenderedEmail {
   const { l, t } = tr(locale);
   return renderEmail({
-    locale: l, subject: t('email.joinConfirm.subject', p), preheader: t('email.joinConfirm.preheader'), eyebrow: p.scope, heading: t('email.joinConfirm.heading'),
+    locale: l, subject: t('email.joinConfirm.subject', p), preheader: t('email.joinConfirm.preheader'), eyebrow: p.scope, eyebrowLogo: p.logoUrl ?? null, heading: t('email.joinConfirm.heading'),
     paragraphs: [t('email.joinConfirm.lead', p)], button: { label: t('email.joinConfirm.button'), url: p.url }, note: t('email.joinConfirm.note'),
     fallback: { label: t('email.layout.linkFallback'), url: p.url }, footer: business(t, p.scope),
   }, opts);
@@ -76,12 +76,12 @@ export function joinConfirmEmail(locale: Locale, p: { name: string; scope: strin
 
 export function backInStockEmail(
   locale: Locale,
-  p: { shop: string; product: string; url: string | null; imageUrl?: string | null; price?: string | null },
+  p: { shop: string; product: string; url: string | null; imageUrl?: string | null; price?: string | null; logoUrl?: string | null },
   opts?: { forceDark?: boolean },
 ): RenderedEmail {
   const { l, t } = tr(locale);
   return renderEmail({
-    locale: l, subject: t('email.backInStock.subject', p), preheader: t('email.backInStock.preheader'), eyebrow: p.shop, heading: t('email.backInStock.heading', p),
+    locale: l, subject: t('email.backInStock.subject', p), preheader: t('email.backInStock.preheader'), eyebrow: p.shop, eyebrowLogo: p.logoUrl ?? null, heading: t('email.backInStock.heading', p),
     paragraphs: [t('email.backInStock.lead', p)],
     products: p.imageUrl || p.price ? { title: '', items: [{ name: p.product, url: p.url, imageUrl: p.imageUrl ?? null, price: p.price ?? null, offerPrice: null, was: null }] } : null,
     button: p.url ? { label: t('email.backInStock.button'), url: p.url } : null, note: t('email.backInStock.note'), footer: business(t, p.shop),
@@ -101,6 +101,7 @@ export function postEmail(
   locale: Locale,
   p: {
     sender: string; // "Lemoni Kifisia"
+    senderLogo?: string | null;
     kind: string;
     title: string;
     body: string;
@@ -135,6 +136,7 @@ export function postEmail(
     subject: p.title,
     preheader: first.length > 120 ? `${first.slice(0, 117)}...` : first,
     eyebrow: p.sender,
+    eyebrowLogo: p.senderLogo ?? null,
     heading: p.title,
     paragraphs,
     cover: p.coverUrl ? { url: p.coverUrl, alt: p.title } : null,

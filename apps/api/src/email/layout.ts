@@ -45,6 +45,8 @@ export interface EmailContent {
   preheader: string;
   // the business above the heading, for mail a shop sends
   eyebrow?: string | null;
+  // the business's logo, shown small beside that name when it has one
+  eyebrowLogo?: string | null;
   heading: string;
   // paragraphs, plain text. single new lines stay as line breaks
   paragraphs: string[];
@@ -186,7 +188,7 @@ export function renderEmail(c: EmailContent, opts: { forceDark?: boolean } = {})
   const spacer = '&#847;&zwnj;&nbsp;'.repeat(80);
 
   const body = [
-    c.eyebrow ? `<p class="ink2" style="margin:0 0 6px;font-family:${UI};font-size:13px;line-height:18px;font-weight:600;color:${C.ink2};">${esc(c.eyebrow)}</p>` : '',
+    c.eyebrow ? eyebrowLine(c.eyebrow, c.eyebrowLogo ? safeUrl(c.eyebrowLogo) : null) : '',
     `<h1 class="ink h1" style="margin:0 0 12px;font-family:${DISPLAY};font-size:28px;line-height:34px;font-weight:600;letter-spacing:-0.3px;color:${C.ink};">${esc(c.heading)}</h1>`,
     ...c.paragraphs.filter(Boolean).map((p) => `<p class="ink" style="margin:0 0 16px;font-family:${UI};font-size:17px;line-height:25px;color:${C.ink};">${para(p)}</p>`),
     c.code ? codeBox(c.code) : '',
@@ -257,4 +259,13 @@ ${body}
   text.push('--', ...c.footer.lines);
   if (unsub) text.push(`${unsub.label}: ${unsub.url}`);
   return { subject: c.subject, html, text: text.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n' };
+}
+
+// the sending business above the heading: its logo (24 px, rounded) and name on one line
+function eyebrowLine(name: string, logo: string | null): string {
+  const text = `<span class="ink2" style="font-family:${UI};font-size:13px;line-height:18px;font-weight:600;color:${C.ink2};">${esc(name)}</span>`;
+  if (!logo) return `<p class="ink2" style="margin:0 0 6px;font-family:${UI};font-size:13px;line-height:18px;font-weight:600;color:${C.ink2};">${esc(name)}</p>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px;border-collapse:collapse;"><tr>`
+    + `<td style="padding:0 8px 0 0;vertical-align:middle;"><img src="${esc(logo)}" width="24" height="24" alt="" style="display:block;width:24px;height:24px;border:0;border-radius:6px;object-fit:contain;"></td>`
+    + `<td style="vertical-align:middle;">${text}</td></tr></table>`;
 }

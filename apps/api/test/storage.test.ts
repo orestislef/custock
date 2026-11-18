@@ -158,6 +158,71 @@ describe('photos in a bucket', () => {
   });
 });
 
+describe('profile photos and the business logo in a bucket', () => {
+  const s3: S3Config = { bucket: 'custock-photos', region: 'auto', endpoint: 'https://acct123.r2.cloudflarestorage.com', accessKeyId: 'AKIDEXAMPLE', secretAccessKey: 'secret', publicUrl: 'https://img.example.com' };
+  const deleted: string[] = [];
+  const store = s3Store(s3, async (url, init) => {
+    if (init?.method === 'DELETE') deleted.push(new URL(String(url)).pathname);
+    return new Response(null, { status: 204 });
+  });
+  let app: App;
+  let maria: ReturnType<typeof caller>;
+  let eleni: ReturnType<typeof caller>;
+
+  beforeAll(async () => {
+    app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://orestislef.gr/custock', apiPublicUrl: 'https://orestislef.gr/custock/api', corsOrigins: [], now: () => clock, rateLimit: false, storage: { kind: 's3', s3 }, photoStore: store });
+    maria = caller(app, await login(app, 'maria'));
+    eleni = caller(app, await login(app, 'eleni'));
+  });
+
+  it('a person sets, replaces and removes their own photo, the old one leaves the bucket', async () => {
+    // only small images, and never through the business route
+    expect((await maria('POST', '/v1/me/uploads/presign', { purpose: 'avatar', mime: 'image/webp', bytes: 2_000_000 })).status).toBe(413);
+    expect((await maria('POST', '/v1/me/uploads/presign', { purpose: 'product', mime: 'image/webp', bytes: 100 })).status).toBe(400);
+    expect((await maria('POST', `/v1/orgs/${s.orgId}/uploads/presign`, { purpose: 'avatar', mime: 'image/webp', bytes: 100 })).status).toBe(400);
+    const a = await maria('POST', '/v1/me/uploads/presign', { purpose: 'avatar', mime: 'image/webp', bytes: 4000 });
+    expect(a.status).toBe(201);
+    const key = `users/${s.users.maria}/avatar/${a.body.fileId}.webp`;
+    expect(a.body.publicUrl).toBe(`https://img.example.com/${key}`);
+    expect(new URL(a.body.uploadUrl).pathname).toBe(`/custock-photos/${key}`);
+    expect(db.prepare('SELECT org_id, purpose FROM files WHERE id = ?').get(a.body.fileId)).toEqual({ org_id: null, purpose: 'avatar' });
+    // someone else's file cannot become my photo
+    expect((await eleni('PATCH', '/v1/me', { avatarFileId: a.body.fileId })).status).toBe(404);
+    expect((await maria('PATCH', '/v1/me', { avatarFileId: a.body.fileId })).status).toBe(204);
+    expect((await maria('GET', '/v1/me/context')).body.user.avatarUrl).toBe(a.body.publicUrl);
+    // the team list shows it
+    const team = await eleni('GET', `/v1/orgs/${s.orgId}/members`);
+    expect(team.body.find((m: Json) => m.userId === s.users.maria).avatarUrl).toBe(a.body.publicUrl);
+    // a new photo replaces it, the old object is deleted
+    const b = await maria('POST', '/v1/me/uploads/presign', { purpose: 'avatar', mime: 'image/webp', bytes: 3000 });
+    expect((await maria('PATCH', '/v1/me', { avatarFileId: b.body.fileId })).status).toBe(204);
+    expect(deleted).toContain(`/custock-photos/${key}`);
+    expect((db.prepare('SELECT deleted_at FROM files WHERE id = ?').get(a.body.fileId) as Json).deleted_at).toBe(clock);
+    // removing it leaves the initials
+    expect((await maria('PATCH', '/v1/me', { avatarFileId: null })).status).toBe(204);
+    expect((await maria('GET', '/v1/me/context')).body.user.avatarUrl).toBeNull();
+    expect(deleted).toContain(`/custock-photos/users/${s.users.maria}/avatar/${b.body.fileId}.webp`);
+  });
+
+  it('the owner sets the business logo, others cannot, and the public page shows it', async () => {
+    expect((await maria('POST', `/v1/orgs/${s.orgId}/uploads/presign`, { purpose: 'logo', mime: 'image/png', bytes: 3000 })).status).toBe(403);
+    expect((await eleni('POST', `/v1/orgs/${s.orgId}/uploads/presign`, { purpose: 'logo', mime: 'image/jpeg', bytes: 3000 })).status).toBe(415);
+    const l = await eleni('POST', `/v1/orgs/${s.orgId}/uploads/presign`, { purpose: 'logo', mime: 'image/png', bytes: 3000 });
+    expect(l.status).toBe(201);
+    expect(l.body.publicUrl).toBe(`https://img.example.com/orgs/${s.orgId}/logo/${l.body.fileId}.png`);
+    const set = await eleni('PATCH', `/v1/orgs/${s.orgId}`, { logoFileId: l.body.fileId });
+    expect(set.status).toBe(200);
+    expect(set.body.logoUrl).toBe(l.body.publicUrl);
+    const slug = (db.prepare('SELECT slug FROM organizations WHERE id = ?').get(s.orgId) as Json).slug;
+    expect(((await (await app.request(`/v1/public/orgs/${slug}`)).json()) as Json).logoUrl).toBe(l.body.publicUrl);
+    // a product photo is not a logo
+    const ph = await eleni('POST', `/v1/orgs/${s.orgId}/uploads/presign`, { purpose: 'product', mime: 'image/png', bytes: 3000 });
+    expect((await eleni('PATCH', `/v1/orgs/${s.orgId}`, { logoFileId: ph.body.fileId })).status).toBe(404);
+    expect((await eleni('PATCH', `/v1/orgs/${s.orgId}`, { logoFileId: null })).body.logoUrl).toBeNull();
+    expect(deleted).toContain(`/custock-photos/orgs/${s.orgId}/logo/${l.body.fileId}.png`);
+  });
+});
+
 describe('local files on purpose, in production mode', () => {
   let app: App;
   let call: ReturnType<typeof caller>;
@@ -185,6 +250,21 @@ describe('local files on purpose, in production mode', () => {
     expect((await call('PUT', path.replace(/.$/, 'x'), png, { 'Content-Type': 'image/png' })).status).toBe(403);
     expect((await app.request('/files/uploads/../../etc/passwd')).status).toBe(404);
     expect((await app.request(`/files/uploads/${s.orgId}/`)).status).toBe(404);
+  });
+});
+
+describe('a local profile photo', () => {
+  it('uploads without a business and is served back', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'custock-avatar-'));
+    const app = createApp({ db, dev: false, jwtSecret: SECRET, publicWebUrl: 'https://orestislef.gr/custock', apiPublicUrl: 'https://orestislef.gr/custock/api', corsOrigins: [], now: () => clock, rateLimit: false, storage: { kind: 'local' }, uploadDir: dir });
+    const call = caller(app, await login(app, 'anna'));
+    const r = await call('POST', '/v1/me/uploads/presign', { purpose: 'avatar', mime: 'image/png', bytes: png.length });
+    expect(r.status).toBe(201);
+    const path = new URL(r.body.uploadUrl).pathname.replace('/custock/api', '');
+    expect((await call('PUT', path, png, { 'Content-Type': 'image/png' })).status).toBe(204);
+    expect(db.prepare('SELECT org_id, purpose FROM files WHERE id = ?').get(r.body.fileId)).toEqual({ org_id: null, purpose: 'avatar' });
+    expect((await call('PATCH', '/v1/me', { avatarFileId: r.body.fileId })).status).toBe(204);
+    expect((await app.request(new URL(r.body.publicUrl).pathname.replace('/custock/api', ''))).status).toBe(200);
   });
 });
 

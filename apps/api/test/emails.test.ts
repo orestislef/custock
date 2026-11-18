@@ -118,6 +118,16 @@ describe('templates', () => {
     expect(m.text).toContain(`Stop these emails: ${WEB}/unsubscribe/t`);
   });
 
+  it('the business logo sits beside its name when it has one, never a non web link', () => {
+    const base = { sender: 'Lemoni', kind: 'news', title: 'Hi', body: 'Body.', coverUrl: null, url: null, products: [], currency: 'EUR', timezone: 'Europe/Athens', validUntil: null, unsubscribeUrl: `${WEB}/u/t` };
+    const withLogo = postEmail('en', { ...base, senderLogo: 'https://img.example.com/orgs/x/logo/y.png' });
+    expect(withLogo.html).toContain('<img src="https://img.example.com/orgs/x/logo/y.png" width="24" height="24" alt=""');
+    expect(withLogo.html).toContain('>Lemoni</span>');
+    expect(postEmail('en', base).html).not.toContain('width="24" height="24"');
+    expect(postEmail('en', { ...base, senderLogo: 'javascript:alert(1)' }).html).not.toContain('javascript:');
+    expect(joinConfirmEmail('en', { name: 'Anna', scope: 'Lemoni', url: `${WEB}/confirm/t`, logoUrl: 'https://img.example.com/l.png' }).html).toContain('src="https://img.example.com/l.png"');
+  });
+
   it('the dark preview turns the dark rules on without the media query', () => {
     const m = sampleEmail('post', 'ru', WEB, { forceDark: true });
     expect(m.html).not.toContain('@media (prefers-color-scheme: dark)');
@@ -259,6 +269,27 @@ describe('first owner by invite', () => {
     expect(inv.status).toBe(201);
     // nobody to tell that the owner accepted
     expect(db.prepare("SELECT count(*) n FROM dev_outbox WHERE json_extract(payload, '$.type') = 'inviteAccepted'").get()).toEqual({ n: 0 });
+    // accepting made the business its join link for the shop page, once
+    const pub = await call('GET', '/v1/public/orgs/fourno');
+    expect(pub.body).toMatchObject({ slug: 'fourno', name: 'Fourno', joinCode: expect.stringMatching(/^[a-z0-9]{6}$/), logoUrl: null });
+    expect((await call('GET', `/v1/public/join/${pub.body.joinCode}`)).status).toBe(200);
+    const again = io({ CUSTOCK_PUBLIC_WEB_URL: WEB });
+    expect(await runCli(db, ['add-join-link', '--org', 'fourno'], again)).toBe(0);
+    expect(again.lines[0]).toBe('fourno already has a join link for the whole business');
+    expect((db.prepare("SELECT count(*) n FROM join_links WHERE org_id = ? AND scope_type = 'org'").get(reg.body.orgId) as Json).n).toBe(1);
+  });
+
+  it('a business made with a password has its join link right away, an unknown slug is a 404', async () => {
+    const out = io({ CUSTOCK_NEW_PASSWORD: 'long enough pass', CUSTOCK_PUBLIC_WEB_URL: WEB });
+    expect(await runCli(db, ['create-business', '--name', 'Bakaliko', '--slug', 'bakaliko', '--owner-email', 'bk@example.com', '--owner-name', 'B'], out)).toBe(0);
+    const link = db.prepare("SELECT label FROM join_links j JOIN organizations o ON o.id = j.org_id WHERE o.slug = 'bakaliko' AND j.scope_type = 'org'").get() as Json;
+    expect(link.label).toBe('Shop page');
+    expect((await call('GET', '/v1/public/orgs/nobody-here')).status).toBe(404);
+    // a business whose owner has not accepted yet: no link, and add-join-link says why
+    const pending = io({ CUSTOCK_PUBLIC_WEB_URL: WEB });
+    expect(await runCli(db, ['create-business', '--name', 'Later', '--slug', 'later', '--owner-email', 'later@example.com', '--invite'], pending)).toBe(0);
+    expect((await call('GET', '/v1/public/orgs/later')).body.joinCode).toBeNull();
+    await expect(runCli(db, ['add-join-link', '--org', 'later'], io({ CUSTOCK_PUBLIC_WEB_URL: WEB }))).rejects.toThrow('no owner account yet');
   });
 
   it('without live mail the password mode stays the default, --invite asks for the link anyway', async () => {

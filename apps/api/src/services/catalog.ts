@@ -1,5 +1,6 @@
 // product loading shared by staff, customer and public endpoints
 
+import type { Db } from '@custock/db';
 import type { Product, StockLevel, Uom } from '@custock/core';
 import type { Tenant } from '../lib/tenant';
 import { parseJson } from '../lib/tenant';
@@ -21,7 +22,7 @@ const BUCKET_KEY = /^orgs\/[0-9a-f-]{36}\/(products|posts|logos|shops)\/[0-9a-f-
 export function fileUrl(storageKey: string | null | undefined): string | null {
   if (!storageKey) return null;
   if (/^https?:\/\//.test(storageKey)) return storageKey;
-  if (storageKey.startsWith('orgs/')) return `${bucketBase ?? `${fileBase}/files`}/${storageKey}`;
+  if (storageKey.startsWith('orgs/') || storageKey.startsWith('users/')) return `${bucketBase ?? `${fileBase}/files`}/${storageKey}`;
   return `${fileBase}/files/${storageKey}`;
 }
 
@@ -194,4 +195,26 @@ export function variantLabel(productName: string, options: string | null, locale
   if (!o) return productName;
   const label = o[locale] ?? o.el ?? Object.values(o).join(' ');
   return `${productName} · ${label}`;
+}
+
+// the profile photo of a person, or null for the initials
+export function avatarUrlOf(db: Db, userId: string | null | undefined): string | null {
+  if (!userId) return null;
+  const row = db.prepare(
+    'SELECT f.storage_key AS k FROM users u JOIN files f ON f.id = u.avatar_file_id AND f.deleted_at IS NULL WHERE u.id = ?',
+  ).get(userId) as { k: string } | undefined;
+  return fileUrl(row?.k);
+}
+
+// sql for a select list: the storage key of the profile photo of the user in column userCol
+export function avatarKeySql(userCol: string): string {
+  return `(SELECT f.storage_key FROM users au JOIN files f ON f.id = au.avatar_file_id AND f.deleted_at IS NULL WHERE au.id = ${userCol})`;
+}
+
+// the business's logo, or null when it has none
+export function orgLogoUrl(db: Db, orgId: string): string | null {
+  const row = db.prepare(
+    'SELECT f.storage_key AS k FROM organizations o JOIN files f ON f.id = o.logo_file_id AND f.deleted_at IS NULL WHERE o.id = ?',
+  ).get(orgId) as { k: string } | undefined;
+  return fileUrl(row?.k);
 }

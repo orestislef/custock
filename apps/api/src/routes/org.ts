@@ -7,7 +7,8 @@ import type { AppEnv, OrgRow } from '../types';
 import { buildContextFor, categoryNameSql, cfgOf, orgOf, readerLocale, requireAuth } from '../lib/context';
 import { ApiProblem } from '../lib/problem';
 import { platform, Tenant } from '../lib/tenant';
-import { fileUrl } from '../services/catalog';
+import { isSuperadmin, platformSettings, storageUse } from '../lib/platform-access';
+import { avatarUrlOf, fileUrl } from '../services/catalog';
 
 export function orgSettings(db: Db, org: OrgRow): OrgSettings {
   const logo = org.logo_file_id ? platform(db).get<{ storage_key: string }>('SELECT storage_key FROM files WHERE id = @id', { id: org.logo_file_id }) : undefined;
@@ -80,16 +81,31 @@ export function orgRoutes(app: Hono<AppEnv>) {
         WHERE m.user_id = @u AND m.status = 'active' AND o.archived_at IS NULL ORDER BY m.joined_at`,
       { u: user.id },
     );
-    const orgs = memberships.map((m) => buildContextFor(db, m.org_id, user.id)).filter((x) => x !== null).map((x) => x.access);
+    // a super admin sees every business: their own first, then the rest by name
+    const superadmin = isSuperadmin(db, user.id);
+    const orgIds = memberships.map((m) => m.org_id);
+    if (superadmin) {
+      for (const o of p.all<{ id: string }>('SELECT id FROM organizations WHERE archived_at IS NULL ORDER BY name COLLATE NOCASE')) {
+        if (!orgIds.includes(o.id)) orgIds.push(o.id);
+      }
+    }
+    const orgs = orgIds.map((id) => buildContextFor(db, id, user.id)).filter((x) => x !== null).map((x) => x.access);
     const following = p.all<{ org_id: string; org_name: string; org_slug: string; customer_id: string }>(
       `SELECT c.org_id, o.name AS org_name, o.slug AS org_slug, c.id AS customer_id FROM customers c JOIN organizations o ON o.id = c.org_id
         WHERE c.user_id = @u AND c.erased_at IS NULL AND o.archived_at IS NULL`,
       { u: user.id },
     );
     const body: MeContext = {
-      user: { id: user.id, email: user.email, displayName: user.displayName, locale: user.locale },
+      user: { id: user.id, email: user.email, displayName: user.displayName, locale: user.locale, avatarUrl: avatarUrlOf(db, user.id) },
       orgs,
       following: following.map((f) => ({ orgId: f.org_id, orgName: f.org_name, orgSlug: f.org_slug, customerId: f.customer_id })),
+      platformRole: superadmin ? 'superadmin' : null,
+      ...(superadmin
+        ? {
+            platformPaused: Object.entries(platformSettings(db)).filter(([k, on]) => on && k.startsWith('pause_')).map(([k]) => k),
+            storagePercent: storageUse(db).percent,
+          }
+        : {}),
     };
     return c.json(body);
   });

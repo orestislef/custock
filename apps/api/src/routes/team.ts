@@ -6,6 +6,7 @@ import { canManageMember, grantableRoles, scopeContains, shopsInScope, type Acce
 import type { AppEnv } from '../types';
 import { has, need, orgOf, orgWide } from '../lib/context';
 import { badRequest } from '../lib/problem';
+import { avatarKeySql, fileUrl } from '../services/catalog';
 
 interface RoleRow {
   id: string;
@@ -38,8 +39,8 @@ export function teamRoutes(app: Hono<AppEnv>) {
     const me = c.get('user').id;
     const all = orgWide(c, 'members.view');
     const myShops = new Set(orgOf(c).access.shops.filter((s) => s.perms.includes('members.view')).map((s) => s.shopId));
-    const members = t.all<{ id: string; user_id: string; name: string | null; email: string | null; status: Member['status'] }>(
-      `SELECT m.id, m.user_id, u.display_name AS name, u.email, m.status FROM memberships m JOIN users u ON u.id = m.user_id
+    const members = t.all<{ id: string; user_id: string; name: string | null; email: string | null; status: Member['status']; avatar_key: string | null }>(
+      `SELECT m.id, m.user_id, u.display_name AS name, u.email, m.status, ${avatarKeySql('u.id')} AS avatar_key FROM memberships m JOIN users u ON u.id = m.user_id
         WHERE m.org_id = @org AND m.status != 'removed' ORDER BY u.display_name`,
     );
     const rows = t.all<{ id: string; membership_id: string; role_id: string; role_name: string; rank: number; scope_type: 'org' | 'group' | 'shop'; scope_id: string }>(
@@ -67,6 +68,7 @@ export function teamRoutes(app: Hono<AppEnv>) {
         userId: m.user_id,
         name: m.name,
         email: m.email,
+        avatarUrl: fileUrl(m.avatar_key),
         status: m.status,
         assignments: mine.map((a) => ({ id: a.id, roleId: a.role_id, roleName: a.role_name, scopeType: a.scope_type, scopeId: a.scope_id, scopeName: scopeName(a.scope_type, a.scope_id) })),
         canManage: check.ok,

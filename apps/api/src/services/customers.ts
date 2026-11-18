@@ -4,6 +4,7 @@ import type { Context } from 'hono';
 import { followsShop, maskEmail, maskPhone, type Customer, type Subscription } from '@custock/core';
 import type { AppEnv } from '../types';
 import { orgOf, orgWide, shopsFor } from '../lib/context';
+import { avatarKeySql, fileUrl } from './catalog';
 
 export interface CustomerRow {
   id: string;
@@ -19,9 +20,12 @@ export interface CustomerRow {
   search_key: string | null;
   contact_key?: string | null;
   created_at: number;
+  // the storage key of the person's profile photo, when they have an account and a photo
+  avatar_key?: string | null;
 }
 
-export const CUSTOMER_COLUMNS = 'id, user_id, name, email, phone, locale, email_ok, push_ok, sms_ok, source, search_key, contact_key, created_at';
+export const CUSTOMER_COLUMNS = `id, user_id, name, email, phone, locale, email_ok, push_ok, sms_ok, source, search_key, contact_key, created_at,
+  ${avatarKeySql('customers.user_id')} AS avatar_key`;
 
 export function loadSubscriptions(c: Context<AppEnv>, customerIds?: string[]): Map<string, Subscription[]> {
   const { t } = orgOf(c);
@@ -85,6 +89,7 @@ export function toCustomer(row: CustomerRow, subs: Subscription[], tags: string[
     tags,
     subscriptions: subs,
     createdAt: row.created_at,
+    avatarUrl: fileUrl(row.avatar_key),
   };
 }
 

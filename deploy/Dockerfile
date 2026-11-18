@@ -40,7 +40,9 @@ COPY packages packages
 COPY apps/web apps/web
 # the base path and the api address are fixed at build time
 ARG CUSTOCK_BASE_PATH=
-ENV CUSTOCK_BASE_PATH=$CUSTOCK_BASE_PATH CUSTOCK_API_URL=http://127.0.0.1:8787 NEXT_TELEMETRY_DISABLED=1
+# the revision goes into the browser bundle for error reports
+ARG CUSTOCK_REV=
+ENV CUSTOCK_BASE_PATH=$CUSTOCK_BASE_PATH CUSTOCK_REV=$CUSTOCK_REV CUSTOCK_API_URL=http://127.0.0.1:8787 NEXT_TELEMETRY_DISABLED=1
 RUN mkdir -p apps/web/public && NODE_OPTIONS=--max-old-space-size=2048 pnpm --filter @custock/web build
 
 FROM node:22-slim
@@ -71,4 +73,9 @@ VOLUME ["/data"]
 EXPOSE 3000 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
   CMD node -e "Promise.all([fetch('http://127.0.0.1:8787/health'),fetch('http://127.0.0.1:3000'+(process.env.CUSTOCK_BASE_PATH||'/'))]).then(r=>process.exit(r.every(x=>x.ok)?0:1)).catch(()=>process.exit(1))"
+# which code this image runs, shown to super admins on "This server". last, so a new revision
+# does not undo the cache of the layers above
+ARG CUSTOCK_REV=
+ARG CUSTOCK_BUILT_AT=
+ENV CUSTOCK_REV=$CUSTOCK_REV CUSTOCK_BUILT_AT=$CUSTOCK_BUILT_AT
 CMD ["node", "deploy/start.mjs"]

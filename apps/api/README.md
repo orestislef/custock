@@ -76,6 +76,40 @@ Customers need mail: joining from a QR code ends with a confirmation email (doub
 customer sign in is a code by email. Until `CUSTOCK_SMTP_URL` is live those emails wait in the
 outbox. The join page also needs `CUSTOCK_TURNSTILE_SECRET`, or `CUSTOCK_TURNSTILE=off`.
 
+## the platform: super admins
+
+A super admin sits above every business owner: every permission in every business without being a
+member of it, the screens at `/admin/platform`, and `/v1/platform/*` (403 for everyone else). The
+first one comes from the command line, the account has to exist first:
+
+```
+docker exec -it custock node --import tsx apps/api/src/cli.ts make-superadmin --email me@example.com
+docker exec -it custock node --import tsx apps/api/src/cli.ts remove-superadmin --email someone@example.com
+docker exec -it custock node --import tsx apps/api/src/cli.ts delete-business --slug test --confirm test
+```
+
+More super admins are invited from the app (the link works 7 days and once, an existing account
+signs in and accepts). The last one can never be removed, and nobody removes himself.
+`delete-business` only takes a business without products, customers, posts or stock movements.
+
+What a super admin decides, enforced in one place (`routes/platform.ts` guards, `lib/platform-access.ts`):
+
+- per business features (`customer_pages`, `posts`, `email`, `push`, `transfers`, `counts`, `reports`,
+  `uploads`): a route of a switched off feature answers 403 `feature_off`, sending skips with
+  `feature_off`. the web simply leaves those screens and buttons out.
+- per business limits (`maxShops`, `maxStaff`, pending invites count as staff): 403 `limit_reached`,
+  and `shopsFull` / `staffFull` in the context so the apps leave the add button out.
+- a paused business (`suspended`): its staff get 403 `org_suspended` and a calm paused screen, its
+  customer pages say it is not available, nothing is sent for it. a super admin still gets in.
+- platform wide pauses: `pause_email`, `pause_push` (messages wait in the outbox), `pause_signups`,
+  `pause_invites`.
+- the photo storage free tier: bytes stored and uploads this month against
+  `CUSTOCK_STORAGE_FREE_BYTES` (10 GB) and `CUSTOCK_STORAGE_FREE_WRITES` (1,000,000). with
+  "stop uploads at the free limit" on (the default), uploads past 95% answer 403 `storage_full`.
+
+Every super admin action lands in `platform_audit` with before and after; inside a business it is
+also in that business's audit log, marked `platform_admin`.
+
 ## emails
 
 Every email has an html part that looks like the app and a plain text part with the same words:

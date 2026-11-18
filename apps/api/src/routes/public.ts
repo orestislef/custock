@@ -105,4 +105,19 @@ export function publicRoutes(app: Hono<AppEnv>) {
     const ids = catalogIds(db, org.id, c.req.query('q'), c.req.query('categoryId'));
     return c.json(storefrontProducts(db, org, ids, { locale: readerLocale(c, org.default_locale), now: nowOf(c) }));
   });
+
+  // what the business's pages need before a visitor has an account: its name and logo, whether the
+  // catalog is open, and the join link for the whole business (the Join on its shop page), if any
+  app.get('/v1/public/orgs/:slug', (c) => {
+    const db = cfgOf(c).db;
+    const org = platform(db).get<OrgRow>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE slug = @s AND archived_at IS NULL`, { s: c.req.param('slug') });
+    if (!org) throw notFound('organization');
+    const link = new Tenant(db, org.id).get<{ code: string }>(
+      `SELECT code FROM join_links WHERE org_id = @org AND scope_type = 'org' AND disabled_at IS NULL AND (expires_at IS NULL OR expires_at > @now)
+        ORDER BY created_at LIMIT 1`,
+      { now: nowOf(c) },
+    );
+    const logo = org.logo_file_id ? platform(db).get<{ storage_key: string }>('SELECT storage_key FROM files WHERE id = @id AND deleted_at IS NULL', { id: org.logo_file_id }) : undefined;
+    return c.json({ slug: org.slug, name: org.name, catalog: org.customer_catalog, joinCode: link?.code ?? null, logoUrl: fileUrl(logo?.storage_key) });
+  });
 }

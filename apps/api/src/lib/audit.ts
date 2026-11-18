@@ -12,11 +12,19 @@ export function audit(
   after: unknown = null,
   now = Date.now(),
 ) {
+  // a super admin acting inside a business: marked here and kept in the platform audit as well
+  const kind = actor.kind ?? (t.viaPlatform ? 'platform_admin' : 'member');
+  if (kind === 'platform_admin') {
+    t.db.prepare(
+      `INSERT INTO platform_audit (id, actor_id, action, org_id, entity_type, entity_id, details_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(uuidv7(now), actor.id, action, t.orgId, entity?.type ?? null, entity?.id ?? null, before == null && after == null ? null : JSON.stringify({ before, after }), now);
+  }
   t.run(
     `INSERT INTO audit_log (id, org_id, actor_id, actor_kind, action, entity_type, entity_id, before_json, after_json, created_at)
      VALUES (@id, @org, @actor, @kind, @action, @etype, @eid, @before, @after, @now)`,
     {
-      id: uuidv7(now), actor: actor.id, kind: actor.kind ?? 'member', action,
+      id: uuidv7(now), actor: actor.id, kind, action,
       etype: entity?.type ?? null, eid: entity?.id ?? null,
       before: before == null ? null : JSON.stringify(before), after: after == null ? null : JSON.stringify(after), now,
     },

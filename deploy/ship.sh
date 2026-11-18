@@ -13,6 +13,7 @@ dir="${CUSTOCK_DIR:-/opt/custock}"
 key=""
 [ -n "${CUSTOCK_SSH_KEY:-}" ] && key="-i $CUSTOCK_SSH_KEY"
 rev=$(git rev-parse --short HEAD)
+built=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 [ -z "$(git status --porcelain -- apps packages deploy)" ] || echo "note: uncommitted changes are not shipped, only $rev"
 
 echo "sending $rev"
@@ -21,7 +22,7 @@ ssh $key "$CUSTOCK_SSH" "cp /tmp/custock-src/deploy/compose.server.yml $dir/comp
 
 echo "building on the server"
 ssh $key "$CUSTOCK_SSH" "set -e
-  docker build -q -f /tmp/custock-src/deploy/Dockerfile --build-arg CUSTOCK_BASE_PATH=$base --label custock.rev=$rev -t custock:latest /tmp/custock-src
+  docker build -q -f /tmp/custock-src/deploy/Dockerfile --build-arg CUSTOCK_BASE_PATH=$base --build-arg CUSTOCK_REV=$rev --build-arg CUSTOCK_BUILT_AT=$built --label custock.rev=$rev -t custock:latest /tmp/custock-src
   rm -rf /tmp/custock-src
   cd $dir && docker compose up -d
   docker builder prune -af >/dev/null

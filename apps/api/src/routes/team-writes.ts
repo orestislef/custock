@@ -23,7 +23,9 @@ import { emailMessage } from '../lib/transport';
 import { inviteEmail } from '../email/messages';
 import { loadRoles } from './team';
 import { loadShops, orgSettings } from './org';
-import { addShop, BootstrapError } from '../services/bootstrap';
+import { addShop, BootstrapError, ensureDefaultJoinLink } from '../services/bootstrap';
+import { avatarKeySql, fileUrl } from '../services/catalog';
+import { retireFile } from './uploads';
 
 const INVITE_TTL = 7 * 86_400_000;
 
@@ -124,6 +126,8 @@ function claimInvite(db: Db, inv: OpenInvite, user: { id: string; name: string }
     );
     bumpPerms(t, [m.id]);
     audit(t, { id: user.id }, 'invite.accepted', { type: 'invite', id: inv.id }, null, null, now);
+    // the first owner from the server setup: the business gets its default join link now
+    if (!inv.invited_by) ensureDefaultJoinLink(db, inv.org_id, user.id, now);
   })();
   // the first owner was invited by the server setup, there is nobody to tell
   if (!inv.invited_by) return;
@@ -386,15 +390,21 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
         customerPrices: z.boolean(),
         customerStock: z.enum(['off', 'availability', 'exact']),
         fewLeftThreshold: z.number().int().min(0).max(100),
+        // a 'logo' upload of this business, or null to take the logo off
+        logoFileId: z.string().max(64).nullable(),
       })
       .partial()
       .parse(await c.req.json());
     const { t, org } = orgOf(c);
     const before = orgSettings(cfgOf(c).db, org);
+    if (patch.logoFileId && !t.get("SELECT 1 FROM files WHERE org_id = @org AND id = @f AND purpose = 'logo' AND deleted_at IS NULL", { f: patch.logoFileId })) {
+      throw notFound('file');
+    }
+    const oldLogo = patch.logoFileId !== undefined && patch.logoFileId !== org.logo_file_id ? org.logo_file_id : null;
     const cols: Record<string, string> = {
       name: 'name', brandColor: 'brand_color', defaultLocale: 'default_locale', timezone: 'timezone', allowNegativeStock: 'allow_negative_stock',
       postsNeedApproval: 'posts_need_approval', pushDailyCap: 'push_daily_cap', quietHours: 'quiet_hours', customerCatalog: 'customer_catalog',
-      customerPrices: 'customer_prices', customerStock: 'customer_stock', fewLeftThreshold: 'few_left_threshold',
+      customerPrices: 'customer_prices', customerStock: 'customer_stock', fewLeftThreshold: 'few_left_threshold', logoFileId: 'logo_file_id',
     };
     const now = nowOf(c);
     cfgOf(c).db.transaction(() => {
@@ -405,6 +415,8 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
       if (patch.postsNeedApproval !== undefined && patch.postsNeedApproval !== before.postsNeedApproval) bumpPerms(t, 'all');
       audit(t, { id: c.get('user').id }, 'org.settings_changed', { type: 'organization', id: org.id }, before, patch, now);
     })();
+    // a replaced or removed logo leaves the bucket
+    if (oldLogo) retireFile(cfgOf(c), oldLogo, now);
     const fresh = platform(cfgOf(c).db).get<typeof org>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE id = @id`, { id: org.id })!;
     return c.json(orgSettings(cfgOf(c).db, fresh) satisfies OrgSettings);
   });
@@ -446,13 +458,13 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
     need(c, 'org.audit.view');
     const offset = decodeCursor(c.req.query('cursor'));
     const limit = clampLimit(c.req.query('limit'), 50, 200);
-    const rows = orgOf(c).t.all<{ id: string; actor_id: string | null; actor_name: string | null; actor_kind: string; action: string; entity_type: string | null; entity_id: string | null; before_json: string | null; after_json: string | null; created_at: number }>(
-      `SELECT a.id, a.actor_id, u.display_name AS actor_name, a.actor_kind, a.action, a.entity_type, a.entity_id, a.before_json, a.after_json, a.created_at
+    const rows = orgOf(c).t.all<{ id: string; actor_id: string | null; actor_name: string | null; actor_avatar: string | null; actor_kind: string; action: string; entity_type: string | null; entity_id: string | null; before_json: string | null; after_json: string | null; created_at: number }>(
+      `SELECT a.id, a.actor_id, u.display_name AS actor_name, ${avatarKeySql('u.id')} AS actor_avatar, a.actor_kind, a.action, a.entity_type, a.entity_id, a.before_json, a.after_json, a.created_at
          FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id WHERE a.org_id = @org ORDER BY a.created_at DESC, a.id DESC LIMIT @lim OFFSET @off`,
       { lim: limit + 1, off: offset },
     );
     const items: AuditEntry[] = rows.map((r) => ({
-      id: r.id, actorId: r.actor_id, actorName: r.actor_name, actorKind: r.actor_kind, action: r.action, entityType: r.entity_type, entityId: r.entity_id,
+      id: r.id, actorId: r.actor_id, actorName: r.actor_name, actorAvatarUrl: fileUrl(r.actor_avatar), actorKind: r.actor_kind, action: r.action, entityType: r.entity_type, entityId: r.entity_id,
       before: parseJson(r.before_json, null), after: parseJson(r.after_json, null), createdAt: r.created_at,
     }));
     return c.json(page(items, offset, limit));

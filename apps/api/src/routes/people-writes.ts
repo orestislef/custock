@@ -17,6 +17,7 @@ import { audit } from '../lib/audit';
 import { cfgOf, need, nowOf, orgOf, ORG_COLUMNS, readerLocale, requireAuth } from '../lib/context';
 import { idempotent } from '../lib/idempotency';
 import { ApiProblem, badRequest, forbidden, notFound } from '../lib/problem';
+import { retireFile } from './uploads';
 import { clientIp, throttle } from '../lib/ratelimit';
 import { platform, Tenant } from '../lib/tenant';
 import { pushReachableSql, recomputePushOk } from '../lib/webpush';
@@ -26,7 +27,7 @@ import { devOutboxTransport, emailMessage } from '../lib/transport';
 import { readUnsubToken, unsubKey } from '../lib/unsub';
 import { shopNameOf } from '../services/ledger';
 import { canSee, customerVisibility, loadSubscriptions, loadTags, reachedShops, toCustomer, CUSTOMER_COLUMNS, type CustomerRow } from '../services/customers';
-import { fileUrl } from '../services/catalog';
+import { fileUrl, orgLogoUrl } from '../services/catalog';
 import { storefrontProducts } from '../services/storefront';
 import { followingOf } from './customer';
 
@@ -165,7 +166,7 @@ function sendConfirmation(cfg: Config, t: Tenant, org: OrgRow, req: ConfirmReque
   );
   const url = `${cfg.publicWebUrl.replace(/\/$/, '')}/confirm/${token}`;
   devOutboxTransport(cfg.db).send(
-    emailMessage(joinConfirmEmail(req.locale, { name, scope: scopeName, url }), { orgId: org.id, customerId: req.customerId, to: email, locale: req.locale, payload: { type: 'join_confirm' } }),
+    emailMessage(joinConfirmEmail(req.locale, { name, scope: scopeName, url, logoUrl: orgLogoUrl(cfg.db, org.id) }), { orgId: org.id, customerId: req.customerId, to: email, locale: req.locale, payload: { type: 'join_confirm' } }),
   );
   return url;
 }
@@ -600,11 +601,31 @@ export function peopleWriteRoutes(app: Hono<AppEnv>) {
   // ------------------------------------------------------------ me
 
   app.patch('/v1/me', requireAuth, async (c) => {
-    const patch = z.object({ displayName: z.string().min(1).max(120).optional(), locale: z.enum(['en', 'el', 'ru']).optional() }).parse(await c.req.json());
-    platform(cfgOf(c).db).run(
+    const patch = z.object({
+      displayName: z.string().min(1).max(120).optional(),
+      locale: z.enum(['en', 'el', 'ru']).optional(),
+      // a profile photo this person uploaded (purpose avatar), or null to remove it
+      avatarFileId: z.string().max(64).nullable().optional(),
+    }).parse(await c.req.json());
+    const cfg = cfgOf(c);
+    const userId = c.get('user').id;
+    const now = nowOf(c);
+    platform(cfg.db).run(
       'UPDATE users SET display_name = coalesce(@n, display_name), locale = coalesce(@l, locale), updated_at = @now WHERE id = @id',
-      { n: patch.displayName ?? null, l: patch.locale ?? null, now: nowOf(c), id: c.get('user').id },
+      { n: patch.displayName ?? null, l: patch.locale ?? null, now, id: userId },
     );
+    if (patch.avatarFileId !== undefined) {
+      const p = platform(cfg.db);
+      if (patch.avatarFileId && !p.get("SELECT 1 FROM files WHERE id = @f AND purpose = 'avatar' AND created_by = @u AND org_id IS NULL AND deleted_at IS NULL", { f: patch.avatarFileId, u: userId })) {
+        throw notFound('file');
+      }
+      const before = p.get<{ avatar_file_id: string | null }>('SELECT avatar_file_id FROM users WHERE id = @id', { id: userId })?.avatar_file_id ?? null;
+      if (before !== patch.avatarFileId) {
+        p.run('UPDATE users SET avatar_file_id = @f, updated_at = @now WHERE id = @id', { f: patch.avatarFileId, now, id: userId });
+        // the old photo is gone from the bucket too
+        retireFile(cfg, before, now);
+      }
+    }
     if (patch.locale) platform(cfgOf(c).db).run('UPDATE customers SET locale = @l WHERE user_id = @id', { l: patch.locale, id: c.get('user').id });
     return c.body(null, 204);
   });

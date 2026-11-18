@@ -8,15 +8,18 @@ import type { Db } from '@custock/db';
 import type { Config, OrgRow } from './types';
 import { loadTopology, ORG_COLUMNS } from './lib/context';
 import { parseJson, platform, Tenant } from './lib/tenant';
+import { sendGate } from './lib/platform-access';
 import { dayKey, localDayStart, quietHoursEnd, inQuietHours } from './lib/time';
 import { devOutboxTransport, type Transport } from './lib/transport';
 import { drainOutbox, type LiveSender } from './lib/live';
 import { setWebBase } from './lib/webpush';
+import { captureError, pruneErrors, setErrorWebBase } from './lib/errors';
 import { unsubKey, unsubToken } from './lib/unsub';
 import { canEmail, canPush, resolveAudience } from './services/audience';
-import { fileUrl, variantLabel } from './services/catalog';
+import { fileUrl, orgLogoUrl, variantLabel } from './services/catalog';
 import { loadPosts } from './services/posts';
 import { backInStockEmail, postEmail } from './email/messages';
+import { markWorkerRun } from './lib/runtime';
 
 const DAY = 86_400_000;
 
@@ -49,6 +52,7 @@ export interface WorkerDeps {
 export async function runJobs(deps: WorkerDeps, now: number = Date.now()): Promise<number> {
   const db = deps.cfg.db;
   setWebBase(deps.cfg.publicWebUrl);
+  setErrorWebBase(deps.cfg.publicWebUrl);
   const p = platform(db);
   ensureNightly(db, now);
   let ran = 0;
@@ -70,6 +74,7 @@ export async function runJobs(deps: WorkerDeps, now: number = Date.now()): Promi
         const backoff = 60_000 * 2 ** job.attempts;
         p.run('UPDATE jobs SET locked_until = NULL, run_at = @next, last_error = @err WHERE id = @id', { next: now + backoff, err: String(err), id: job.id });
         deps.log?.(`[worker] ${job.kind} failed: ${String(err)}`);
+        captureError(db, { kind: 'worker', error: err, route: `job ${job.kind}` }, { now });
       }
       ran++;
     }
@@ -87,6 +92,7 @@ async function handle(deps: WorkerDeps, kind: string, payload: Record<string, un
     case 'rollup_day':
       rollup(deps.cfg.db, now, deps.log);
       purgeUnconfirmed(deps.cfg.db, now);
+      pruneErrors(deps.cfg.db, now);
       return;
     default:
       throw new Error(`unknown job ${kind}`);
@@ -161,6 +167,14 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
   );
   for (const d of rows) {
     const t = new Tenant(db, d.org_id);
+    // the business is paused or the channel is switched off by a super admin. a platform wide pause
+    // leaves the delivery queued until it is lifted
+    const gate = sendGate(db, d.channel, d.org_id);
+    if (gate === 'hold') continue;
+    if (gate) {
+      t.run("UPDATE deliveries SET status = 'skipped', skip_reason = @r, updated_at = @now WHERE org_id = @org AND id = @id", { r: gate, now, id: d.id });
+      continue;
+    }
     const org = orgRow(db, d.org_id)!;
     const c = t.get<{ id: string; locale: string; email: string | null; user_id: string | null; name: string | null }>(
       'SELECT id, locale, email, user_id, name FROM customers WHERE org_id = @org AND id = @c AND erased_at IS NULL',
@@ -202,6 +216,7 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
         const post = loadPosts(t, [d.post_id], { withStats: false, showPrices: !!org.customer_prices, locale })[0];
         const mail = postEmail(locale, {
           sender: shopName ? `${org.name} ${shopName}` : org.name,
+          senderLogo: orgLogoUrl(deps.cfg.db, org.id),
           kind: post?.kind ?? 'news',
           title: text?.title ?? org.name,
           body: text?.body ?? '',
@@ -243,7 +258,7 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
             )
           : undefined;
         const mail = backInStockEmail(locale, {
-          shop: shopLabel, product,
+          shop: shopLabel, product, logoUrl: orgLogoUrl(deps.cfg.db, org.id),
           url: a ? `${web}/s/${encodeURIComponent(org.slug)}/p/${encodeURIComponent(a.product_id)}` : null,
           imageUrl: fileUrl(extra?.storage_key),
           price: org.customer_prices && extra?.price_minor != null ? formatMoney(extra.price_minor, org.currency, locale) : null,
@@ -278,6 +293,7 @@ export function rollup(db: Db, now: number, log?: (line: string) => void) {
       rollupOrg(db, org, now);
     } catch (err) {
       log?.(`[worker] rollup for ${org.id} failed: ${String(err)}`);
+      captureError(db, { kind: 'worker', error: err, route: 'job rollup_day', orgId: org.id }, { now });
     }
   }
 }
@@ -332,6 +348,7 @@ export function startWorker(deps: WorkerDeps, everyMs = 5_000): () => void {
     if (busy) return;
     busy = true;
     runJobs(deps)
+      .then(() => markWorkerRun())
       .catch((err) => deps.log?.(`[worker] ${String(err)}`))
       .finally(() => {
         busy = false;

@@ -21,6 +21,10 @@ function bind(params: Named): Named {
 }
 
 export class Tenant {
+  // set when the caller acts here through the platform role (a super admin who is not a member).
+  // audit() marks those rows as platform_admin and copies them to the platform audit
+  viaPlatform = false;
+
   constructor(
     readonly db: Db,
     readonly orgId: string,

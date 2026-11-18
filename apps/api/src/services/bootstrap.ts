@@ -88,6 +88,8 @@ export function createBusiness(db: Db, b: NewBusiness): { orgId: string; userId:
     }
     audit(t, { id: userId, kind: 'system' }, 'org.created', { type: 'org', id: orgId }, null, { name: b.name, slug: b.slug, owner: email }, now);
     if (b.shopName?.trim()) shopId = addShop(db, orgId, { name: b.shopName }, { id: userId, kind: 'system' }, now).id;
+    // with an invite the link is made when the owner accepts it (join links need a person behind them)
+    if (userId) ensureDefaultJoinLink(db, orgId, userId, now);
     if (invite) inviteUrl = inviteOwner(db, orgId, email, b.locale ?? 'el', b.webUrl!, now).url;
   })();
   return { orgId, userId, shopId, inviteUrl };
@@ -144,4 +146,40 @@ export function addShop(db: Db, orgId: string, s: NewShop, actor: { id: string |
   bumpPerms(t, 'all');
   audit(t, actor, 'shop.created', { type: 'shop', id }, null, { name: s.name, slug }, now);
   return { id, slug };
+}
+
+export const DEFAULT_JOIN_LABEL = 'Shop page';
+
+// a new six character join code nobody uses yet
+export function newJoinCode(db: Db): string {
+  let code = '';
+  do code = randomToken(5).replace(/[-_]/g, '').toLowerCase().slice(0, 6);
+  while (code.length < 6 || platform(db).get('SELECT 1 FROM join_links WHERE code = @c', { c: code }));
+  return code;
+}
+
+// every business starts with one way in for customers: a join link for the whole business, the one
+// the shop page offers. made once, when the business has an owner account. returns the code, or
+// null when the business already has an active one for the whole business.
+export function ensureDefaultJoinLink(db: Db, orgId: string, createdBy: string, now = Date.now()): string | null {
+  const t = new Tenant(db, orgId);
+  const existing = t.get("SELECT 1 FROM join_links WHERE org_id = @org AND scope_type = 'org' AND disabled_at IS NULL AND (expires_at IS NULL OR expires_at > @now)", { now });
+  if (existing) return null;
+  const id = uuidv7(now);
+  const code = newJoinCode(db);
+  t.run(
+    "INSERT INTO join_links (id, org_id, code, scope_type, scope_id, label, created_by, created_at) VALUES (@id, @org, @code, 'org', @org, @label, @u, @now)",
+    { id, code, label: DEFAULT_JOIN_LABEL, u: createdBy, now },
+  );
+  audit(t, { id: createdBy, kind: 'system' }, 'joinlink.created', { type: 'join_link', id }, null, { code, label: DEFAULT_JOIN_LABEL }, now);
+  return code;
+}
+
+// the first active owner of a business, for setup steps that need a person behind them
+export function firstOwner(db: Db, orgId: string): string | null {
+  return platform(db).get<{ user_id: string }>(
+    `SELECT m.user_id FROM memberships m JOIN role_assignments a ON a.membership_id = m.id JOIN roles r ON r.id = a.role_id
+      WHERE m.org_id = @o AND m.status = 'active' AND r.template_key = 'owner' ORDER BY m.joined_at LIMIT 1`,
+    { o: orgId },
+  )?.user_id ?? null;
 }

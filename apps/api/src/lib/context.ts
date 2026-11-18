@@ -9,6 +9,7 @@ import { verifyAccess } from './auth';
 import { verifyExternal } from './external-auth';
 import { forbidden, notFound, unauthorized } from './problem';
 import { Tenant, platform } from './tenant';
+import { isSuperadmin, orgFlags, orgFull, platformAssignment } from './platform-access';
 
 export const cfgOf = (c: Context<AppEnv>): Config => c.get('cfg');
 export const nowOf = (c: Context<AppEnv>): number => {
@@ -132,18 +133,31 @@ export function buildContextFor(db: Db, orgId: string, userId: string): OrgConte
     "SELECT id, perms_version FROM memberships WHERE org_id = @org AND user_id = @u AND status = 'active'",
     { u: userId },
   );
-  if (!m) return null;
+  // a super admin has every permission in every business, member or not (lib/platform-access.ts)
+  const superadmin = isSuperadmin(db, userId);
+  if (!m && !superadmin) return null;
   const { topology, shopNames, groupNames } = loadTopology(db, org.id);
-  const { assignments, roleNames } = loadAssignments(t, m.id, org);
-  const access = buildOrgAccess({
-    org: { id: org.id, name: org.name, slug: org.slug, currency: org.currency, timezone: org.timezone, defaultLocale: org.default_locale },
-    roleNames,
-    permsVersion: m.perms_version,
-    assignments,
-    topology,
-    shopNames,
-  });
-  return { org, t, membershipId: m.id, permsVersion: m.perms_version, access, topology, assignments, shopNames, groupNames };
+  const member = m ? loadAssignments(t, m.id, org) : { assignments: [], roleNames: [] as string[] };
+  const assignments = superadmin ? [...member.assignments, platformAssignment(org.id)] : member.assignments;
+  const viaPlatform = superadmin && !m;
+  t.viaPlatform = viaPlatform;
+  const permsVersion = m?.perms_version ?? 1;
+  const flags = orgFlags(db, org.id);
+  const access = {
+    ...buildOrgAccess({
+      org: { id: org.id, name: org.name, slug: org.slug, currency: org.currency, timezone: org.timezone, defaultLocale: org.default_locale },
+      roleNames: viaPlatform ? ['superadmin'] : member.roleNames,
+      permsVersion,
+      assignments,
+      topology,
+      shopNames,
+    }),
+    ...(viaPlatform ? { platformAccess: true } : {}),
+    ...(flags?.status === 'suspended' ? { suspended: true } : {}),
+    ...(flags?.disabledFeatures.length ? { disabledFeatures: [...flags.disabledFeatures] } : {}),
+    ...Object.fromEntries(Object.entries(orgFull(db, org.id, flags)).filter(([, full]) => full)),
+  };
+  return { org, t, membershipId: m?.id ?? '', permsVersion, access, topology, assignments, shopNames, groupNames, viaPlatform };
 }
 
 // /v1/orgs/:org/*. not a member looks the same as not existing.

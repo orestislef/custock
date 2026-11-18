@@ -15,18 +15,35 @@ import { cfgOf, has, need, nowOf, orgOf } from '../lib/context';
 import { ApiProblem, forbidden, notFound } from '../lib/problem';
 import { localStore, offStore, s3Store, type PhotoStore } from '../lib/storage';
 import { platform } from '../lib/tenant';
+import { captureError } from '../lib/errors';
 
 const TTL = 10 * 60_000;
 export const MAX_UPLOAD_BYTES = 5_000_000;
 const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const MIME: Record<string, string> = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
 
-const PERM: Record<UploadPurpose, string> = {
+const PERM: Record<Exclude<UploadPurpose, 'avatar'>, string> = {
   product: 'products.edit',
   post: 'posts.create',
   logo: 'org.settings.manage',
   shop: 'shop.settings.manage',
 };
+
+// a profile photo and a logo are small squares made in the browser (512 px), so they get a smaller
+// cap than product and post photos. a logo keeps its transparency, so png is allowed too.
+const LIMIT: Record<UploadPurpose, { bytes: number; mimes: string[] }> = {
+  product: { bytes: MAX_UPLOAD_BYTES, mimes: ['image/jpeg', 'image/png', 'image/webp'] },
+  post: { bytes: MAX_UPLOAD_BYTES, mimes: ['image/jpeg', 'image/png', 'image/webp'] },
+  shop: { bytes: MAX_UPLOAD_BYTES, mimes: ['image/jpeg', 'image/png', 'image/webp'] },
+  logo: { bytes: 1_000_000, mimes: ['image/png', 'image/webp'] },
+  avatar: { bytes: 1_000_000, mimes: ['image/webp', 'image/jpeg', 'image/png'] },
+};
+
+function checkLimits(purpose: UploadPurpose, mime: string, bytes: number) {
+  const l = LIMIT[purpose];
+  if (!l.mimes.includes(mime)) throw new ApiProblem(415 as 400, 'validation', `${purpose} photos must be ${l.mimes.join(' or ')}`);
+  if (bytes > l.bytes) throw new ApiProblem(413 as 400, 'validation', 'file too large');
+}
 
 export function uploadDir(cfg: Config): string {
   return cfg.uploadDir ?? join(dirname(DEFAULT_DB_PATH), 'uploads');
@@ -82,7 +99,7 @@ export function photoStoreOf(cfg: Config): PhotoStore {
   if (!store) {
     const setting = cfg.storage ?? { kind: 'local' };
     store = setting.kind === 's3'
-      ? s3Store(setting.s3)
+      ? s3Store(setting.s3, undefined, (err) => captureError(cfg.db, { kind: 'storage', error: err, route: 'storage delete' }))
       : setting.kind === 'off'
         ? offStore
         : localStore(uploadDir(cfg), (i) => sign(cfg, { f: i.fileId, o: i.orgId, m: i.mime, b: i.bytes, p: i.purpose, u: '', e: i.now + i.expiresIn }), apiBase(cfg));
@@ -94,8 +111,11 @@ export function photoStoreOf(cfg: Config): PhotoStore {
 export function uploadRoutes(app: Hono<AppEnv>) {
   app.post('/v1/orgs/:org/uploads/presign', async (c) => {
     const input = PresignInput.parse(await c.req.json());
+    // a profile photo belongs to the person, it has its own route below
+    if (input.purpose === 'avatar') throw new ApiProblem(400, 'validation', 'profile photos go to /v1/me/uploads/presign');
     const perm = PERM[input.purpose];
     if (!has(c, perm)) need(c, perm);
+    checkLimits(input.purpose, input.mime, input.bytes);
     const cfg = cfgOf(c);
     const store = photoStoreOf(cfg);
     if (store.kind === 'off') throw new ApiProblem(501 as 500, 'internal', 'photo storage is not set up on this server');
@@ -133,9 +153,10 @@ export function uploadRoutes(app: Hono<AppEnv>) {
     if (!slot || slot.e < now || !slot.u) throw forbidden('upload slot expired or invalid');
     if ((c.req.header('Content-Type') ?? '').split(';')[0]!.trim() !== slot.m) throw new ApiProblem(415 as 400, 'validation', 'content type does not match the slot');
     const declared = Number(c.req.header('Content-Length') ?? '0');
-    if (declared > slot.b || declared > MAX_UPLOAD_BYTES) throw new ApiProblem(413 as 400, 'validation', 'file too large');
+    const cap = Math.min(MAX_UPLOAD_BYTES, LIMIT[slot.p]?.bytes ?? MAX_UPLOAD_BYTES);
+    if (declared > slot.b || declared > cap) throw new ApiProblem(413 as 400, 'validation', 'file too large');
     const buf = Buffer.from(await c.req.arrayBuffer());
-    if (!buf.length || buf.length > slot.b || buf.length > MAX_UPLOAD_BYTES) throw new ApiProblem(413 as 400, 'validation', 'file too large');
+    if (!buf.length || buf.length > slot.b || buf.length > cap) throw new ApiProblem(413 as 400, 'validation', 'file too large');
     if (!looksLike(slot.m, buf)) throw new ApiProblem(415 as 400, 'validation', 'not an image of that type');
     const name = `${slot.f}.${EXT[slot.m]}`;
     const storageKey = `uploads/${slot.o}/${name}`;
@@ -147,9 +168,40 @@ export function uploadRoutes(app: Hono<AppEnv>) {
     db.run(
       `INSERT INTO files (id, org_id, storage_key, purpose, is_public, mime, bytes, created_by, created_at)
        VALUES (@id, @org, @key, @purpose, 1, @mime, @bytes, @u, @now)`,
-      { id: slot.f, org: slot.o, key: storageKey, purpose: slot.p, mime: slot.m, bytes: buf.length, u: slot.u, now },
+      { id: slot.f, org: slot.p === 'avatar' ? null : slot.o, key: storageKey, purpose: slot.p, mime: slot.m, bytes: buf.length, u: slot.u, now },
     );
     return c.body(null, 204);
+  });
+
+  // the person's own profile photo: not tied to a business, so customers can have one too. the key is
+  // users/<user>/avatar/<uuid>.webp in the bucket. PATCH /v1/me with avatarFileId puts it in place.
+  app.post('/v1/me/uploads/presign', async (c) => {
+    const input = PresignInput.parse(await c.req.json());
+    if (input.purpose !== 'avatar') throw new ApiProblem(400, 'validation', 'only profile photos here');
+    checkLimits('avatar', input.mime, input.bytes);
+    const cfg = cfgOf(c);
+    const store = photoStoreOf(cfg);
+    if (store.kind === 'off') throw new ApiProblem(501 as 500, 'internal', 'photo storage is not set up on this server');
+    const now = nowOf(c);
+    const user = c.get('user').id;
+    const fileId = uuidv7(now);
+    const ext = EXT[input.mime]!;
+    let slot: ReturnType<PhotoStore['presign']>;
+    if (store.kind === 'local' && !cfg.photoStore) {
+      const token = sign(cfg, { f: fileId, o: user, m: input.mime, b: input.bytes, p: 'avatar', u: user, e: now + TTL });
+      const base = apiBase(cfg);
+      slot = { storageKey: `uploads/${user}/${fileId}.${ext}`, uploadUrl: `${base}/v1/uploads/${token}`, headers: { 'Content-Type': input.mime }, publicUrl: `${base}/files/uploads/${user}/${fileId}.${ext}` };
+    } else {
+      slot = store.presign({ orgId: user, fileId, purpose: 'avatar', mime: input.mime, ext, bytes: input.bytes, now, expiresIn: TTL });
+      if (!slot) throw new ApiProblem(501 as 500, 'internal', 'photo storage is not set up on this server');
+      platform(cfg.db).run(
+        `INSERT INTO files (id, org_id, storage_key, purpose, is_public, mime, bytes, created_by, created_at)
+         VALUES (@id, NULL, @key, 'avatar', 1, @mime, @bytes, @u, @now)`,
+        { id: fileId, key: slot.storageKey, mime: input.mime, bytes: input.bytes, u: user, now },
+      );
+    }
+    const body: PresignResult = { fileId, uploadUrl: slot.uploadUrl, method: 'PUT', headers: slot.headers, publicUrl: slot.publicUrl, expiresAt: now + TTL };
+    return c.json(body, 201);
   });
 
   app.get('/files/uploads/:org/:name', (c) => {
@@ -165,4 +217,14 @@ export function uploadRoutes(app: Hono<AppEnv>) {
     c.header('X-Content-Type-Options', 'nosniff');
     return c.body(readFileSync(path));
   });
+}
+
+// a file that is no longer used: marked deleted, and the object removed from storage (best effort)
+export function retireFile(cfg: Config, fileId: string | null | undefined, now: number) {
+  if (!fileId) return;
+  const db = platform(cfg.db);
+  const row = db.get<{ storage_key: string }>('SELECT storage_key FROM files WHERE id = @id AND deleted_at IS NULL', { id: fileId });
+  if (!row) return;
+  db.run('UPDATE files SET deleted_at = @now WHERE id = @id', { now, id: fileId });
+  void photoStoreOf(cfg).remove(row.storage_key);
 }

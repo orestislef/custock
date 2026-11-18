@@ -127,6 +127,28 @@ describe('web push', () => {
     expect(db.prepare('SELECT 1 FROM push_subscriptions WHERE endpoint LIKE ?').get('%/sofia-0')).toBeUndefined();
   });
 
+  it('a test push goes only to the caller own devices, once a minute', async () => {
+    const outbox = (userId: string) => db.prepare("SELECT payload, title FROM dev_outbox WHERE user_id = ? AND json_extract(payload, '$.type') = 'test'").all(userId) as Json[];
+    // nothing to send to: no row, and the answer says so
+    expect((await call('POST', '/v1/me/push/test', tokens.maria, {})).body).toEqual({ devices: 0 });
+    expect(outbox(s.users.maria!)).toHaveLength(0);
+    // a customer in a business's app: only that business, and the tap opens its page
+    expect((await call('POST', '/v1/me/push/test', tokens.web, { orgId: 'not-my-business' })).status).toBe(404);
+    const r = await call('POST', '/v1/me/push/test', tokens.web, { orgId: s.orgId });
+    expect(r.body).toEqual({ devices: 1 });
+    const webUser = (db.prepare('SELECT user_id FROM customers WHERE id = ?').get(customerId) as Json).user_id;
+    const rows = outbox(webUser);
+    expect(rows).toHaveLength(1);
+    const slug = (db.prepare('SELECT slug FROM organizations WHERE id = ?').get(s.orgId) as Json).slug;
+    expect(JSON.parse(rows[0].payload).url).toBe(`http://localhost:3000/custock/s/${slug}`);
+    expect((await call('POST', '/v1/me/push/test', tokens.web, { orgId: s.orgId })).status).toBe(429);
+    // staff app: every subscription without a business, the tap opens /admin
+    const staff = await call('POST', '/v1/me/push/test', tokens.sofia);
+    expect(staff.body).toEqual({ devices: 20 });
+    expect(JSON.parse(outbox(s.users.sofia!)[0].payload).url).toBe('http://localhost:3000/custock/admin');
+    expect((await call('POST', '/v1/me/push/test')).status).toBe(401);
+  });
+
   it('a visible push carries the page to open, a silent one does not', () => {
     const tr = devOutboxTransport(db, () => {});
     const { id } = tr.send({ channel: 'push', orgId: s.orgId, userId: s.users.eleni, title: 'Count', body: 'ready', payload: { type: 'countReady', countId: 'c1' } });
