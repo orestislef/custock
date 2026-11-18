@@ -19,9 +19,12 @@ COPY packages/core/package.json packages/core/
 COPY packages/db/package.json packages/db/
 COPY packages/i18n/package.json packages/i18n/
 COPY packages/tokens/package.json packages/tokens/
+# the lockfile is left out on purpose: in the full workspace drizzle-orm is resolved with the
+# phone's expo-sqlite as a peer, which would drag react native into the server image
 RUN echo "packages: [apps/api, 'packages/*']" > pnpm-workspace.yaml \
  && echo "onlyBuiltDependencies: [better-sqlite3, esbuild]" >> pnpm-workspace.yaml \
- && pnpm install --prod --no-frozen-lockfile
+ && rm pnpm-lock.yaml \
+ && pnpm install --prod
 
 # the web as a next.js standalone server
 FROM base AS web
