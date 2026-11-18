@@ -1,11 +1,11 @@
 'use client';
 
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LoginApi } from '@/components/admin/admin-context';
 import { saveTokens } from '@/lib/api-client';
 import { useT } from '@/lib/i18n-client';
-import { FIXTURE_LOGINS } from '@/lib/fixtures';
+import { devBuild } from '@/lib/env';
 import { LocaleSwitch } from '@/components/ui/client-kit';
 import { Avatar } from '@/components/ui/kit';
 
@@ -17,6 +17,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // quick logins for the made up accounts, only while developing
+  const [devLogins, setDevLogins] = useState<{ email: string; name: string; role: string }[]>([]);
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' && devBuild) void import('@/lib/fixtures').then((m) => setDevLogins(m.FIXTURE_LOGINS));
+  }, []);
 
   async function signIn(e?: React.FormEvent, as?: string) {
     e?.preventDefault();
@@ -56,10 +61,10 @@ export default function LoginPage() {
           <button className="btn btn-primary btn-large" type="submit" disabled={busy || !email || !password}>{t('common:action.signIn')}</button>
         </form>
 
-        <section className="inset-group mt-10">
+        {devLogins.length ? <section className="inset-group mt-10">
           <h2 className="inset-group-head">{t('login.devTitle')}</h2>
           <div className="list">
-            {FIXTURE_LOGINS.map((u) => (
+            {devLogins.map((u) => (
               <button key={u.email} type="button" className="row" onClick={() => void signIn(undefined, u.email)} disabled={busy}>
                 <Avatar name={u.name} size={32} />
                 <span className="row-main">
@@ -70,7 +75,7 @@ export default function LoginPage() {
             ))}
           </div>
           <p className="inset-group-foot">{t('login.devFoot')}</p>
-        </section>
+        </section> : null}
       </div>
     </main>
   );

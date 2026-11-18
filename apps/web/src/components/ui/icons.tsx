@@ -233,3 +233,77 @@ export const IconCopy = make(() => (
     <path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" />
   </>
 ));
+// a viewfinder with a scan line, the scan tab
+export const IconScan = make((f) => (
+  <>
+    <path d="M4 8.5V6a2 2 0 0 1 2-2h2.5M15.5 4H18a2 2 0 0 1 2 2v2.5M20 15.5V18a2 2 0 0 1-2 2h-2.5M8.5 20H6a2 2 0 0 1-2-2v-2.5" />
+    <path d="M7.5 12h9" strokeWidth={f ? 2.6 : 1.8} />
+  </>
+));
+// the ios share symbol, for the add to home screen steps
+export const IconShare = make(() => (
+  <>
+    <path d="M8.5 9H7a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 7 20h10a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 17 9h-1.5" />
+    <path d="M12 3.5v10M8.5 7 12 3.5 15.5 7" />
+  </>
+));
+export const IconAddSquare = make(() => (
+  <>
+    <rect x="4" y="4" width="16" height="16" rx="4" />
+    <path d="M12 8.5v7M8.5 12h7" />
+  </>
+));
+export const IconTorch = make((f) => (
+  <>
+    <path d="M8 3.5h8v3l-2 3.5v10a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V10L8 6.5z" fill={f ? 'currentColor' : 'none'} />
+    <path d="M8 6.5h8" stroke={f ? 'var(--c-shelf)' : 'currentColor'} />
+  </>
+), true);
+export const IconKeyboard = make(() => (
+  <>
+    <rect x="3" y="6" width="18" height="12" rx="2" />
+    <path d="M7 10h.01M10.3 10h.01M13.6 10h.01M17 10h.01M7 13.5h.01M17 13.5h.01M9.5 13.5h5" strokeWidth={2.2} />
+  </>
+));
+export const IconCamera = make(() => (
+  <>
+    <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.2L9 5h6l1.3 2h2.2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z" />
+    <circle cx="12" cy="12.5" r="3.3" />
+  </>
+));
+export const IconClock = make(() => (
+  <>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  </>
+));
+export const IconDownload = make(() => (
+  <>
+    <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" />
+    <path d="M5 19.5h14" />
+  </>
+));
+export const IconTrash = make(() => (
+  <>
+    <path d="M4.5 7h15M9.5 7V5h5v2M6.5 7l1 12.5a1.5 1.5 0 0 0 1.5 1.5h6a1.5 1.5 0 0 0 1.5-1.5L17.5 7" />
+    <path d="M10 11v6M14 11v6" />
+  </>
+));
+export const IconNews = make((f) => (
+  <>
+    <rect x="4" y="4.5" width="16" height="15" rx="2.5" />
+    <path d="M8 9h8M8 12.5h8M8 16h5" stroke={f ? 'var(--c-shelf)' : 'currentColor'} />
+  </>
+), true);
+export const IconWifiOff = make(() => (
+  <>
+    <path d="M3 9.5a13 13 0 0 1 18 0M6.2 13a8.5 8.5 0 0 1 11.6 0M9.4 16.4a4 4 0 0 1 5.2 0" />
+    <path d="M4 4l16 16" />
+  </>
+));
+export const IconPhoneApp = make(() => (
+  <>
+    <rect x="6.5" y="3" width="11" height="18" rx="2.5" />
+    <path d="M10.5 18h3" />
+  </>
+));

@@ -7,14 +7,21 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAdmin } from './admin-context';
+import { OutboxBadge } from './outbox-badge';
 import { Avatar } from '@/components/ui/kit';
-import { LocaleSwitch, Picker, Sheet } from '@/components/ui/client-kit';
+import { LocaleSwitch, Picker, Sheet, useToast } from '@/components/ui/client-kit';
 import {
-  IconBox, IconChart, IconChevronLeft, IconChevronRight, IconGear, IconHome, IconLink, IconLogout, IconMegaphone, IconMore, IconPeople, IconShield, IconShop, IconHistory, IconMail,
+  IconBox, IconChart, IconChevronLeft, IconChevronRight, IconGear, IconHome, IconLink, IconLogout, IconMegaphone, IconMore, IconPeople, IconShield, IconShop, IconHistory, IconMail, IconScan, IconWifiOff, IconPhoneApp,
 } from '@/components/ui/icons';
+import { AppIcon, InstallRow, InstallSteps } from '@/components/pwa/install-coach';
+import { PushRow } from '@/components/pwa/push-row';
+import { basePath } from '@/lib/api-client';
+import { devBuild } from '@/lib/env';
+import { startOfflineSync, useOnline, useOutbox } from '@/lib/outbox';
+import { refreshSubscription } from '@/lib/push';
 
-// dev tools stay visible unless the build turns them off
-const devTools = process.env.NEXT_PUBLIC_DEV_TOOLS !== '0';
+// dev tools only in development builds, never on the server
+const devTools = devBuild && process.env.NEXT_PUBLIC_DEV_TOOLS !== '0';
 
 type Section = 'main' | 'business' | 'dev';
 type NavItem = { href: string; key: string; icon: (p: { filled?: boolean; size?: number }) => ReactNode; show: boolean; section: Section; children?: { href: string; key: string; show: boolean }[] };
@@ -31,6 +38,7 @@ export function useNav(): NavItem[] {
         { href: '/admin/stock/transfers', key: 'transfers', show: anyShop('stock.transfer.send') || anyShop('stock.transfer.receive') },
       ],
     },
+    { href: '/admin/scan', key: 'scan', icon: IconScan, show: ['stock.sell', 'stock.receive', 'stock.count', 'stock.transfer.send'].some(anyShop), section: 'main' },
     { href: '/admin/customers', key: 'customers', icon: IconPeople, show: anyShop('customers.view'), section: 'main' },
     { href: '/admin/posts', key: 'posts', icon: IconMegaphone, show: anyShop('posts.view'), section: 'main' },
     { href: '/admin/reports', key: 'reports', icon: IconChart, show: anyShop('reports.view'), section: 'main' },
@@ -49,11 +57,23 @@ function isActive(pathname: string, href: string, exact = false) {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { t, org, me, shops, shopId, setShopId, logout } = useAdmin();
+  const { t, api, org, me, shops, shopId, setShopId, logout, locale } = useAdmin();
   const pathname = usePathname();
   const nav = useNav();
+  const toast = useToast();
+  const online = useOnline();
   const [moreOpen, setMoreOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [installSteps, setInstallSteps] = useState(false);
+  // signing out wipes this device, so changes still waiting to sync need a second tap
+  const unsynced = useOutbox().queued;
+  const [confirmOut, setConfirmOut] = useState(false);
+  const appIcon = <AppIcon src={`${basePath}/icons/icon-192.png`} size={44} label="Custock" />;
+
+  // stock changes saved without signal go out when it is back. a push subscription the browser
+  // rotated is sent again
+  useEffect(() => startOfflineSync(api, (n) => toast(t('offline.synced', { count: n }))), [api, t, toast]);
+  useEffect(() => { void refreshSubscription(api, { orgId: null, locale: locale as 'en' }); }, [api, locale]);
 
   // phone tabs: the first four sections, the rest under More
   const tabs = nav.slice(0, nav.length > 5 ? 4 : 5);
@@ -129,11 +149,13 @@ export function Shell({ children }: { children: ReactNode }) {
             <span className="md:hidden t-headline">{org.name}</span>
             <span id="bar-title" className="t-headline flex-1 text-center md:text-left truncate opacity-0 transition-opacity" aria-hidden="true" />
             <span id="bar-action" className="md:hidden" />
+            <OutboxBadge />
             <ShopSwitcher shops={shops} shopId={shopId} onChange={setShopId} canAll={org.shops.length > 1} />
             <button type="button" className="md:hidden icon-btn" aria-label={t('admin.account')} onClick={() => setUserOpen(true)}>
               <Avatar name={me.user.displayName} size={30} />
             </button>
           </div>
+          {!online ? <p className="offline-line m-0" role="status"><IconWifiOff size={16} className="flex-none" />{t('offline.line')}</p> : null}
         </header>
 
         <main id="main" tabIndex={-1} className="outline-none flex-1 px-4 md:px-8 pb-[calc(110px+env(safe-area-inset-bottom))] md:pb-12 w-full max-w-[1200px]">{children}</main>
@@ -163,7 +185,7 @@ export function Shell({ children }: { children: ReactNode }) {
       </nav>
 
       <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title={t('nav.more')}>
-        <ul className="list mb-2" role="list">
+        <ul className="list mb-4" role="list">
           {rest.map((item) => {
             const Icon = item.icon;
             return (
@@ -177,9 +199,20 @@ export function Shell({ children }: { children: ReactNode }) {
             );
           })}
         </ul>
+        <InstallRow appName="Custock" icon={appIcon} render={(open, label) => (
+          <ul className="list mb-2" role="list">
+            <li>
+              <button type="button" className="row has-icon" onClick={open}>
+                <span className="icon-tile"><IconPhoneApp size={18} /></span>
+                <span className="row-main row-title">{label}</span>
+                <IconChevronRight size={16} className="chev" />
+              </button>
+            </li>
+          </ul>
+        )} />
       </Sheet>
 
-      <Sheet open={userOpen} onClose={() => setUserOpen(false)} title={t('admin.account')}>
+      <Sheet open={userOpen} onClose={() => { setUserOpen(false); setConfirmOut(false); }} title={t('admin.account')}>
         <div className="flex items-center gap-3 mb-4">
           <Avatar name={me.user.displayName} size={48} />
           <div className="min-w-0">
@@ -197,16 +230,24 @@ export function Shell({ children }: { children: ReactNode }) {
             </li>
           ))}
         </ul>
+        <section className="inset-group" style={{ marginBottom: 16 }}>
+          <div className="list">
+            <PushRow api={api} orgId={null} title={t('push.staffTitle')} sub={t('push.staffSub')} onInstall={() => setInstallSteps(true)} />
+          </div>
+          <p className="inset-group-foot">{t('push.staffFoot')}</p>
+        </section>
         <ul className="list mb-2" role="list">
           <li className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></li>
           <li>
-            <button type="button" className="row" onClick={() => void logout()} style={{ color: 'var(--c-error)' }}>
+            <button type="button" className="row" onClick={() => (unsynced && !confirmOut ? setConfirmOut(true) : void logout())} style={{ color: 'var(--c-error)' }}>
               <IconLogout size={20} />
-              <span className="row-main row-title">{t('common:action.signOut')}</span>
+              <span className="row-main row-title">{confirmOut ? t('offline.signOutAnyway') : t('common:action.signOut')}</span>
             </button>
           </li>
         </ul>
+        {confirmOut ? <p className="inset-group-foot mb-2" role="alert" style={{ color: 'var(--c-error)' }}>{t('offline.signOutWarning', { count: unsynced })}</p> : null}
       </Sheet>
+      <InstallSteps open={installSteps} onClose={() => setInstallSteps(false)} appName="Custock" icon={appIcon} />
     </div>
   );
 }

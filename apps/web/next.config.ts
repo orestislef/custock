@@ -15,7 +15,11 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   transpilePackages: ['@custock/core', '@custock/i18n', '@custock/tokens'],
   basePath,
-  env: { NEXT_PUBLIC_API_MODE: apiUrl ? 'real' : 'fixtures', NEXT_PUBLIC_BASE_PATH: basePath ?? '' },
+  env: {
+    NEXT_PUBLIC_API_MODE: apiUrl || process.env.NODE_ENV === 'production' ? 'real' : 'fixtures',
+    NEXT_PUBLIC_BASE_PATH: basePath ?? '',
+    NEXT_PUBLIC_SHOW_DEV: process.env.CUSTOCK_SHOW_DEV === '1' ? '1' : '',
+  },
   images: {
     unoptimized: true,
     remotePatterns: [

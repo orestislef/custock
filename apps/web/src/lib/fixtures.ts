@@ -779,7 +779,8 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     },
     async invite(_org, input) {
       if (!canDo('members.invite', input.scopeType === 'shop' ? input.scopeId : undefined)) throw new FixtureError(403, 'forbidden');
-      return { id: uid(), devLink: `/admin/invite/${uid().slice(0, 12)}` };
+      const link = `/admin/invite/${uid().slice(0, 12)}`;
+      return { id: uid(), link, emailed: false, devLink: link };
     },
     async assignRole() { /* stored on the real api */ },
     async removeAssignment() { /* stored on the real api */ },
@@ -1114,6 +1115,27 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     },
     async devOutbox(limit = 100) { return outbox.slice(0, limit); },
     async devRunJobs() { return { ran: 0 }; },
+    // the sample data has no push service: the switches explain that instead of asking for permission
+    async pushKey() { return null; },
+    async savePushSubscription() { /* kept on the real api */ },
+    async deletePushSubscription() { /* kept on the real api */ },
+    // invites from a link: the sample invite belongs to a new person
+    async invitePreview(token) {
+      if (token.length < 8) throw new FixtureError(410, 'invite_expired');
+      return { orgName: settings.name, scopeName: shops[0]!.name, roleName: 'staff', email: 'new.person@example.com', accountExists: false, expiresAt: NOW + 7 * DAY };
+    },
+    async registerWithInvite() {
+      const p = people.find((x) => roles.find((r) => r.id === x.assignments[0]?.roleId)?.templateKey === 'staff') ?? people[0]!;
+      currentUser = p.userId;
+      return { ...tokens(p.userId), orgId: ORG };
+    },
+    async acceptInvite() { return { orgId: ORG }; },
+    async createShop(_org, input) {
+      if (!canDo('shops.create')) throw new FixtureError(403, 'forbidden');
+      const shop: Shop = { ...shops[0]!, id: uid(), name: input.name, slug: input.slug ?? input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), city: input.city ?? null, address: input.address ?? null, phone: input.phone ?? null };
+      shops.push(shop);
+      return shop;
+    },
   };
   // anything the sample data does not cover answers like a missing endpoint
   return new Proxy(api, {

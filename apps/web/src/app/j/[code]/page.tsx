@@ -5,6 +5,7 @@ import { getT } from '@/lib/i18n-server';
 import { PublicShell } from '@/components/public/public-shell';
 import { Photo } from '@/components/ui/client-kit';
 import { JoinForm } from './join-form';
+import { orgAppMetadata } from '@/lib/manifests';
 
 export async function generateMetadata({ params }: PageProps<'/j/[code]'>): Promise<Metadata> {
   const { code } = await params;
@@ -12,7 +13,9 @@ export async function generateMetadata({ params }: PageProps<'/j/[code]'>): Prom
   try {
     const { api } = await serverApi(locale);
     const page = await api.joinPage(code);
-    return { title: t('join.metaTitle', { scope: page.scopeName }), robots: { index: false } };
+    // adding this page to the home screen installs the business's app, when we know its address
+    const slug = (page as { orgSlug?: string }).orgSlug;
+    return { ...(slug ? orgAppMetadata(slug, page.orgName) : {}), title: t('join.metaTitle', { scope: page.scopeName }), robots: { index: false } };
   } catch {
     return { title: 'Custock' };
   }

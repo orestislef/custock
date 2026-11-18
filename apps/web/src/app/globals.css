@@ -129,7 +129,7 @@
 
 @layer base {
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0;
     background: var(--c-shelf);
@@ -458,6 +458,35 @@
   }
 
   .print-only { display: none; }
+
+  /* scanning: the camera card, its frame and the controls laid over it */
+  .scan-camera { position: relative; overflow: hidden; border-radius: 22px; background: #0B0B0D; color: #fff; isolation: isolate; }
+  .scan-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s ease-out; }
+  .scan-frame { position: absolute; left: 50%; top: 52%; width: min(76%, 360px); aspect-ratio: 1.6; transform: translate(-50%, -50%); border-radius: 18px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92), 0 0 0 100vmax rgba(0, 0, 0, 0.3); overflow: hidden; }
+  .scan-line { position: absolute; left: 10px; right: 10px; top: 12%; height: 2px; border-radius: 1px; background: #FF6B8E; box-shadow: 0 0 12px #FF6B8E; animation: scan-sweep 1.6s ease-in-out infinite alternate; }
+  .scan-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 64px 24px 24px; text-align: center; color: rgba(255, 255, 255, 0.86); }
+  .scan-empty p { max-width: 300px; }
+  .scan-top { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; z-index: 1; }
+  .scan-pill { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 12px; border-radius: 15px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 13px; line-height: 16px; font-weight: 600; border: 0; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+  button.scan-pill { cursor: pointer; min-height: 36px; }
+  .scan-round { width: 44px; height: 44px; flex: none; border-radius: 22px; border: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.55); color: #fff; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); cursor: pointer; }
+
+  /* a business's app: room for the floating tab bar under the last line */
+  .has-tabbar { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+
+  /* the offline line under the toolbar */
+  .offline-line { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 13px; line-height: 18px; color: var(--c-few-text); background: var(--c-few-tint); }
+
+  /* phones: inputs under 16 px make ios zoom in on focus */
+  @media (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: max(16px, 1em); }
+  }
+
+  /* from the home screen the app is the whole screen: chrome does not select or open callouts */
+  @media (display-mode: standalone) {
+    .bar, nav, button, .btn, a.row, .chip, .seg, .picker, .icon-btn { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    body { overscroll-behavior-x: none; }
+  }
 }
 
 @keyframes fade-in { from { opacity: 0; } }
@@ -466,6 +495,7 @@
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 16px); } }
 @keyframes skel { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
 @keyframes page-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes scan-sweep { from { top: 12%; } to { top: 86%; } }
 @keyframes told-in { 0% { transform: scale(0.85); opacity: 0; } 60% { transform: scale(1.06); opacity: 1; } 100% { transform: scale(1); } }
 @keyframes told-dots {
   0% { opacity: 1; box-shadow: 0 0 0 0 var(--c-accent), 0 0 0 0 var(--c-accent), 0 0 0 0 var(--c-accent), 0 0 0 0 var(--c-accent), 0 0 0 0 var(--c-accent); }
@@ -473,6 +503,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .scan-line { animation: none !important; top: 50%; }
   *, *::before, *::after {
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;

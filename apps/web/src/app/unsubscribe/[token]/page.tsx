@@ -2,6 +2,7 @@ import { getT } from '@/lib/i18n-server';
 import { serverApi } from '@/lib/api-server';
 import { PublicShell } from '@/components/public/public-shell';
 import { UnsubscribeForm } from './unsubscribe-form';
+import { devBuild } from '@/lib/env';
 
 export const metadata = { robots: { index: false } };
 
@@ -13,8 +14,9 @@ export default async function UnsubscribePage({ params, searchParams }: PageProp
   const { t, locale } = await getT();
   const { api, mode } = await serverApi(locale);
   const info = mode === 'real' ? await api.unsubscribePage(token).catch(() => null) : null;
-  const shop = info?.scopeName ?? (typeof sp.shop === 'string' ? sp.shop : 'Lemoni Kifisia');
-  const org = info?.orgName ?? (typeof sp.org === 'string' ? sp.org : 'Lemoni');
+  // the sample shop only while developing without the api
+  const shop = info?.scopeName ?? (typeof sp.shop === 'string' ? sp.shop : devBuild ? 'Lemoni Kifisia' : '');
+  const org = info?.orgName ?? (typeof sp.org === 'string' ? sp.org : devBuild ? 'Lemoni' : 'Custock');
   return (
     <PublicShell orgName={org} t={t}>
       <h1 className="t-title1 t-display m-0 mt-4">{t('unsubscribe.title')}</h1>

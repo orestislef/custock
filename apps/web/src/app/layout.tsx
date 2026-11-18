@@ -3,6 +3,8 @@ import { Commissioner } from 'next/font/google';
 import { getLocale } from '@/lib/i18n-server';
 import { I18nProvider } from '@/lib/i18n-client';
 import { ToastProvider } from '@/components/ui/client-kit';
+import { PwaRoot } from '@/components/pwa/pwa-root';
+import { appIcons } from '@/lib/manifests';
 import './globals.css';
 
 // display face for a few moments only. greek and cyrillic included, see thinking/10-design.md
@@ -16,6 +18,10 @@ export const metadata: Metadata = {
   title: { default: 'Custock', template: '%s · Custock' },
   description: 'A clean blend of Customer and Stock.',
   applicationName: 'Custock',
+  icons: appIcons(),
+  // the manifest is set where it belongs: the staff app (/ and /admin) or a business (/s/<org>)
+  appleWebApp: { capable: true, title: 'Custock', statusBarStyle: 'default' },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
@@ -35,6 +41,7 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
       <body>
         <I18nProvider locale={locale}>
           <ToastProvider>{children}</ToastProvider>
+          <PwaRoot />
         </I18nProvider>
       </body>
     </html>

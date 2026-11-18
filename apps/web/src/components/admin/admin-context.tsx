@@ -10,6 +10,9 @@ import type { TFunction } from '@custock/i18n';
 import { createBrowserApi, loadTokens, saveTokens } from '@/lib/api-client';
 import { useLocale, useT } from '@/lib/i18n-client';
 import { can as canFn } from '@/lib/perms';
+import { resetCatalogSync } from '@/lib/catalog-cache';
+import { wipeLocal } from '@/lib/outbox';
+import { disablePush } from '@/lib/push';
 
 interface AdminState {
   api: CustockApi;
@@ -117,8 +120,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    // nothing of this person stays on the device: no push to it, no saved stock work, no catalog copy
+    await disablePush(getApi()).catch(() => {});
     await getApi().logout().catch(() => {});
     saveTokens(null);
+    resetCatalogSync();
+    await wipeLocal();
     setState(null);
     router.replace('/admin/login');
   }, [router]);

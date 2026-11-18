@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import type { PublicProduct } from '@custock/core';
 import type { TFunction } from '@custock/i18n';
 import { money, date } from '@/lib/format';
@@ -7,7 +8,8 @@ import { Photo } from '@/components/ui/client-kit';
 import { IconBell, IconShop } from '@/components/ui/icons';
 
 // the product as a customer sees it: what the merchant allows, and nothing else
-export function ProductView({ p, t, locale, joinHref, notifyHref }: { p: PublicProduct; t: TFunction; locale: string; joinHref?: string | null; notifyHref?: string | null }) {
+// actions replaces the join and notify links, for a signed in follower in the business's app
+export function ProductView({ p, t, locale, joinHref, notifyHref, actions }: { p: PublicProduct; t: TFunction; locale: string; joinHref?: string | null; notifyHref?: string | null; actions?: ReactNode }) {
   const anyOut = p.availability.some((a) => a.state === 'out');
   const stockShown = p.availability.some((a) => a.state != null);
   return (
@@ -40,14 +42,16 @@ export function ProductView({ p, t, locale, joinHref, notifyHref }: { p: PublicP
         </Group>
       ) : null}
 
-      <div className="flex flex-col gap-3">
-        {anyOut && notifyHref ? (
-          <Link className="btn btn-primary btn-large" href={notifyHref}><IconBell size={20} />{t('product.notifyMe')}</Link>
-        ) : null}
-        {joinHref ? (
-          <Link className={`btn btn-large ${anyOut && notifyHref ? 'btn-tinted' : 'btn-primary'}`} href={joinHref}>{t('product.join', { org: p.orgName })}</Link>
-        ) : null}
-      </div>
+      {actions ?? (
+        <div className="flex flex-col gap-3">
+          {anyOut && notifyHref ? (
+            <Link className="btn btn-primary btn-large" href={notifyHref}><IconBell size={20} />{t('product.notifyMe')}</Link>
+          ) : null}
+          {joinHref ? (
+            <Link className={`btn btn-large ${anyOut && notifyHref ? 'btn-tinted' : 'btn-primary'}`} href={joinHref}>{t('product.join', { org: p.orgName })}</Link>
+          ) : null}
+        </div>
+      )}
     </article>
   );
 }

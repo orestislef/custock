@@ -16,7 +16,7 @@ export default function TransferPage({ params }: { params: Promise<{ id: string 
   const { api, org, t, locale, can, shops } = useAdmin();
   const toast = useToast();
   const tr = useAsync(() => api.transfer(org.orgId, id), [id]);
-  const allShops = useAsync(() => api.shops(org.orgId), []);
+  const allShops = useAsync(() => api.shops(org.orgId, { all: true }), []);
   const [got, setGot] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const x = tr.data;

@@ -16,6 +16,8 @@ import {
 } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { useNames } from '@/lib/use-names';
+import { AppIcon, InstallCoach } from '@/components/pwa/install-coach';
+import { basePath } from '@/lib/api-client';
 import { date, qtyNumber, relative } from '@/lib/format';
 
 // home answers "what needs me" first, then what changed, then a few numbers as a list.
@@ -65,6 +67,7 @@ function ManagerHome() {
   return (
     <Page title={greeting(t, me.user.displayName?.split(' ')[0] ?? '', now)} subtitle={date(now, locale, { weekday: 'long', day: 'numeric', month: 'long' })}>
       {can('joinlinks.manage', null) ? <Tip id="dash-qr">{t('dash.tipQr')}</Tip> : null}
+      <StaffCoach />
       <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-2 gap-x-6 items-start">
         <div>
           <Group title={t('dash.needsYou')} footer={d && !needs.length ? t('dash.allClear') : undefined}>
@@ -131,6 +134,7 @@ function StaffToday() {
 
   return (
     <Page title={t('today.title')} subtitle={`${greeting(t, me.user.displayName?.split(' ')[0] ?? '', now)} · ${date(now, locale, { weekday: 'long', day: 'numeric', month: 'long' })}`}>
+      <StaffCoach />
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
         {actions.map((a) => (
           <button key={a.mode} type="button" className="card p-4 text-left border-0 cursor-pointer flex flex-col gap-3 min-h-[96px]" onClick={() => setMode(a.mode)}>
@@ -175,5 +179,16 @@ function StaffToday() {
           onDone={() => { void mine.reload(); }} />
       ) : null}
     </Page>
+  );
+}
+
+// "add custock to your home screen", on phones only, closable for good
+function StaffCoach() {
+  const { t } = useAdmin();
+  return (
+    <div className="md:hidden">
+      <InstallCoach place="staff-home" appName="Custock" className="mb-6"
+        icon={<AppIcon src={`${basePath}/icons/icon-192.png`} size={48} label="Custock" />} body={t('pwa.staffCoachBody')} />
+    </div>
   );
 }

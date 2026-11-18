@@ -8,7 +8,8 @@ import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { Avatar, Group, Row, Why } from '@/components/ui/kit';
 import { Picker, Sheet, useToast } from '@/components/ui/client-kit';
-import { IconCheck, IconLock, IconPlus, IconShield } from '@/components/ui/icons';
+import { IconCheck, IconCopy, IconLock, IconPlus, IconShare, IconShield } from '@/components/ui/icons';
+import { basePath } from '@/lib/api-client';
 import { useAsync } from '@/lib/use-async';
 
 export default function TeamPage() {
@@ -64,7 +65,7 @@ export default function TeamPage() {
 }
 
 function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { api, org, t, shops } = useAdmin();
+  const { api, org, t, shops, locale } = useAdmin();
   const toast = useToast();
   const orgWide = org.orgPerms.includes('members.invite');
   const scopes: { type: ScopeType; id: string; name: string }[] = [
@@ -74,7 +75,8 @@ function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
   const [scope, setScope] = useState('0');
   const [email, setEmail] = useState('');
   const [roleId, setRoleId] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
+  // the invite: the link to hand over, and whether it also went out by email
+  const [done, setDone] = useState<{ link: string; emailed: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const sc = scopes[Number(scope)];
   const roles = useAsync(() => (open && sc ? api.grantableRoles(org.orgId, sc.type, sc.id) : Promise.resolve([])), [open, scope]);
@@ -86,9 +88,10 @@ function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
     if (!sc || !roleId) return;
     setError(null);
     try {
-      const r = await api.invite(org.orgId, { email: email.trim(), roleId, scopeType: sc.type, scopeId: sc.id, locale: 'el' });
-      setDone(r.devLink ?? '');
-      toast(t('team.invited', { email }));
+      const r = await api.invite(org.orgId, { email: email.trim(), roleId, scopeType: sc.type, scopeId: sc.id, locale: locale as 'en' });
+      const link = /^https?:/.test(r.link) ? r.link : `${window.location.origin}${basePath}${r.link}`;
+      setDone({ link, emailed: r.emailed });
+      if (r.emailed) toast(t('team.invited', { email }));
     } catch (e) {
       setError(t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
     }
@@ -108,9 +111,24 @@ function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
       {done != null ? (
         <div className="text-center py-4">
           <span className="inline-grid place-items-center w-14 h-14 rounded-full mb-3" style={{ background: 'color-mix(in srgb, var(--c-success) 14%, transparent)', color: 'var(--c-success)' }}><IconCheck size={28} /></span>
-          <p className="t-headline m-0">{t('team.invited', { email })}</p>
-          <p className="t-sub t-2 mt-2">{t('team.invitedSub')}</p>
-          {done ? <p className="t-foot t-2 mt-3 break-all">{t('team.devLink')}: {done}</p> : null}
+          {done.emailed ? (
+            <>
+              <p className="t-headline m-0">{t('team.invited', { email })}</p>
+              <p className="t-sub t-2 mt-2">{t('team.invitedSub')}</p>
+            </>
+          ) : (
+            <>
+              <p className="t-headline m-0">{t('team.linkReady')}</p>
+              <p className="t-sub t-2 mt-2">{t('team.linkReadySub', { email })}</p>
+              <p className="t-foot tnum break-all text-left card p-3 mt-4 mb-3" style={{ background: 'var(--c-shelf)' }}>{done.link}</p>
+              <div className="flex gap-2 justify-center flex-wrap">
+                <button type="button" className="btn btn-tinted" onClick={() => void navigator.clipboard.writeText(done.link).then(() => toast(t('links.copied')))}><IconCopy size={18} />{t('team.copyLink')}</button>
+                {typeof navigator !== 'undefined' && 'share' in navigator ? (
+                  <button type="button" className="btn btn-gray" onClick={() => void navigator.share({ title: t('team.shareTitle', { org: org.name }), text: t('team.shareText', { org: org.name }), url: done.link }).catch(() => {})}><IconShare size={18} />{t('common:action.share')}</button>
+                ) : null}
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <>

@@ -23,7 +23,7 @@ export default function TransfersPage() {
   const canSend = shops.some((s) => can('stock.transfer.send', s.id));
   useShortcuts({ create: useCallback(() => { if (canSend) setCreating(true); }, [canSend]) });
   // names of every shop, also the ones outside this member's reach
-  const allShops = useAsync(() => api.shops(org.orgId), []);
+  const allShops = useAsync(() => api.shops(org.orgId, { all: true }), []);
   const name = (id: string) => (allShops.data ?? shops).find((s) => s.id === id)?.name ?? t('transfers.otherShop');
 
   if (!allowed) return <Page title={t('transfers.title')}><Why>{t('common:error.forbidden')}</Why></Page>;
@@ -59,7 +59,7 @@ function NewTransfer({ open, onClose, onCreated }: { open: boolean; onClose: () 
   const { api, org, t, locale, can, shops, shopId } = useAdmin();
   const [error, setError] = useState<string | null>(null);
   const from = shops.filter((s) => can('stock.transfer.send', s.id));
-  const allShops = useAsync(() => (open ? api.shops(org.orgId) : Promise.resolve([])), [open]);
+  const allShops = useAsync(() => (open ? api.shops(org.orgId, { all: true }) : Promise.resolve([])), [open]);
   const [fromId, setFrom] = useState(shopId && from.some((s) => s.id === shopId) ? shopId : from[0]?.id ?? '');
   const [toId, setTo] = useState('');
   const [lines, setLines] = useState<{ variantId: string; name: string; qty: number }[]>([]);

@@ -19,7 +19,8 @@
     "join": "Join page",
     "shelf": "Shelf product",
     "catalog": "Catalog",
-    "offers": "Offers"
+    "offers": "Offers",
+    "scan": "Scan"
   },
   "notFound": {
     "title": "Nothing here",
@@ -55,9 +56,10 @@
   "confirm": {
     "title": "You are in",
     "body": "You now follow {{scope}}. News and offers will come the way you chose.",
-    "app": "Get the Custock app for offers and back in stock alerts on your phone.",
+    "app": "Sign in with your email, then add {{org}} to your Home Screen for offers in one tap.",
     "failTitle": "This link did not work",
-    "failBody": "It may have expired. Scan the QR code again to get a new one."
+    "failBody": "It may have expired. Scan the QR code again to get a new one.",
+    "open": "Open {{org}}"
   },
   "product": {
     "availability": "Where to find it",
@@ -161,7 +163,8 @@
     "settings": "Settings",
     "more": "More",
     "audit": "Audit log",
-    "outbox": "Dev outbox"
+    "outbox": "Dev outbox",
+    "scan": "Scan"
   },
   "dash": {
     "morning": "Good morning, {{name}}",
@@ -500,7 +503,12 @@
     },
     "needEmail": "Add their email.",
     "needRole": "Pick a role.",
-    "cantGive": "Roles you can't give"
+    "cantGive": "Roles you can't give",
+    "linkReady": "Invite link ready",
+    "linkReadySub": "Send it to {{email}} however you like. It works once, for 7 days.",
+    "copyLink": "Copy link",
+    "shareTitle": "Join {{org}} on Custock",
+    "shareText": "Your invite to the {{org}} team."
   },
   "roles": {
     "title": "Roles",
@@ -616,7 +624,15 @@
     "previewProduct": "Thyme honey 450g",
     "previewNoPrice": "Ask in the shop",
     "previewOff": "Catalog is off, so customers only see posts.",
-    "hiddenShop": "Hidden from customers"
+    "hiddenShop": "Hidden from customers",
+    "shopPage": "Your shop page",
+    "makePublic": "Show it to everyone",
+    "copyLink": "Copy link",
+    "shopPageState": {
+      "off": "Customers see your posts and offers only. Turn the catalog on to let them browse.",
+      "subscribers": "Only people who follow you can browse it. Strangers who open the link are asked to join first.",
+      "public": "Anyone with the link can browse your catalog. Put it on your window, receipts and social media."
+    }
   },
   "links": {
     "title": "QR codes",
@@ -875,7 +891,9 @@
     "emptyTitle": "Nothing sent yet",
     "emptyBody": "Messages show up here as soon as something fans out.",
     "offTitle": "Not available",
-    "offBody": "The outbox only exists when the api runs in development mode."
+    "offBody": "The outbox only exists when the api runs in development mode.",
+    "showPushes": "Show pushes on this device",
+    "showPushesSub": "Each new push in the outbox appears as a real notification here. Nothing leaves the server."
   },
   "today": {
     "title": "Today",
@@ -887,5 +905,233 @@
     "nothingYet": "Nothing yet today",
     "fromShop": "From {{shop}}",
     "fromOther": "From another shop"
+  },
+  "scanner": {
+    "mode": {
+      "lookup": "Look up",
+      "receive": "Receive",
+      "sell": "Sell",
+      "count": "Count",
+      "transfer": "Transfer"
+    },
+    "hint": {
+      "lookup": "Point at a barcode to open the product.",
+      "receive": "Scan everything that arrived, then confirm once.",
+      "sell": "Each scan takes one off, with undo.",
+      "count": "Scan each item. Differences show against the expected stock.",
+      "transfer": "Scan what goes to the other shop, then pick the shop."
+    },
+    "listHead": {
+      "receive_one": "{{count}} item",
+      "receive_other": "{{count}} items",
+      "sell_one": "Sold now · {{count}} item",
+      "sell_other": "Sold now · {{count}} items",
+      "count_one": "{{count}} counted",
+      "count_other": "{{count}} counted",
+      "transfer_one": "{{count}} item",
+      "transfer_other": "{{count}} items"
+    },
+    "receiveCta_one": "Receive {{count}} item",
+    "receiveCta_other": "Receive {{count}} items",
+    "received_one": "Received {{count}} item",
+    "received_other": "Received {{count}} items",
+    "sold": "Sold {{count}} × {{name}}",
+    "applyCount": "Apply differences",
+    "countApplied_one": "{{count}} difference applied",
+    "countApplied_other": "{{count}} differences applied",
+    "countNoDifferences": "Everything matches. Nothing to change.",
+    "countNeedsApproval": "Counts are applied by a manager. Show them this list.",
+    "expected": "Expected {{qty}}",
+    "clear": "Clear",
+    "torch": "Torch",
+    "typeCode": "Type a code",
+    "typeCodePlaceholder": "Barcode digits",
+    "samples": "Try a sample code",
+    "unknownTitle": "Unknown code",
+    "damaged": "This code looks damaged. Check the digits.",
+    "createWithCode": "New product with this code",
+    "unknownSaved": "Saved for your manager, who can add it to a product.",
+    "cameraWhy": "The camera reads barcodes. Nothing is recorded or saved.",
+    "noModesTitle": "Nothing to scan for your role",
+    "noModesBody": "Your role can look at stock but not change it.",
+    "lowStock_one": "{{count}} product just dropped to its reorder point",
+    "lowStock_other": "{{count}} products just dropped to their reorder point",
+    "countSubmitted": "Count sent to your manager for review",
+    "submitCount": "Send count for review",
+    "lines_one": "{{count}} line",
+    "lines_other": "{{count}} lines",
+    "pickShop": "Pick the shop it goes to",
+    "sendCta_one": "Send {{count}} item to {{shop}}",
+    "sendCta_other": "Send {{count}} items to {{shop}}",
+    "noDestination": "There is no other shop to send to.",
+    "transferSent_one": "{{count}} item on the way to {{shop}}",
+    "transferSent_other": "{{count}} items on the way to {{shop}}",
+    "title": "Scan",
+    "modeLabel": "What a scan does",
+    "useCamera": "Continue",
+    "denied": "The camera is off for this site. Allow it in the browser settings (Safari: aA, Website Settings; Chrome: the icon left of the address), then try again.",
+    "unavailable": "No camera here. Type the code, or use a usb scanner, it types into the field.",
+    "starting": "Starting the camera",
+    "listLabel": "Scanned",
+    "less": "One less {{name}}",
+    "more": "One more {{name}}",
+    "openTransfer": "Open"
+  },
+  "offline": {
+    "badge_one": "{{count}} not synced yet",
+    "badge_other": "{{count}} not synced yet",
+    "rejectedBadge_one": "{{count}} refused, tap to see why",
+    "rejectedBadge_other": "{{count}} refused, tap to see why",
+    "title": "Waiting to sync",
+    "onlineBody": "Saved movements go out on their own. You can also send them now.",
+    "offlineBody": "No connection. Sales, deliveries and corrections are saved on this device and go out when the connection is back.",
+    "waiting_one": "Waiting: {{count}}",
+    "waiting_other": "Waiting: {{count}}",
+    "refused_one": "Refused: {{count}}",
+    "refused_other": "Refused: {{count}}",
+    "refusedFooter": "The server did not accept these, for the reason shown. Show them to your manager, then remove them here.",
+    "allSynced": "Everything is synced",
+    "retry": "Send now",
+    "discard": "Remove refused",
+    "savedSale": "No signal. Sale of {{count}} × {{name}} saved, it syncs later",
+    "savedReceive_one": "No signal. {{count}} item saved, it syncs later",
+    "savedReceive_other": "No signal. {{count}} items saved, they sync later",
+    "savedAdjust": "No signal. Saved, it syncs later",
+    "synced_one": "{{count}} saved movement synced",
+    "synced_other": "{{count}} saved movements synced",
+    "line": "No connection. Stock changes are saved on this device and sync later.",
+    "needsSignal": "This needs a connection. Try again when you are back online.",
+    "modeNeedsSignal": "Counts and transfers need a connection. Look up, sell and receive work without one.",
+    "signOutAnyway": "Sign out anyway",
+    "signOutWarning_one": "{{count}} change is not synced yet. Signing out deletes it from this device.",
+    "signOutWarning_other": "{{count}} changes are not synced yet. Signing out deletes them from this device."
+  },
+  "pwa": {
+    "staffDescription": "Stock, scanning, customers and posts for your shops.",
+    "orgDescription": "Offers, news and back in stock alerts from {{org}}.",
+    "shortcutScan": "Scan",
+    "shortcutStock": "Stock",
+    "offlineTitle": "No connection",
+    "offlineBody": "This page needs the internet. Check Wi-Fi or mobile data and try again.",
+    "coachTitle": "Add {{app}} to your Home Screen",
+    "staffCoachBody": "Opens full screen in one tap, scans with the camera, keeps working with weak signal and can alert you.",
+    "orgCoachBody": "Offers and news in one tap, and a note on your phone when something you wait for is back.",
+    "install": "Add",
+    "showHow": "Show me how",
+    "notNow": "Not now",
+    "addToHome": "Add to Home Screen",
+    "stepsTitle": "Add to Home Screen",
+    "stepsLead": "Two taps in Safari and {{app}} is on your Home Screen like an app.",
+    "step": "Step {{n}}",
+    "step1": "Tap Share in the Safari toolbar.",
+    "step2": "Scroll down and tap Add to Home Screen.",
+    "step3": "Tap Add. Open {{app}} from your Home Screen.",
+    "addShort": "Add",
+    "stepsFoot": "On iPad the Share button is at the top. In Chrome on iPhone it is in the address bar."
+  },
+  "push": {
+    "staffTitle": "Alerts on this device",
+    "staffSub": "Low stock, deliveries on the way, posts to approve.",
+    "staffFoot": "Only on this device, and only what your role can see.",
+    "why": {
+      "install": "On iPhone, notifications work once this is on your Home Screen.",
+      "denied": "Notifications are blocked for this site. Allow them in the browser or phone settings.",
+      "off": "Notifications are not set up on this server yet.",
+      "unsupported": "This browser cannot show notifications.",
+      "failed": "That did not work. Try again in a moment."
+    },
+    "nudgeTitle": "Hear it first",
+    "nudgeBody": "Turn on notifications and {{org}} can tell you the moment it is back.",
+    "turnOn": "Continue"
+  },
+  "shopper": {
+    "tabsLabel": "Sections",
+    "tabs": {
+      "shop": "Shop",
+      "offers": "Offers",
+      "news": "News",
+      "you": "You"
+    },
+    "signIn": {
+      "title": "Sign in",
+      "lead": "No password. We email you a 6 digit code. Use the email you joined {{org}} with.",
+      "email": "Email",
+      "send": "Email me a code",
+      "code": "Code",
+      "sentTo": "We sent a code to {{email}}. It works for 10 minutes.",
+      "devCode": "Development: the code is {{code}}. Nothing was emailed.",
+      "wrongCode": "That code is not right, or it expired.",
+      "otherEmail": "Use another email",
+      "already": "Already joined? Sign in",
+      "notYet": "Not following yet?",
+      "joinLink": "Join {{org}}"
+    },
+    "news": {
+      "title": "News",
+      "hello": "Hi {{name}}, here is what is new.",
+      "endsOn": "Ends {{date}}",
+      "emptyTitle": "Nothing yet",
+      "emptyBody": "When {{org}} posts news or an offer, it lands here.",
+      "signInTitle": "Sign in for the news",
+      "signInLead": "News and offers from {{org}}, for the people who follow it. No password, a code by email.",
+      "notFollowingTitle": "You do not follow {{org}} yet",
+      "notFollowingBody": "Join to get their news and offers. You choose how you hear from them."
+    },
+    "me": {
+      "title": "You",
+      "channels": "How {{org}} reaches you",
+      "push": "Notifications",
+      "pushSub": "Offers, news and back in stock, at most 2 a day",
+      "channelsFoot": "Never between 22:00 and 09:00. You can change this anytime.",
+      "waiting": "Waiting for",
+      "waitingEmpty": "Nothing yet",
+      "waitingFoot": "You hear once, when it is back.",
+      "stopWaiting": "Stop",
+      "saved": "Saved",
+      "savedEmpty": "Nothing saved yet",
+      "privacy": "Your data",
+      "privacyFoot": "Each business only sees what you shared with it.",
+      "export": "Download my data",
+      "exported": "Your data is ready",
+      "delete": "Delete my account",
+      "deleteTitle": "Delete your account?",
+      "deleteBody": "Your details are erased from every business you follow and you are signed out. This cannot be undone.",
+      "deleteConfirm": "Delete account",
+      "deleted": "Your account is deleted"
+    },
+    "product": {
+      "save": "Save",
+      "saved": "Saved",
+      "savedToast": "Saved. Find it under You.",
+      "unsavedToast": "Removed from saved",
+      "notifySet": "Done. We will tell you once, when it is back."
+    }
+  },
+  "landing": {
+    "lead": "Stock and customers for your shops, in one app on your phone.",
+    "scanTitle": "Scan to sell, receive and count",
+    "scanSub": "The phone camera is the barcode reader. Works with weak signal.",
+    "peopleTitle": "Your customers, with their consent",
+    "peopleSub": "They join from a QR code at the till, the window or a receipt.",
+    "offersTitle": "Offers that reach people",
+    "offersSub": "Posts by push and email, and a note when what they wait for is back.",
+    "signIn": "Sign in",
+    "inviteOnly": "New here? Your team sends you an invite link."
+  },
+  "invite": {
+    "title": "Join {{org}}",
+    "lead": "You are invited as {{role}} in {{scope}}.",
+    "email": "Email",
+    "name": "Your name",
+    "namePlaceholder": "First and last name",
+    "password": "Password",
+    "passwordHint": "At least 10 characters. A few words are easier to remember.",
+    "passwordShort": "Use at least 10 characters.",
+    "join": "Join {{org}}",
+    "signInLead": "You already have an account with this email. Sign in to accept.",
+    "accept": "Sign in and join",
+    "accountExists": "This email already has an account. Sign in to accept.",
+    "goneTitle": "This invite no longer works",
+    "goneBody": "It was used, revoked or is older than 7 days. Ask for a new one."
   }
 }

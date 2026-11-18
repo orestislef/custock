@@ -2,6 +2,8 @@ import { serverApi } from '@/lib/api-server';
 import { getT } from '@/lib/i18n-server';
 import { PublicShell } from '@/components/public/public-shell';
 import { IconCheck, IconWarning } from '@/components/ui/icons';
+import Link from 'next/link';
+import { defaultOrgSlug } from '@/lib/env';
 
 export const metadata = { robots: { index: false } };
 
@@ -10,6 +12,8 @@ export default async function ConfirmPage({ params }: PageProps<'/confirm/[token
   const { t, locale } = await getT();
   const { api } = await serverApi(locale);
   const result = await api.confirmJoin(token).catch(() => null);
+  // the business's own app, where its news, offers and alerts live from now on
+  const slug = (result as { orgSlug?: string } | null)?.orgSlug ?? defaultOrgSlug();
 
   return (
     <PublicShell orgName={result?.orgName ?? 'Custock'} t={t}>
@@ -21,7 +25,12 @@ export default async function ConfirmPage({ params }: PageProps<'/confirm/[token
             </span>
             <h1 className="t-title1 t-display m-0">{t('confirm.title')}</h1>
             <p className="t-body t-2 mt-3 mb-0">{t('confirm.body', { scope: result.scopeName })}</p>
-            <div className="tip mt-6 text-left"><span className="t-sub">{t('confirm.app')}</span></div>
+            {slug ? (
+              <>
+                <Link href={`/s/${slug}/me`} className="btn btn-primary btn-large mt-6">{t('confirm.open', { org: result.orgName })}</Link>
+                <p className="t-foot t-2 mt-3 mb-0">{t('confirm.app', { org: result.orgName })}</p>
+              </>
+            ) : null}
           </>
         ) : (
           <>

@@ -1,0 +1,71 @@
+'use client';
+
+// one switch for notifications on this device. the browser's permission prompt only ever follows
+// a tap on it. when push cannot work here the row says why instead of failing quietly.
+
+import { useEffect, useState, type ReactNode } from 'react';
+import type { CustockApi, Locale } from '@custock/core';
+import { Switch } from '@/components/ui/kit';
+import { IconBell } from '@/components/ui/icons';
+import { useLocale, useT } from '@/lib/i18n-client';
+import { disablePush, enablePush, pushIsOn, pushState, type PushState } from '@/lib/push';
+
+type Why = 'install' | 'denied' | 'off' | 'unsupported' | 'failed' | null;
+
+export function usePushSwitch(api: CustockApi, orgId: string | null) {
+  const locale = useLocale() as Locale;
+  const [on, setOn] = useState(false);
+  const [state, setState] = useState<PushState>(() => pushState());
+  const [serverHasPush, setServerHasPush] = useState<boolean | null>(null);
+  const [why, setWhy] = useState<Why>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void pushIsOn().then((v) => { if (alive) setOn(v); });
+    void api.pushKey().then((k) => { if (alive) setServerHasPush(!!k); }, () => { if (alive) setServerHasPush(false); });
+    return () => { alive = false; };
+  }, [api]);
+
+  const toggle = async (next: boolean) => {
+    setBusy(true);
+    setWhy(null);
+    try {
+      if (!next) {
+        await disablePush(api);
+        setOn(false);
+        return;
+      }
+      const r = await enablePush(api, { orgId, locale });
+      setState(pushState());
+      if (r === 'on') setOn(true);
+      else setWhy(r);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // what to say when the switch cannot be used at all
+  const blocked: Why = serverHasPush === false ? 'off' : state === 'install' ? 'install' : state === 'denied' ? 'denied' : state === 'unsupported' ? 'unsupported' : null;
+  return { on, toggle, busy, why: why ?? blocked, blocked, ready: serverHasPush !== null };
+}
+
+export function PushRow({ api, orgId, title, sub, onInstall, icon }: { api: CustockApi; orgId: string | null; title: string; sub?: string; onInstall?: () => void; icon?: ReactNode }) {
+  const t = useT();
+  const p = usePushSwitch(api, orgId);
+  if (!p.ready) return null;
+  return (
+    <div className="row has-icon">
+      {icon ?? <span className="icon-tile"><IconBell size={18} /></span>}
+      <span className="row-main">
+        <span className="row-title block">{title}</span>
+        {sub && !p.why ? <span className="row-sub block">{sub}</span> : null}
+        {p.why ? <span className="row-sub block" role="status">{t(`push.why.${p.why}`)}</span> : null}
+        {p.why === 'install' && onInstall ? (
+          <button type="button" className="btn btn-plain" style={{ minHeight: 36, padding: 0 }} onClick={onInstall}>{t('pwa.showHow')}</button>
+        ) : null}
+      </span>
+      {p.blocked ? null : <Switch checked={p.on} disabled={p.busy} label={title} onChange={(v) => void p.toggle(v)} />}
+    </div>
+  );
+}

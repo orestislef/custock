@@ -1,11 +1,9 @@
-'use client';
+import type { Metadata } from 'next';
+import { AdminFrame } from '@/components/admin/admin-frame';
+import { staffAppMetadata } from '@/lib/manifests';
 
-import { usePathname } from 'next/navigation';
-import { AdminProvider } from '@/components/admin/admin-context';
-import { Shell } from '@/components/admin/shell';
+export const metadata: Metadata = { ...staffAppMetadata(), robots: { index: false } };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const bare = pathname === '/admin/login' || pathname.startsWith('/admin/print');
-  return <AdminProvider>{bare ? children : <Shell>{children}</Shell>}</AdminProvider>;
+  return <AdminFrame>{children}</AdminFrame>;
 }

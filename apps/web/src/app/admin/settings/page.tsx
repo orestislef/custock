@@ -5,7 +5,8 @@ import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { Group, Row, Segmented, StockBadge, Switch, Why } from '@/components/ui/kit';
 import { Picker, useToast } from '@/components/ui/client-kit';
-import { IconInfo, IconShop } from '@/components/ui/icons';
+import { IconCopy, IconInfo, IconLink, IconShop } from '@/components/ui/icons';
+import { basePath } from '@/lib/api-client';
 import { useAsync } from '@/lib/use-async';
 import { money } from '@/lib/format';
 
@@ -53,6 +54,8 @@ export default function SettingsPage() {
         <div>
           <h2 className="t-title3 m-0 mb-1">{t('settings.customerPage')}</h2>
           <p className="t-sub t-2 m-0 mb-5">{t('settings.customerPageLead')}</p>
+
+          <ShopPageCard slug={s.slug} mode={s.customerCatalog} canOrg={canOrg} onPublic={() => void patch({ customerCatalog: 'public' })} />
 
           <section className="inset-group">
             <h3 className="inset-group-head">{t('settings.catalog')}</h3>
@@ -159,5 +162,29 @@ function Preview({ s, shops }: { s: OrgSettings; shops: Shop[] }) {
         })}
       </div>
     </div>
+  );
+}
+
+// the business's own page for customers, and the one switch that decides whether a stranger can
+// browse it. a new business starts with followers only, so this says so and offers the change.
+function ShopPageCard({ slug, mode, canOrg, onPublic }: { slug: string; mode: CustomerCatalogMode; canOrg: boolean; onPublic: () => void }) {
+  const { t } = useAdmin();
+  const toast = useToast();
+  const url = typeof window === 'undefined' ? `${basePath}/s/${slug}` : `${window.location.origin}${basePath}/s/${slug}`;
+  return (
+    <section className="card p-4 mb-7">
+      <div className="flex gap-3 items-start">
+        <span className="icon-tile flex-none"><IconLink size={18} /></span>
+        <div className="flex-1 min-w-0">
+          <p className="t-headline m-0">{t('settings.shopPage')}</p>
+          <p className="t-sub t-2 m-0 mt-1">{t(`settings.shopPageState.${mode}`)}</p>
+          <p className="t-sub m-0 mt-2 truncate tnum"><a href={url} target="_blank" rel="noreferrer">{url.replace(/^https?:\/\//, '')}</a></p>
+          <div className="flex gap-2 mt-3 flex-wrap">
+            {mode !== 'public' && canOrg ? <button type="button" className="btn btn-primary" onClick={onPublic}>{t('settings.makePublic')}</button> : null}
+            <button type="button" className="btn btn-gray" onClick={() => void navigator.clipboard.writeText(url).then(() => toast(t('links.copied')))}><IconCopy size={18} />{t('settings.copyLink')}</button>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

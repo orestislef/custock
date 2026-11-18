@@ -43,7 +43,7 @@ function Field({ label, children, sep }: { label: string; children: React.ReactN
   );
 }
 
-export function ProductForm({ product }: { product?: Product & { levels: StockLevel[] } }) {
+export function ProductForm({ product, initialBarcode }: { product?: Product & { levels: StockLevel[] }; initialBarcode?: string }) {
   const { api, org, t, locale, can, settings } = useAdmin();
   const router = useRouter();
   const toast = useToast();
@@ -64,7 +64,7 @@ export function ProductForm({ product }: { product?: Product & { levels: StockLe
   const [track, setTrack] = useState(product?.trackStock ?? true);
   const [price, setPrice] = useState(v0?.priceMinor != null ? (v0.priceMinor / 100).toFixed(2) : '');
   const [cost, setCost] = useState(v0?.costMinor != null ? (v0.costMinor / 100).toFixed(2) : '');
-  const [barcode, setBarcode] = useState('');
+  const [barcode, setBarcode] = useState(initialBarcode ?? '');
   const [options, setOptions] = useState<Option[]>([]);
   const [images, setImages] = useState<string[]>(product?.images.map((i) => i.url) ?? []);
   const [imageUrl, setImageUrl] = useState('');

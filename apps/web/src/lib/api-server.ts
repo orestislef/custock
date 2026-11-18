@@ -1,7 +1,7 @@
 // the api for server components. real client when CUSTOCK_API_URL answers, fixtures otherwise.
 
 import { createApiClient, type CustockApi } from '@custock/core';
-import { createFixtureApi } from './fixtures';
+import { headers } from 'next/headers';
 
 let fixture: CustockApi | null = null;
 let probe: Promise<boolean> | null = null;
@@ -20,11 +20,28 @@ async function reachable(url: string): Promise<boolean> {
 export async function serverApi(locale?: string): Promise<{ api: CustockApi; mode: 'real' | 'fixtures' }> {
   const url = process.env.CUSTOCK_API_URL?.replace(/\/$/, '');
   // in production the api is always real. sample data is only a fallback while developing
-  if (url && (process.env.NODE_ENV === 'production' || (await reachable(url)))) {
-    return { api: createApiClient({ baseUrl: url, getLocale: () => locale ?? null }), mode: 'real' };
+  if (process.env.NODE_ENV === 'production') {
+    return { api: createApiClient({ baseUrl: url ?? 'http://127.0.0.1:8787', getLocale: () => locale ?? null, headers: forwarded }), mode: 'real' };
   }
-  fixture ??= createFixtureApi();
+  if (url && (await reachable(url))) {
+    return { api: createApiClient({ baseUrl: url, getLocale: () => locale ?? null, headers: forwarded }), mode: 'real' };
+  }
+  fixture ??= (await import('./fixtures')).createFixtureApi();
   return { api: fixture, mode: 'fixtures' };
+}
+
+// the visitor's address for the api's rate limits and consent records. the api only believes it
+// with the shared internal key (CUSTOCK_INTERNAL_KEY, set for both processes by deploy/start.mjs).
+// the reverse proxy appends the real address last.
+export async function forwarded(): Promise<Record<string, string> | undefined> {
+  const key = process.env.CUSTOCK_INTERNAL_KEY;
+  if (!key) return undefined;
+  try {
+    const ip = (await headers()).get('x-forwarded-for')?.split(',').map((x) => x.trim()).filter(Boolean).at(-1);
+    return ip ? { 'X-Custock-Internal': key, 'X-Custock-Client-Ip': ip } : undefined;
+  } catch {
+    return undefined; // outside a request, for example at build time
+  }
 }
 
 export const isDev = process.env.NODE_ENV !== 'production' || process.env.CUSTOCK_SHOW_DEV === '1';
