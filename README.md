@@ -1,7 +1,7 @@
 # Custock
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
-![Expo](https://img.shields.io/badge/Expo%20(React%20Native)-000020?logo=expo&logoColor=white)
+![PWA](https://img.shields.io/badge/PWA-installable-5A0FC8?logo=pwa&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
 ![Languages](https://img.shields.io/badge/i18n-EN%20%7C%20EL%20%7C%20RU-B0234F)
