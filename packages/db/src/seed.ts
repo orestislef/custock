@@ -205,6 +205,12 @@ export function seed(db: Db, opts: { now?: number; passwordHash?: string } = {})
       ins('category_translations', { category_id: cats[k], locale: 'en', name: en });
       ins('category_translations', { category_id: cats[k], locale: 'ru', name: ru });
     });
+    // each sample category shows one of the built in icons (databases older than 0015 have no column)
+    const icons: Record<string, string> = { pantry: 'jar', coffee: 'coffee', sweets: 'sweets', home: 'box', care: 'leaf', cheese: 'cheese' };
+    if ((db.prepare('PRAGMA table_info(categories)').all() as { name: string }[]).some((c) => c.name === 'icon_key')) {
+      const setIcon = db.prepare('UPDATE categories SET icon_key = ? WHERE id = ?');
+      for (const [k, icon] of Object.entries(icons)) if (cats[k]) setIcon.run(icon, cats[k]);
+    }
 
     // ------------------------------------------------------------ products
     interface ProductDef {

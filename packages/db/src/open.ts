@@ -80,6 +80,12 @@ export function rebuildSearch(db: Db): void {
   db.exec("INSERT INTO products_fts(products_fts) VALUES ('rebuild'); INSERT INTO customers_fts(customers_fts) VALUES ('rebuild');");
 }
 
+// a migration that copies a table other tables point at (sqlite cannot change a column or a check
+// in place) needs foreign keys off while it runs, and sqlite only switches them outside a
+// transaction. such a file carries this line; every key is checked before it commits, so it can
+// never leave a dangling reference behind.
+const FOREIGN_KEYS_OFF = /^--\s*custock:foreign-keys-off(?=\s|$)/m;
+
 // forward only. each file runs once, in name order, inside a transaction.
 export function migrate(db: Db, dir: string = MIGRATIONS_DIR): string[] {
   db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)');
@@ -89,11 +95,22 @@ export function migrate(db: Db, dir: string = MIGRATIONS_DIR): string[] {
   for (const file of files) {
     if (done.has(file)) continue;
     const sql = readFileSync(join(dir, file), 'utf8');
-    db.transaction(() => {
-      db.exec(sql);
-      FIXUPS[file]?.(db);
-      db.prepare('INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)').run(file, Date.now());
-    })();
+    const keysOff = FOREIGN_KEYS_OFF.test(sql);
+    const keysWere = keysOff ? (db.pragma('foreign_keys', { simple: true }) as number) : 0;
+    if (keysOff) db.pragma('foreign_keys = OFF');
+    try {
+      db.transaction(() => {
+        db.exec(sql);
+        FIXUPS[file]?.(db);
+        if (keysOff) {
+          const broken = db.pragma('foreign_key_check') as { table: string }[];
+          if (broken.length) throw new Error(`${file} would leave ${broken.length} broken references (first in ${broken[0]!.table})`);
+        }
+        db.prepare('INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)').run(file, Date.now());
+      })();
+    } finally {
+      if (keysOff && keysWere) db.pragma('foreign_keys = ON');
+    }
     applied.push(file);
   }
   return applied;
