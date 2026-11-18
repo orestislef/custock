@@ -1,4 +1,5 @@
 import { see, L, WEB, eq, expect, go, login, open, seed, skip, test, text } from '../lib.mjs';
+import cfg from '../e2e.config.mjs';
 
 test('pwa', 'staff and business manifests', async () => {
   const staff = await (await fetch(`${WEB}/manifest.webmanifest`)).json();
@@ -9,18 +10,20 @@ test('pwa', 'staff and business manifests', async () => {
   eq([icon.status, icon.headers.get('content-type')], [200, 'image/png'], 'business icon');
 });
 
-test('pwa', 'the service worker registers with the /custock/ scope', async (t) => {
+test('pwa', 'the service worker registers with the base path scope', async (t) => {
+  // the app's own path: /custock/ under a path, / on its own subdomain
+  const want = `${cfg.basePath}/`;
   const page = await open(t, { device: 'phone' });
   await go(page, '/admin/login');
-  const scope = await page.evaluate(async () => {
+  const scope = await page.evaluate(async (want) => {
     for (let i = 0; i < 40; i++) {
-      const r = await navigator.serviceWorker.getRegistration('/custock/');
+      const r = await navigator.serviceWorker.getRegistration(want);
       if (r?.active) return new URL(r.scope).pathname;
       await new Promise((ok) => setTimeout(ok, 250));
     }
     return '';
-  });
-  eq(scope, '/custock/', 'service worker scope');
+  }, want);
+  eq(scope, want, 'service worker scope');
 });
 
 test('pwa', 'offline: a page seen before opens, a new one shows the offline page', async (t) => {

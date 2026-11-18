@@ -15,7 +15,8 @@ export default {
   // E2E_BUILD_DIR lets two runs build side by side (a sibling folder of the repo root's e2e-build)
   build: process.env.E2E_BUILD_DIR ? join(repo, process.env.E2E_BUILD_DIR) : join(repo, 'e2e-build'),
   results: join(here, 'results'),
-  basePath: '/custock',
+  // E2E_BASE_PATH='' builds and tests the app at the root, as on its own subdomain
+  basePath: process.env.E2E_BASE_PATH ?? '/custock',
   apiPort: Number(process.env.E2E_API_PORT ?? 8811),
   webPort: Number(process.env.E2E_WEB_PORT ?? 3811),
   password: 'custock',

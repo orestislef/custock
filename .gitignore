@@ -46,3 +46,6 @@ CLAUDE.md
 
 # tool folders from templates
 .claude/
+
+# e2e build snapshots (apps/web/e2e)
+/e2e-build*/

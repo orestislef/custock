@@ -1,4 +1,4 @@
-import { see, L, api, eq, expect, go, lemoni, linkIn, login, ok, one, open, outboxFor, q, seed, sleep, test, text, waitOutbox } from '../lib.mjs';
+import { see, L, api, eq, expect, go, lemoni, linkIn, login, ok, one, open, outboxFor, q, seed, skip, sleep, test, text, waitOutbox } from '../lib.mjs';
 import { openSheet, primary } from '../helpers.mjs';
 
 const st = { email: 'cust-e2e@example.com' };
@@ -78,6 +78,8 @@ test('customers', 'catalog off, followers and everyone', async (t) => {
 });
 
 test('customers', 'notify me, then back in stock sends a delivery', async (t) => {
+  // a run filtered on "stock" picks this test without the earlier ones that sign the customer up
+  if (!st.tokens) skip('needs the customer signed up by the earlier tests in this file');
   const l = await lemoni();
   const owner = await login(seed.owner);
   const p = await ok(`/v1/orgs/${l.orgId}/products`, { method: 'POST', token: owner, body: { name: 'E2E Rare tea', priceMinor: 450, uom: 'piece' } });
