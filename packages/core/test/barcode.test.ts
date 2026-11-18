@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ean13, expandUpcE, gtinCheckDigit, isValidGtin, makeInternalEan13, normalizeBarcode } from '../src/index';
+import { DEFAULT_OWN_DOMAINS, ean13, expandUpcE, gtinCheckDigit, isValidGtin, makeInternalEan13, normalizeBarcode, ownDomainsFor, setOwnDomains } from '../src/index';
 
 describe('barcodes', () => {
   it('computes check digits', () => {
@@ -46,5 +46,22 @@ describe('barcodes', () => {
     expect(isValidGtin(c)).toBe(true);
     expect(normalizeBarcode(c).kind).toBe('internal');
     expect(makeInternalEan13(7, '29').startsWith('29')).toBe(true);
+  });
+});
+
+describe('our own shelf qr codes', () => {
+  const shelf = 'https://orestislef.gr/custock/p/5200044170102';
+  it('come from the configured web address, not a fixed list', () => {
+    expect(DEFAULT_OWN_DOMAINS).not.toContain('orestislef.github.io');
+    expect(ownDomainsFor('https://orestislef.gr/custock', 'shop.example.com', 'not a url %')).toEqual(['custock.app', 'localhost', 'orestislef.gr', 'shop.example.com']);
+    expect(normalizeBarcode(shelf).kind).toBe('raw');
+    expect(normalizeBarcode(shelf, null, { ownDomains: ownDomainsFor('https://orestislef.gr') })).toMatchObject({ kind: 'gtin', codeNorm: '05200044170102' });
+    expect(normalizeBarcode('https://orestislef.github.io/custock/p/5200044170102').kind).toBe('raw');
+  });
+  it('the api can set the default once', () => {
+    setOwnDomains(ownDomainsFor('https://orestislef.gr/custock'));
+    expect(normalizeBarcode(shelf).kind).toBe('gtin');
+    setOwnDomains([]);
+    expect(normalizeBarcode(shelf).kind).toBe('raw');
   });
 });

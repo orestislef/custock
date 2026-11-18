@@ -118,7 +118,7 @@ export interface CustockApi {
   // public, no login
   joinPage(code: string): Promise<JoinPage>;
   join(code: string, input: JoinInput): Promise<{ pending: true; devConfirmLink?: string }>;
-  confirmJoin(token: string): Promise<{ orgName: string; scopeName: string }>;
+  confirmJoin(token: string): Promise<{ orgName: string; scopeName: string; orgSlug?: string }>;
   shelfProduct(code: string): Promise<PublicProduct>;
 
   // ---------------------------------------------------------------- stage 2 additions

@@ -11,7 +11,29 @@ export interface NormalizedBarcode {
   gtin: string | null; // gtin-14 when it is one
 }
 
-export const DEFAULT_OWN_DOMAINS = ['custock.app', 'orestislef.github.io', 'localhost'];
+export const DEFAULT_OWN_DOMAINS: readonly string[] = ['custock.app', 'localhost'];
+
+// the hosts our own shelf qr codes point at, as host names. pass urls or hosts: the api gives the
+// host of CUSTOCK_PUBLIC_WEB_URL, a web page its own origin.
+export function ownDomainsFor(...urlsOrHosts: (string | null | undefined)[]): string[] {
+  const out = new Set<string>(DEFAULT_OWN_DOMAINS);
+  for (const u of urlsOrHosts) {
+    if (!u) continue;
+    try {
+      out.add(new URL(u.includes('://') ? u : `https://${u}`).hostname.toLowerCase());
+    } catch {
+      // not a url or host, skipped
+    }
+  }
+  return [...out];
+}
+
+let ownDefault: readonly string[] = DEFAULT_OWN_DOMAINS;
+
+// what normalizeBarcode uses when no ownDomains are passed. the api sets it once at startup.
+export function setOwnDomains(domains: readonly string[]) {
+  ownDefault = domains.length ? domains : DEFAULT_OWN_DOMAINS;
+}
 
 // default in store prefix range for our own labels (gs1 restricted circulation 20 to 29)
 export const DEFAULT_INTERNAL_PREFIX = '20';
@@ -100,7 +122,7 @@ export function normalizeBarcode(
 ): NormalizedBarcode {
   const code = raw.trim().replace(/^\][A-Za-z]\d/, '');
   const sym = (symbology ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const ownDomains = opts.ownDomains ?? DEFAULT_OWN_DOMAINS;
+  const ownDomains = opts.ownDomains ?? ownDefault;
 
   // urls: our own shelf qr, gs1 digital link, anything else stays raw
   if (/^https?:\/\//i.test(code)) {

@@ -496,6 +496,8 @@ export type FeedItem = z.infer<typeof FeedItem>;
 export const JoinPage = z.object({
   code: z.string(),
   orgName: z.string(),
+  // the business's page is /s/<orgSlug>. optional so older clients and fixtures still fit
+  orgSlug: z.string().optional(),
   scopeName: z.string(),
   scopeType: ScopeType,
   brandColor: z.string().nullable(),
@@ -635,7 +637,8 @@ export const Invite = z.object({
   roleName: z.string(),
   scopeType: ScopeType,
   scopeId: z.string(),
-  invitedBy: z.string(),
+  // null for the first owner of a business, invited by the server setup
+  invitedBy: z.string().nullable(),
   createdAt: z.number(),
   expiresAt: z.number(),
 });
@@ -665,6 +668,8 @@ export const DevOutboxItem = z.object({
   locale: z.string().nullable(),
   title: z.string().nullable(),
   body: z.string().nullable(),
+  // emails: the html that goes out next to the plain text body
+  html: z.string().nullable().optional(),
   payload: z.unknown().nullable(),
   createdAt: z.number(),
 });
