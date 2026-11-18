@@ -3,6 +3,32 @@
 What we write custock in. I know Flutter, so Flutter was the starting point. This file is the
 honest comparison and the pick.
 
+## update: the website is the phone app
+
+**decided:** no Expo app for now. the Next.js web app is the product on phones too, added to the
+home screen as a web app (PWA). staff and customers use the same site, installed or not.
+
+why:
+
+- one app to build and run instead of two. the web had to exist anyway (join pages, admin).
+- no app store review, no builds on a mac, updates are live the moment we deploy.
+- a shop can put "add us to your home screen" on a poster. each business gets its own home
+  screen app with its own name and icon (a manifest per business).
+
+what the browser gives us now, and the limits we accept:
+
+| need | on the web | limit |
+|---|---|---|
+| scanning | camera plus BarcodeDetector, a zxing wasm fallback where the browser has none (iOS Safari) | a bit slower than native, fine for counter and shelf work |
+| push | Web Push with our own VAPID keys, no Firebase needed | on iOS only after the app is added to the home screen (iOS 16.4 and up) |
+| offline stock work | service worker plus IndexedDB outbox, same idempotent movement ids | iOS may clear storage of sites not used for weeks, the outbox syncs on every open |
+| haptics | navigator.vibrate on Android | none on iOS |
+| look and feel | our own tab bar, sheets and transitions, safe areas, standalone mode | not the system tab bar, so liquid glass is drawn by us |
+
+the Expo app is parked on its own branch with everything it had (scanning, offline outbox,
+transfers). if the web ever hits a wall (background sync on iOS, very fast scanning), it comes
+back as a thin shell around the same api.
+
 ## what the product actually needs
 
 Before picking tools, the list of things that are hard here:

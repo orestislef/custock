@@ -38,6 +38,47 @@ All in `deploy/.env` (start from `env.example`).
 | `CUSTOCK_DEV` | never on a server | dev features |
 | `LITESTREAM_BUCKET`, `LITESTREAM_ENDPOINT`, `LITESTREAM_ACCESS_KEY_ID`, `LITESTREAM_SECRET_ACCESS_KEY` | yes | the R2 bucket and an API token for it |
 
+## one container on a shared server
+
+The simplest setup, and the one in use: the api and the web in one image (`Dockerfile`,
+`start.mjs`), one container, behind the reverse proxy the server already has, under a path of an
+existing domain (`/custock`). The server keeps no source code: `ship.sh` sends the committed code
+over ssh, builds the image there, then removes the source and the build cache.
+
+| file | what |
+|------|------|
+| `Dockerfile` | api and web together, the web built for `CUSTOCK_BASE_PATH` |
+| `start.mjs` | starts the api, then the web once the api answers, stops both together |
+| `compose.server.yml` | the container, ports on 127.0.0.1 only. lives on the server as `/opt/custock/compose.yml` |
+| `ship.sh` | build and restart by hand from your machine |
+
+Once on the server: `/opt/custock/.env` from `env.example` (secrets, `CUSTOCK_PUBLIC_WEB_URL` with
+the path, `CUSTOCK_API_URL` as `<web url>/api`, `CUSTOCK_TRUSTED_PROXY=1`), then the proxy. For
+Apache, inside the domain's `:443` virtual host, the api line first:
+
+```
+<Location /custock>
+    RequestHeader set X-Forwarded-Proto "https"
+</Location>
+ProxyPass /custock/api/ http://127.0.0.1:8790/
+ProxyPassReverse /custock/api/ http://127.0.0.1:8790/
+ProxyPass /custock http://127.0.0.1:3090/custock
+ProxyPassReverse /custock http://127.0.0.1:3090/custock
+```
+
+Then every update, from the repo on your machine:
+
+```
+CUSTOCK_SSH=root@your-server CUSTOCK_SSH_KEY=~/.ssh/your-key sh deploy/ship.sh
+```
+
+Only committed code is shipped. The data lives in the `custock_data` volume and survives
+rebuilds. The first owner is created with the api's command line inside the container (see
+[apps/api](../apps/api/README.md)).
+
+The rest of this file is the bigger setup with the api and web as separate services and
+litestream next to them.
+
 ## first install
 
 1. A server with Docker and the compose plugin, a user that is not root, the firewall open for 22,
