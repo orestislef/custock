@@ -11,10 +11,10 @@
     },
     {
       "key": "demo",
-      "name": "Clickable demo (GitHub Pages)",
+      "name": "Demo (GitHub Pages)",
       "percent": 100,
       "state": "done",
-      "note": "Live with every planned flow in English, Greek and Russian, on phones and desktop. Passed an independent Apple design review: 45 fixes applied (contrast, tab labels, accent discipline, sticky receive, modal composer, edge swipe back, reduced transparency, self hosted font)."
+      "note": "The real app on made up data in the browser, rebuilt from the code with node scripts/build-demo.mjs. Owner, manager, staff and the customer app, in English, Greek and Russian. Nothing is sent, a reload starts over."
     },
     {
       "key": "setup",
@@ -169,6 +169,10 @@
     {
       "at": "2026-11-19T11:00:00+02:00",
       "text": "Live test on production with real email, push on an iPhone and the camera. Fixed: the camera counting one label many times, a lost scan behind a slow one, push consent from the app switch, back in stock and post push texts, lost in transit in shrinkage, forgot password for customers, sign ins piling up, a job queued every 5 seconds. Test data wiped. 100%."
+    },
+    {
+      "at": "2026-11-19T12:30:00+02:00",
+      "text": "The demo is now the real app on made up data, built from the code instead of the first hand made prototype."
     }
   ],
   "screens": [

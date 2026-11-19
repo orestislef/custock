@@ -25,10 +25,10 @@ English, Greek and Russian from the first screen.
 
 **[orestislef.github.io/custock/demo](https://orestislef.github.io/custock/demo/)**
 
-A clickable demo of how the finished app should behave, with made up data. Switch roles to see what
-each person can and cannot do, switch language, change what customers are allowed to see, scan,
-receive, post an offer and watch the push land on a customer's phone. Works on a phone too, and
-can be added to the home screen.
+The real app, built as static pages on made up data that lives in your browser. Sign in from the start
+page as the owner, a manager or staff, or open the customer app, and try stock, scanning with a typed
+code, posts, reports, settings and notify me. Nothing is sent anywhere and a reload starts over.
+Built with `node scripts/build-demo.mjs`.
 
 ## Status
 
