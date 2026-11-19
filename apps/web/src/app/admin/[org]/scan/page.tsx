@@ -9,10 +9,11 @@ import Link from '@/components/admin/org-link';
 import { useSearchParams } from 'next/navigation';
 import { useOrgRouter as useRouter } from '@/components/admin/org-link';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ean13, featureOn, uuidv7, type MovementBatchResult, type Product, type ScanResult, type Shop, type StockCount, type StockLevel } from '@custock/core';
+import { ScanFilter, ean13, featureOn, uuidv7, type MovementBatchResult, type Product, type ScanResult, type Shop, type StockCount, type StockLevel } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { OutboxBadge } from '@/components/admin/outbox-badge';
-import { Camera } from '@/components/scan/camera';
+import { Camera, SAME_CODE_GAP_MS } from '@/components/scan/camera';
+import { armScanSound, scanSound } from '@/lib/scan-sound';
 import { useToast } from '@/components/ui/client-kit';
 import { Chips, Why } from '@/components/ui/kit';
 import { IconBarcode, IconCheck, IconKeyboard, IconMinus, IconPlus, IconShop, IconTruck } from '@/components/ui/icons';
@@ -74,6 +75,14 @@ function Scan() {
   const [archived, setArchived] = useState<Product | null>(null);
   const countId = useRef<string | null>(null);
   const inFlight = useRef(false);
+  // codes read while the one before is still on its way wait here and go through in order. the
+  // camera already ignores a code held still, so this only ever holds different items scanned fast
+  const waiting = useRef<{ raw: string; format?: string; at: number; camera: boolean }[]>([]);
+  const nextCode = useRef<(raw: string, format?: string, at?: number, camera?: boolean) => Promise<void>>(async () => {});
+  // what the camera counts: one item at a time inside the frame. after a lookup it learns which
+  // codes are the same item (the barcode and the qr code on one shelf label)
+  const filter = useMemo(() => new ScanFilter(SAME_CODE_GAP_MS), []);
+  useEffect(() => { armScanSound(); }, []);
 
   // keep a copy of this shop's catalog on the device, so scans resolve without signal
   useEffect(() => {
@@ -154,9 +163,16 @@ function Scan() {
     setLines((cur) => [{ variantId, product, qty: line.countedQty, expected: line.expectedQty }, ...cur.filter((l) => l.variantId !== variantId)]);
   }
 
-  async function handleCode(raw: string, format?: string) {
+  // at: when the code was read, so a code that waited in line is judged by when it was seen.
+  // camera: from the camera, where one item can show several codes. typed codes (a keyboard or a
+  // usb scanner) always count, every time.
+  async function handleCode(raw: string, format?: string, at: number = now(), camera = false) {
     const value = raw.trim();
-    if (!value || inFlight.current) return;
+    if (!value) return;
+    if (inFlight.current) {
+      if (waiting.current.length < 50) waiting.current.push({ raw: value, format, at, camera });
+      return;
+    }
     inFlight.current = true;
     try {
       let r: ScanResult;
@@ -169,6 +185,7 @@ function Scan() {
         r = { codeNorm: value, kind: 'raw', valid: true, match: hit ? 'variant' : 'unknown', packQty: hit?.packQty ?? 1, product: hit?.product ?? null, variantId: hit?.variantId ?? null };
       }
       if (r.match === 'unknown' || !r.product || !r.variantId) {
+        scanSound('miss');
         setUnknown(r);
         setArchived(null);
         return;
@@ -177,8 +194,12 @@ function Scan() {
       // an archived product is not sold, received or counted from the scanner; look up still opens it
       if (r.match === 'archived' && mode !== 'lookup') { setArchived(r.product); return; }
       setArchived(null);
+      // another code of an item already in the picture (the qr next to the barcode) is not a second
+      // item. a pack code and a unit code of one product are different items.
+      if (camera && !filter.claim(value, `${r.variantId}:${r.packQty}`, at)) return;
+      scanSound('ok');
       const levels = (r.product as Product & { levels?: StockLevel[] }).levels;
-      if (mode === 'lookup') router.push(`/admin/stock/${r.product.id}`);
+      if (mode === 'lookup') { waiting.current = []; router.push(`/admin/stock/${r.product.id}`); }
       else if (mode === 'sell') await sellOne(r.product, r.variantId, r.packQty);
       else if (mode === 'count') await countScan(r.product, r.variantId, r.packQty, 'add');
       else addLine(r.product, r.variantId, r.packQty, levels);
@@ -186,8 +207,12 @@ function Scan() {
       toast(isNetworkError(e) ? t('offline.needsSignal') : t(`common:error.${(e as { code?: string }).code ?? 'internal'}`));
     } finally {
       inFlight.current = false;
+      const next = waiting.current.shift();
+      if (next) void nextCode.current(next.raw, next.format, next.at, next.camera);
     }
   }
+  // the newest handleCode (it reads the current mode and shop), for the codes that waited
+  useEffect(() => { nextCode.current = handleCode; });
 
   async function receiveAll() {
     if (!workShop || !lines.length) return;
@@ -260,6 +285,9 @@ function Scan() {
   function changeMode(m: Mode) {
     setMode(m);
     try { localStorage.setItem(MODE_KEY, m); } catch {}
+    // codes waiting from the old mode are dropped. an item still in the picture does not count in the
+    // new mode until it is taken away and shown again, so changing mode never sells by surprise
+    waiting.current = [];
     setLines([]);
     setUnknown(null);
     setArchived(null);
@@ -282,7 +310,9 @@ function Scan() {
     <div className="page-in pt-3 max-w-[640px]">
       <h1 className="sr-only">{t('scanner.title')}</h1>
       <Camera
-        onCode={(raw, format) => void handleCode(raw, format)}
+        onCode={(raw, format) => void handleCode(raw, format, now(), true)}
+        filter={filter}
+        silent
         paused={busy}
         overlay={<OutboxBadge dark />}
         actions={
@@ -367,6 +397,10 @@ function Scan() {
                   <span className="t-headline tnum min-w-[36px] text-center"><Tally value={l.qty} format={(n) => qtyNumber(n, l.product.uom, locale)} /></span>
                   {mode !== 'sell' ? (
                     <button type="button" className="icon-btn" aria-label={t('scanner.more', { name: name(l.product) })} onClick={() => setQty(l, l.qty + 1)}><IconPlus size={20} /></button>
+                  ) : l.product.uom === 'piece' ? (
+                    // one more of the same, without scanning the same code again
+                    <button type="button" className="icon-btn" aria-label={t('scanner.sellOneMore', { name: name(l.product) })} disabled={busy}
+                      onClick={() => void sellOne(l.product, l.variantId, 1).then(() => scanSound('ok'), () => toast(t('offline.needsSignal')))}><IconPlus size={20} /></button>
                   ) : null}
                 </li>
               ))}

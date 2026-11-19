@@ -6,7 +6,8 @@
 
 import { basePath } from './api-client';
 
-export interface Detected { rawValue: string; format: string }
+// boundingBox: where in the camera picture, in camera pixels (both readers give it)
+export interface Detected { rawValue: string; format: string; boundingBox?: { x: number; y: number; width: number; height: number } }
 export interface Detector { detect(source: HTMLVideoElement): Promise<Detected[]> }
 
 // everything a shop meets: retail barcodes, carton codes (itf-14), labels (code 128, 39) and qr

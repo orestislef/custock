@@ -1037,9 +1037,9 @@
     },
     "hint": {
       "lookup": "Point at a barcode or QR code to open the product.",
-      "receive": "Scan everything that arrived, then confirm once.",
-      "sell": "Each scan takes one off, with undo.",
-      "count": "Scan each item. Differences show against the expected stock.",
+      "receive": "One item at a time in the frame, then confirm once. Change the numbers with − and +.",
+      "sell": "One item at a time in the frame. Held still it counts once, for more of the same tap +. Undo is on each sale.",
+      "count": "One item at a time in the frame. Held still it counts once, show it again for the next one.",
       "transfer": "Scan what goes to the other shop, then pick the shop."
     },
     "listHead": {
@@ -1096,7 +1096,8 @@
     "more": "One more {{name}}",
     "openTransfer": "Open",
     "archivedTitle": "Archived product",
-    "archivedBody": "{{name}} is archived. It is not sold, received or counted any more."
+    "archivedBody": "{{name}} is archived. It is not sold, received or counted any more.",
+    "sellOneMore": "Sell one more {{name}}"
   },
   "offline": {
     "badge_one": "{{count}} not synced yet",
