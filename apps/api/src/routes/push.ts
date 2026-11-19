@@ -9,7 +9,8 @@ import type { AppEnv } from '../types';
 import { cfgOf, nowOf } from '../lib/context';
 import { ApiProblem, notFound } from '../lib/problem';
 import { throttle } from '../lib/ratelimit';
-import { platform } from '../lib/tenant';
+import { platform, Tenant } from '../lib/tenant';
+import { consent } from './people-writes';
 import { devOutboxTransport } from '../lib/transport';
 import { pushUrl, recomputePushOk, subscriptionsFor } from '../lib/webpush';
 
@@ -54,6 +55,13 @@ export function pushRoutes(app: Hono<AppEnv>) {
            SELECT id FROM push_subscriptions WHERE user_id = @u ORDER BY updated_at DESC, rowid DESC LIMIT @max)`,
         { u: user.id, max: MAX_SUBSCRIPTIONS_PER_USER },
       );
+      // turning on notifications in a business's own app is the yes to its notifications. only when
+      // the customer never decided: a no they gave stays a no until they say yes themselves
+      if (orgId) {
+        const cust = p.get<{ id: string }>('SELECT id FROM customers WHERE org_id = @o AND user_id = @u AND erased_at IS NULL', { o: orgId, u: user.id });
+        const decided = cust && p.get("SELECT 1 FROM consents WHERE org_id = @o AND customer_id = @c AND channel = 'push'", { o: orgId, c: cust.id });
+        if (cust && !decided) consent(new Tenant(db, orgId), cust.id, 'push', true, input.locale ?? user.locale, 'app', now, null, ua);
+      }
       recomputePushOk(db, user.id, now);
       if (before && before.user_id !== user.id) recomputePushOk(db, before.user_id, now);
     })();

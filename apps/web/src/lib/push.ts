@@ -139,6 +139,9 @@ export async function enablePush(api: CustockApi, opts: { orgId: string | null; 
     await api.savePushSubscription(toInput(sub, opts.orgId, opts.locale));
     await kvSet('push.saved', { at: Date.now(), orgId: opts.orgId }).catch(() => {});
     setWanted(opts.orgId, true);
+    // in a business's own app this tap is also the yes to its notifications. for its team the
+    // call has nothing to do and is turned away, which is fine
+    if (opts.orgId) await api.setChannel(opts.orgId, 'push', true).catch(() => {});
     return 'on';
   } catch {
     return 'failed';
@@ -148,6 +151,8 @@ export async function enablePush(api: CustockApi, opts: { orgId: string | null; 
 // signing out keeps the wish (forget false), turning the switch off forgets it
 export async function disablePush(api: CustockApi, opts: { forget?: boolean; orgId?: string | null } = {}): Promise<void> {
   if (opts.forget) setWanted(opts.orgId ?? null, false);
+  // turning the switch off in a business's app is a no to its notifications too (signing out is not)
+  if (opts.forget && opts.orgId) await api.setChannel(opts.orgId, 'push', false).catch(() => {});
   const sub = await currentSubscription().catch(() => null);
   if (!sub) return;
   await api.deletePushSubscription(sub.endpoint).catch(() => {});

@@ -124,7 +124,7 @@ function addPendingSubscription(t: Tenant, customerId: string, scopeType: string
 
 // the consent ledger plus the cached flags. email counts only with a confirmed address,
 // push only with an app on a device.
-function consent(t: Tenant, customerId: string, channel: 'email' | 'push' | 'sms', granted: boolean, locale: string, source: string, now: number, ip: string | null = null, ua: string | null = null) {
+export function consent(t: Tenant, customerId: string, channel: 'email' | 'push' | 'sms', granted: boolean, locale: string, source: string, now: number, ip: string | null = null, ua: string | null = null) {
   t.run(
     `INSERT INTO consents (id, org_id, customer_id, channel, granted, text_version, source, ip, user_agent, created_at)
      VALUES (@id, @org, @c, @ch, @g, @v, @s, @ip, @ua, @now)`,

@@ -111,6 +111,29 @@ describe('web push', () => {
     expect(await preview()).toBe(before + 1);
   });
 
+  it('turning on notifications in the business app is the yes, unless the customer said no before', async () => {
+    const join = async (email: string) => {
+      const code = (await call('POST', '/v1/auth/otp/request', undefined, { email, locale: 'en' })).body.devCode;
+      const token = (await call('POST', '/v1/auth/otp/verify', undefined, { email, code })).body.accessToken;
+      // joined with email only, nothing said about push
+      expect((await call('POST', '/v1/c/join/kif7q2', token, { push: false })).status).toBe(200);
+      const id = (db.prepare('SELECT id FROM customers WHERE org_id = ? AND email = ?').get(s.orgId, email) as Json).id;
+      return { token, ok: () => (db.prepare('SELECT push_ok FROM customers WHERE id = ?').get(id) as Json).push_ok };
+    };
+    const quiet = await join('push.later@example.com');
+    expect(quiet.ok()).toBe(0);
+    expect((await call('POST', '/v1/me/push-subscriptions', quiet.token, { ...fakeSubscription('later-1'), orgId: s.orgId })).status).toBe(204);
+    expect(quiet.ok()).toBe(1);
+    // a no stays a no when the app refreshes its subscription
+    const said = await join('push.no@example.com');
+    expect((await call('PUT', '/v1/c/channels', said.token, { orgId: s.orgId, channel: 'push', on: false })).status).toBe(204);
+    expect((await call('POST', '/v1/me/push-subscriptions', said.token, { ...fakeSubscription('no-1'), orgId: s.orgId })).status).toBe(204);
+    expect(said.ok()).toBe(0);
+    // and the switch in the app says yes again
+    expect((await call('PUT', '/v1/c/channels', said.token, { orgId: s.orgId, channel: 'push', on: true })).status).toBe(204);
+    expect(said.ok()).toBe(1);
+  });
+
   it('the same browser signed in as someone else moves the subscription', async () => {
     expect((await call('POST', '/v1/me/push-subscriptions', tokens.anna, { ...sub, orgId: null })).status).toBe(204);
     expect((db.prepare('SELECT user_id FROM push_subscriptions WHERE endpoint = ?').get(sub.endpoint) as Json).user_id).toBe(s.users.anna);
