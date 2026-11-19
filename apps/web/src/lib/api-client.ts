@@ -7,7 +7,8 @@ import { createApiClient, type CustockApi, type MeContext } from '@custock/core'
 import { reportError } from './report-error';
 
 // a production build always talks to the real api, sample data exists only while developing
-export const apiMode: 'real' | 'fixtures' = process.env.NODE_ENV === 'production' || process.env.NEXT_PUBLIC_API_MODE === 'real' ? 'real' : 'fixtures';
+// the public demo always runs on the sample data in the browser
+export const apiMode: 'real' | 'fixtures' = process.env.NEXT_PUBLIC_DEMO === '1' ? 'fixtures' : process.env.NODE_ENV === 'production' || process.env.NEXT_PUBLIC_API_MODE === 'real' ? 'real' : 'fixtures';
 // the path the app is served under ('' or for example '/custock'), fixed at build time
 export const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 
@@ -115,7 +116,8 @@ export function createBrowserApi(opts: {
       onServerError: (e) => reportError({ source: 'api', method: e.method, apiPath: e.path, status: e.status }),
     });
   }
-  if (process.env.NODE_ENV === 'production') throw new Error('no sample data in a production build');
+  // the public demo is the one production build that runs on the sample data
+  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_DEMO !== '1') throw new Error('no sample data in a production build');
   if (!fixture) {
     const token = loadTokens()?.accessToken;
     fixture = lazyFixtureApi(token?.startsWith('dev.') ? token.slice(4) : null);
@@ -127,7 +129,7 @@ export function createBrowserApi(opts: {
 function lazyFixtureApi(initialUser: string | null): CustockApi {
   let loading: Promise<CustockApi> | null = null;
   // the condition is fixed at build time, so a production bundle does not even contain the chunk
-  const load = () => (loading ??= process.env.NODE_ENV === 'production'
+  const load = () => (loading ??= process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_DEMO !== '1'
     ? Promise.reject(new Error('no sample data in a production build'))
     : import('./fixtures').then((m) => m.createFixtureApi(initialUser)));
   return new Proxy({} as CustockApi, {

@@ -19,6 +19,11 @@ async function reachable(url: string): Promise<boolean> {
 
 export async function serverApi(locale?: string): Promise<{ api: CustockApi; mode: 'real' | 'fixtures' }> {
   const url = process.env.CUSTOCK_API_URL?.replace(/\/$/, '');
+  // the public demo is built from the sample data, there is no api
+  if (process.env.NEXT_PUBLIC_DEMO === '1') {
+    fixture ??= (await import('./fixtures')).createFixtureApi();
+    return { api: fixture, mode: 'fixtures' };
+  }
   // in production the api is always real. sample data is only a fallback while developing
   if (process.env.NODE_ENV === 'production') {
     return { api: createApiClient({ baseUrl: url ?? 'http://127.0.0.1:8787', getLocale: () => locale ?? null, headers: forwarded }), mode: 'real' };

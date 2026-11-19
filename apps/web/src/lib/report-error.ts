@@ -95,7 +95,8 @@ let installed = false;
 
 // once per page: uncaught errors and promise rejections nobody handled
 export function installErrorReporting() {
-  if (installed || typeof window === 'undefined') return;
+  // the public demo has no server to report to
+  if (installed || typeof window === 'undefined' || process.env.NEXT_PUBLIC_DEMO === '1') return;
   installed = true;
   window.addEventListener('error', (e) => {
     // a failed image or script load has no error object, the page handles those itself

@@ -6,17 +6,23 @@ import path from 'node:path';
 const apiUrl = process.env.CUSTOCK_API_URL?.replace(/\/$/, '');
 // set at build time to serve the app under a path, for example /custock on a shared domain
 const basePath = process.env.CUSTOCK_BASE_PATH?.replace(/\/$/, '') || undefined;
+// the public demo (scripts/build-demo.mjs): static files for GitHub Pages with the sample data in
+// the browser. no server, no api, no proxy. when it is not set, nothing below changes.
+const demo = process.env.CUSTOCK_DEMO === '1';
+const demoBase = demo ? (basePath ?? '/custock/demo') : undefined;
 
 const nextConfig: NextConfig = {
   // the previous rendering model: pages read cookies for the language on every request.
   // cache components can come back once the customer pages are tuned for a static shell.
   cacheComponents: false,
   // the docker image (deploy/web.Dockerfile) runs the standalone server
-  output: 'standalone',
+  output: demo ? 'export' : 'standalone',
+  // a static host serves a folder's index.html
+  ...(demo ? { trailingSlash: true } : {}),
   // a separate build folder for side by side local builds (checks), the default otherwise
   distDir: process.env.CUSTOCK_NEXT_DIST || '.next',
   transpilePackages: ['@custock/core', '@custock/i18n', '@custock/tokens'],
-  basePath,
+  basePath: demoBase ?? basePath,
   poweredByHeader: false,
   // fixed security headers for every page. the Content-Security-Policy, with its nonce, comes from
   // src/proxy.ts. the HSTS header is set by the reverse proxy in front (deploy/README.md).
@@ -36,11 +42,12 @@ const nextConfig: NextConfig = {
     ];
   },
   env: {
-    NEXT_PUBLIC_API_MODE: apiUrl || process.env.NODE_ENV === 'production' ? 'real' : 'fixtures',
-    NEXT_PUBLIC_BASE_PATH: basePath ?? '',
+    NEXT_PUBLIC_API_MODE: demo ? 'fixtures' : apiUrl || process.env.NODE_ENV === 'production' ? 'real' : 'fixtures',
+    NEXT_PUBLIC_BASE_PATH: demoBase ?? basePath ?? '',
+    NEXT_PUBLIC_DEMO: demo ? '1' : '',
     // the build revision browsers put on their error reports (deploy/ship.sh passes it)
     NEXT_PUBLIC_BUILD_REV: process.env.CUSTOCK_REV ?? process.env.CUSTOCK_BUILD_REV ?? '',
-    NEXT_PUBLIC_SHOW_DEV: process.env.CUSTOCK_SHOW_DEV === '1' ? '1' : '',
+    NEXT_PUBLIC_SHOW_DEV: demo || process.env.CUSTOCK_SHOW_DEV === '1' ? '1' : '',
   },
   images: {
     unoptimized: true,
@@ -71,5 +78,11 @@ const nextConfig: NextConfig = {
     ];
   },
 };
+
+// a static export has no headers or rewrites to serve (the static host sends its own)
+if (demo) {
+  delete nextConfig.headers;
+  delete nextConfig.rewrites;
+}
 
 export default nextConfig;

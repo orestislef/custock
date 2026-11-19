@@ -1,0 +1,9 @@
+# GitHub Pages builds this repository with Jekyll, which leaves out names starting with an
+# underscore. the demo (demo/, built by scripts/build-demo.mjs) needs these.
+include:
+  - _next
+  - __*
+  - _not-found
+  - _buildManifest.js
+  - _ssgManifest.js
+  - _clientMiddlewareManifest.js

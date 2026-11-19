@@ -26,7 +26,7 @@ export default function LoginPage() {
   // quick logins for the made up accounts, only while developing
   const [devLogins, setDevLogins] = useState<{ email: string; name: string; role: string }[]>([]);
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production' && devBuild) void import('@/lib/fixtures').then((m) => setDevLogins(m.FIXTURE_LOGINS));
+    if ((process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_DEMO === '1') && devBuild) void import('@/lib/fixtures').then((m) => setDevLogins(m.FIXTURE_LOGINS));
   }, []);
 
   async function signIn(e?: React.FormEvent, as?: string) {

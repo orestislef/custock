@@ -49,3 +49,5 @@ CLAUDE.md
 
 # e2e build snapshots (apps/web/e2e)
 /e2e-build*/
+# the demo copy scripts/build-demo.mjs builds in
+/apps/.web-demo/

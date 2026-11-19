@@ -6,7 +6,7 @@ import type {
   Audience, AudiencePreview, Category, Customer, CustomerDetail, CustockApi, DashboardCards, FeedItem,
   GrantableRole, JoinInput, JoinLink, JoinPage, Locale, MeContext, Member, Movement, MovementBatchResult,
   MovementInput, OrgAccess, OrgSettings, Page, Post, PostInput, Product, ProductInput, PublicProduct, Role,
-  ScanResult, ScopeType, SeriesPoint, Shop, ShopGroup, StockLevel, Tokens, Variant,
+  ScanResult, ScopeType, SeriesPoint, Shop, ShopGroup, StockAlertItem, StockLevel, Tokens, Variant,
 } from '@custock/core';
 import { ALL_PERMISSIONS } from './perms';
 import { deviceOf, matches, searchKey } from '@custock/core';
@@ -48,6 +48,13 @@ export function ean13(body12: string): string {
 }
 
 const uid = () => (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2));
+
+// the public demo is static: a page exists only for ids known when it was built. a product, post,
+// count, transfer, customer, role or join link made there gets the next of a known series
+// (p-d1, p-d2, ...) instead of a random id. DEMO_SERIES is how many of each the build makes pages for.
+export const DEMO_SERIES = 12;
+const demoSeqs: Record<string, number> = {};
+const entityId = (prefix: string, random: () => string) => (process.env.NEXT_PUBLIC_DEMO === '1' ? `${prefix}d${(demoSeqs[prefix] = (demoSeqs[prefix] ?? 0) + 1)}` : random());
 
 class FixtureError extends Error {
   constructor(public status: number, public code: string) {
@@ -485,6 +492,10 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     };
   };
 
+  // the signed in customer of the sample data: follows Lemoni, what they saved and wait for
+  const mine = { following: true, saved: new Set<string>(), alerts: [] as StockAlertItem[] };
+  const isCustomer = () => currentUser === customerUser.userId;
+
   const publicProduct = (p: ProductRow): PublicProduct => {
     const v = p.variants[0]!;
     const offerPost = posts.find((x) => x.kind === 'offer' && x.status === 'sent' && (x.validUntil ?? 0) > Date.now() && x.products.some((pp) => pp.variantId === v.id));
@@ -499,7 +510,9 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
         const state = onHand <= 0 ? 'out' : onHand <= (p.uom === 'piece' ? settings.fewLeftThreshold : settings.fewLeftThreshold * 1000) ? 'few' : 'in';
         return { shopId: s.id, shopName: s.name, state: mode === 'off' ? null : state, qty: mode === 'exact' ? Math.max(0, onHand) : null };
       }),
-      variantId: v.id, waitingForIt: false, saved: false,
+      variantId: v.id,
+      waitingForIt: isCustomer() && mine.alerts.some((a) => a.productId === p.id && a.status === 'waiting'),
+      saved: isCustomer() && mine.saved.has(p.id),
     };
   };
 
@@ -513,7 +526,9 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async requestOtp() { return { sent: true, devCode: '123456' }; },
     async verifyOtp(email, code) {
       if (code !== '123456') throw new FixtureError(401, 'unauthorized');
-      currentUser = email === customerUser.email ? customerUser.userId : null;
+      // any address signs in as the sample customer, who keeps the address typed
+      if (!people.some((p) => p.email === email.toLowerCase().trim())) customerUser.email = email.toLowerCase().trim();
+      currentUser = customerUser.userId;
       return tokens(customerUser.userId);
     },
     async refresh(rt) { return tokens(rt.replace('devr.', '')); },
@@ -530,6 +545,12 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       return tokens(people[0]!.userId);
     },
     async me(): Promise<MeContext> {
+      if (isCustomer()) {
+        return {
+          user: { id: customerUser.userId, email: customerUser.email, displayName: customerUser.name, locale: customerUser.locale },
+          orgs: [], following: mine.following ? [{ orgId: ORG, orgName: settings.name, orgSlug: settings.slug, customerId: 'c-1' }] : [],
+        };
+      }
       const p = me();
       if (!p) throw new FixtureError(401, 'unauthorized');
       return { user: { id: p.userId, email: p.email, displayName: p.name, locale: p.locale }, orgs: [access(p)], following: [] };
@@ -591,7 +612,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     },
     async createProduct(_org, input: ProductInput) {
       if (!canDo('products.create')) throw new FixtureError(403, 'forbidden');
-      const id = `p-${uid().slice(0, 8)}`;
+      const id = entityId('p-', () => `p-${uid().slice(0, 8)}`);
       const code = input.barcode ?? ean13(`20${String(2000 + barcodeSeq++).padStart(10, '0')}`);
       // the sample data already takes variants and photo urls, the shapes the form sends
       const specs = input.variants?.length ? input.variants : [{ options: null, priceMinor: input.priceMinor ?? null }];
@@ -717,7 +738,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async createJoinLink(_org, input) {
       if (!canDo('joinlinks.manage', input.scopeType === 'shop' ? input.scopeId : undefined)) throw new FixtureError(403, 'forbidden');
       const code = uid().replace(/-/g, '').slice(0, 8);
-      const link: JoinLink = { id: uid(), code, scopeType: input.scopeType, scopeId: input.scopeId, label: input.label ?? null, url: `/j/${code}`, opens: 0, signups: 0, confirmed: 0, disabled: false };
+      const link: JoinLink = { id: entityId('jl-', uid), code, scopeType: input.scopeType, scopeId: input.scopeId, label: input.label ?? null, url: `/j/${code}`, opens: 0, signups: 0, confirmed: 0, disabled: false };
       joinLinks.unshift(link);
       return link;
     },
@@ -734,7 +755,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async createPost(_org, input: PostInput) {
       if (!canDo('posts.create')) throw new FixtureError(403, 'forbidden');
       const p: Post = {
-        id: `post-${uid().slice(0, 8)}`, orgId: ORG, kind: input.kind, status: 'draft', defaultLocale: input.defaultLocale,
+        id: entityId('post-', () => `post-${uid().slice(0, 8)}`), orgId: ORG, kind: input.kind, status: 'draft', defaultLocale: input.defaultLocale,
         translations: input.translations as Post['translations'], channels: input.channels, audience: input.audience,
         products: input.products.map((x) => variantInfo(x.variantId, x.offerPriceMinor)), coverUrl: input.coverUrl, scheduledAt: input.scheduledAt,
         validFrom: input.validFrom, validUntil: input.validUntil, authorId: me()!.userId, authorName: me()!.name, approvedBy: null,
@@ -824,7 +845,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       if (!canDo('roles.manage')) throw new FixtureError(403, 'forbidden');
       const existing = roles.find((r) => r.id === input.id);
       if (existing) { Object.assign(existing, { name: input.name, rank: input.rank, permissions: input.permissions }); return existing; }
-      const role: Role = { id: uid(), templateKey: null, name: input.name, rank: input.rank, locked: false, permissions: input.permissions, memberCount: 0 };
+      const role: Role = { id: entityId('role-', uid), templateKey: null, name: input.name, rank: input.rank, locked: false, permissions: input.permissions, memberCount: 0 };
       roles.push(role);
       return role;
     },
@@ -925,10 +946,37 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async notifyMe(variantId, shopId) {
       const l = levels.find((x) => x.variantId === variantId && (!shopId || x.shopId === shopId));
       if (l) l.waiting += 1;
+      const p = products.find((x) => x.variants.some((v) => v.id === variantId));
+      if (isCustomer() && p && !mine.alerts.some((a) => a.variantId === variantId && a.status === 'waiting')) {
+        mine.alerts.unshift({ id: uid(), orgId: ORG, orgName: settings.name, variantId, productId: p.id, productName: p.name, imageUrl: p.images[0]?.url ?? null,
+          shopId, shopName: shops.find((x) => x.id === shopId)?.name ?? null, status: 'waiting', createdAt: Date.now(), notifiedAt: null });
+      }
     },
-    async setFavorite() { /* kept on the real api */ },
+    async setFavorite(productId, saved) {
+      if (saved) mine.saved.add(productId);
+      else mine.saved.delete(productId);
+    },
+    async alerts() { return isCustomer() ? mine.alerts.filter((a) => a.status !== 'cancelled') : []; },
+    async cancelAlert(alertId) {
+      const a = mine.alerts.find((x) => x.id === alertId);
+      if (a) a.status = 'cancelled';
+    },
+    async favorites() { return isCustomer() ? products.filter((p) => mine.saved.has(p.id)).map(publicProduct) : []; },
+    async follow() { mine.following = true; },
+    async joinAsCustomer(code) {
+      const link = joinLinks.find((l) => l.code === code);
+      mine.following = true;
+      return { orgName: settings.name, scopeName: link ? scopeName(link.scopeType, link.scopeId) : settings.name };
+    },
+    async updateMe(patch) {
+      const p = me();
+      if (patch.displayName) {
+        if (p) p.name = patch.displayName;
+        else if (isCustomer()) customerUser.name = patch.displayName;
+      }
+    },
     async followedShops() { return shops.map((s) => ({ ...s, orgName: settings.name })); },
-    async unfollow() { /* kept on the real api */ },
+    async unfollow() { mine.following = false; },
     async setChannel() { /* kept on the real api */ },
     async exportMyData() { return { customer: customers[0] }; },
     async startAccountDelete() { return { method: 'code' as const, sent: true as const, devCode: '000000' }; },
@@ -952,7 +1000,9 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       if (!link || link.disabled) throw new FixtureError(410, 'join_link_disabled');
       link.signups += 1;
       void input;
-      return { pending: true, devConfirmLink: `/confirm/${code}.${uid().slice(0, 8)}` };
+      // the public demo has one confirmation page, built ahead (scripts/build-demo.mjs). a plain
+      // link, so it carries the base path itself
+      return { pending: true, devConfirmLink: process.env.NEXT_PUBLIC_DEMO === '1' ? `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/confirm/demo` : `/confirm/${code}.${uid().slice(0, 8)}` };
     },
     async confirmJoin(token) {
       const code = token.split('.')[0] ?? '';
@@ -1012,7 +1062,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     },
     async startCount(_org, shopId, input) {
       if (!canDo('stock.count', shopId)) throw new FixtureError(403, 'forbidden');
-      const c: StockCount = { id: `count-${uid().slice(0, 8)}`, shopId, kind: input.kind, filter: input.filter ?? null, status: 'open', startedBy: me()!.userId, startedAt: Date.now(), submittedAt: null, appliedBy: null, appliedAt: null, uncountedPolicy: null, lines: [] };
+      const c: StockCount = { id: entityId('count-', () => `count-${uid().slice(0, 8)}`), shopId, kind: input.kind, filter: input.filter ?? null, status: 'open', startedBy: me()!.userId, startedAt: Date.now(), submittedAt: null, appliedBy: null, appliedAt: null, uncountedPolicy: null, lines: [] };
       counts.unshift(c);
       return c;
     },
@@ -1071,7 +1121,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async createTransfer(_org, input) {
       if (!canDo('stock.transfer.send', input.fromShopId)) throw new FixtureError(403, 'forbidden');
       const x: Transfer = {
-        id: `tr-${uid().slice(0, 8)}`, fromShopId: input.fromShopId, toShopId: input.toShopId, status: 'draft', note: input.note ?? null,
+        id: entityId('tr-', () => `tr-${uid().slice(0, 8)}`), fromShopId: input.fromShopId, toShopId: input.toShopId, status: 'draft', note: input.note ?? null,
         createdBy: me()!.userId, createdAt: Date.now(), sentAt: null, receivedAt: null,
         lines: input.lines.map((l) => ({ variantId: l.variantId, name: productOfVariant(l.variantId)?.name ?? '', qtySent: l.qty, qtyReceived: null, lost: 0 })),
       };
@@ -1112,7 +1162,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async addCustomer(_org, input) {
       if (!canDo('customers.add', input.shopId)) throw new FixtureError(403, 'forbidden');
       const row: CustomerRow = {
-        id: `c-${uid().slice(0, 6)}`, name: input.name, email: input.email ?? '', phone: null, fullPhone: input.phone ?? '', contactMasked: false,
+        id: entityId('c-', () => `c-${uid().slice(0, 6)}`), name: input.name, email: input.email ?? '', phone: null, fullPhone: input.phone ?? '', contactMasked: false,
         locale: input.locale, emailOk: false, pushOk: false, smsOk: false, hasApp: false, source: 'staff', tags: input.tags,
         subscriptions: [{ scopeType: 'shop', scopeId: input.shopId, status: 'pending' }], createdAt: Date.now(),
         consents: [], notes: [], waitingFor: [], favorites: [], deliveries: [], key: searchKey(input.name, input.email),
@@ -1234,7 +1284,8 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
   return new Proxy(api, {
     get(target, prop) {
       const v = (target as Record<string | symbol, unknown>)[prop];
-      if (v !== undefined || typeof prop === 'symbol') return v;
+      // not a promise: the api is handed over from an async import, which looks for then()
+      if (v !== undefined || typeof prop === 'symbol' || prop === 'then') return v;
       return async () => { throw new FixtureError(501, 'internal'); };
     },
   }) as CustockApi;
@@ -1242,3 +1293,21 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
 
 export const FIXTURE_LOGINS = people.map((p) => ({ email: p.email, name: p.name, role: roles.find((r) => r.id === p.assignments[0]!.roleId)!.templateKey! }));
 export { FixtureError };
+
+// the ids the public demo builds pages for (scripts/build-demo.mjs): the sample data, then a
+// series for what a visitor makes (see entityId)
+export function demoRouteIds() {
+  const series = (prefix: string) => Array.from({ length: DEMO_SERIES }, (_, i) => `${prefix}d${i + 1}`);
+  return {
+    orgSlugs: [settings.slug],
+    products: [...products.map((p) => p.id), ...series('p-')],
+    productCodes: products.flatMap((p) => p.variants.flatMap((v) => v.barcodes.map((b) => b.code))),
+    customers: [...customers.map((c) => c.id), ...series('c-')],
+    posts: [...posts.map((p) => p.id), ...series('post-')],
+    counts: [...counts.map((c) => c.id), ...series('count-')],
+    transfers: [...transfers.map((x) => x.id), ...series('tr-')],
+    roles: [...roles.map((r) => r.id), ...series('role-')],
+    joinLinks: [...joinLinks.map((l) => l.id), ...series('jl-')],
+    joinCodes: joinLinks.map((l) => l.code),
+  };
+}

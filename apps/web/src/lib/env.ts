@@ -4,6 +4,10 @@
 
 export const devBuild = process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_SHOW_DEV === '1';
 
+// the public demo (scripts/build-demo.mjs): a static copy with the sample data in the browser, no
+// server and no api. nothing is sent anywhere.
+export const demoBuild = process.env.NEXT_PUBLIC_DEMO === '1';
+
 // the sample business of local development. on a server these come from the environment or not at all
 export function defaultJoinCode(): string | null {
   return process.env.CUSTOCK_DEFAULT_JOIN_CODE || (devBuild ? 'ig4m8x' : null);

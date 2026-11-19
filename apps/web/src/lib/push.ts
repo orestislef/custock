@@ -59,7 +59,8 @@ export function pushState(): PushState {
 }
 
 // the service worker only runs in production builds (dev chunks change on every save)
-export const swEnabled = process.env.NODE_ENV === 'production' || process.env.NEXT_PUBLIC_SW === '1';
+// no service worker in the public demo: its pages are static files on another site
+export const swEnabled = process.env.NEXT_PUBLIC_DEMO !== '1' && (process.env.NODE_ENV === 'production' || process.env.NEXT_PUBLIC_SW === '1');
 
 export async function registration(): Promise<ServiceWorkerRegistration | null> {
   if (!swEnabled || !('serviceWorker' in navigator)) return null;
