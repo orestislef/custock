@@ -85,7 +85,8 @@
     "expired": "Έληξε",
     "theft": "Κλοπή",
     "own_use": "Ιδιοχρησιμοποίηση",
-    "correction": "Διόρθωση"
+    "correction": "Διόρθωση",
+    "transit": "Χάθηκε στη μεταφορά"
   },
   "postKind": {
     "news": "Νέα",

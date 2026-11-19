@@ -267,6 +267,10 @@ describe('transfers', () => {
     expect(got.body.lines[0].lost).toBe(1);
     expect(onHand(s.shops.kifisia, tahini)).toBe(toBefore + 9);
     expect(q('SELECT in_transit_in n FROM stock_levels WHERE shop_id = ? AND variant_id = ?', s.shops.kifisia, tahini).n).toBe(0);
+    // the lost one shows in shrinkage, for the shop that sent it
+    const transit = async (shop: string) => ((await call('GET', `${org()}/reports/shrinkage?shopId=${shop}`, 'eleni')).body as { reason: string; qty: number }[]).find((r) => r.reason === 'transit')?.qty ?? 0;
+    expect(await transit(s.shops.marousi)).toBe(1);
+    expect(await transit(s.shops.kifisia)).toBe(0);
   });
 });
 

@@ -85,7 +85,8 @@
     "expired": "Expired",
     "theft": "Theft",
     "own_use": "Own use",
-    "correction": "Correction"
+    "correction": "Correction",
+    "transit": "Lost in transit"
   },
   "postKind": {
     "news": "News",

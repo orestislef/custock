@@ -239,6 +239,18 @@ export function reportRoutes(app: Hono<AppEnv>) {
         GROUP BY coalesce(m.reason, m.kind) ORDER BY qty DESC`,
       { shops, from: nowOf(c) - days(c, 30) * DAY },
     );
+    // what left a shop on a transfer and never arrived. it counts for the shop that sent it.
+    const transit = t.get<{ qty: number | null; value: number | null }>(
+      `SELECT sum(l.qty_sent - l.qty_received) AS qty,
+              sum((CASE WHEN p.uom = 'piece' THEN l.qty_sent - l.qty_received ELSE (l.qty_sent - l.qty_received) / 1000.0 END) * coalesce(v.cost_minor, 0)) AS value
+         FROM transfer_lines l JOIN transfers tr ON tr.id = l.transfer_id
+         JOIN product_variants v ON v.id = l.variant_id JOIN products p ON p.id = v.product_id
+        WHERE l.org_id = @org AND tr.status = 'received' AND tr.received_at >= @from
+          AND tr.from_shop_id IN (SELECT value FROM json_each(@shops)) AND l.qty_received < l.qty_sent`,
+      { shops, from: nowOf(c) - days(c, 30) * DAY },
+    );
+    if (transit?.qty) rows.push({ reason: 'transit', qty: transit.qty, value: transit.value ?? 0 });
+    rows.sort((a, b) => b.qty - a.qty);
     return c.json(rows.map((r) => ({ reason: r.reason, qty: r.qty, valueMinor: money ? Math.round(r.value) : null })));
   });
 }
