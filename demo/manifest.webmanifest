@@ -1,16 +1,21 @@
 {
-  "name": "Custock demo",
+  "name": "Custock",
   "short_name": "Custock",
-  "description": "Clickable demo of Custock, a CRM and inventory app for shops. Made up data.",
-  "id": "./",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/custock/demo/admin/",
+  "scope": "/custock/demo/",
   "display": "standalone",
   "background_color": "#F3F3F0",
-  "theme_color": "#F3F3F0",
+  "theme_color": "#B0234F",
   "icons": [
-    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/custock/demo/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/custock/demo/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }
