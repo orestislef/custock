@@ -98,6 +98,8 @@ export async function runJobs(deps: WorkerDeps, now: number = Date.now()): Promi
   if (now - lastHousekeeping > 60_000) {
     lastHousekeeping = now;
     expireTokenMessages(db, now);
+    purgeOldJobs(db, now);
+    purgeSpent(db, now);
     purgeUnconfirmedFiles(db, now, deps.removeObject);
   }
   if (deps.live) {
@@ -328,9 +330,38 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
   }
 }
 
-// one nightly rollup per org day
+// one rollup (and stock check) per day. the dedupe index only covers jobs still waiting, so a
+// finished one is looked for too: without that a new one was queued every 5 seconds all day
 function ensureNightly(db: Db, now: number) {
-  enqueue(db, 'rollup_day', {}, now, `rollup:${dayKey(now, 'Europe/Athens')}`);
+  const key = `rollup:${dayKey(now, 'Europe/Athens')}`;
+  if (platform(db).get('SELECT 1 AS x FROM jobs WHERE dedupe_key = @k', { k: key })) return;
+  enqueue(db, 'rollup_day', {}, now, key);
+}
+
+// finished jobs are kept a week to look back on, ones that gave up a month, then they go
+export const JOB_KEEP_MS = 7 * 86_400_000;
+export function purgeOldJobs(db: Db, now: number): number {
+  return platform(db).run(
+    'DELETE FROM jobs WHERE (done_at IS NOT NULL AND done_at < @done) OR (done_at IS NULL AND attempts >= max_attempts AND run_at < @failed)',
+    { done: now - JOB_KEEP_MS, failed: now - 30 * 86_400_000 },
+  ).changes;
+}
+
+// what is only kept for a while, so the database stays small on a small server: rotated and ended
+// sign ins (a refresh every 15 minutes makes a row), spent sign in codes and reset links, and old
+// throttle counters. the stock ledger, audit logs and what was sent to customers are the history
+// of the business and stay. a rotated sign in is kept a week so a stolen old token still ends its
+// family.
+export function purgeSpent(db: Db, now: number): number {
+  const p = platform(db);
+  const week = now - 7 * 86_400_000;
+  const day = now - 86_400_000;
+  let gone = 0;
+  gone += p.run('DELETE FROM sessions WHERE expires_at < @now OR (revoked_at IS NOT NULL AND revoked_at < @week) OR (replaced_by IS NOT NULL AND created_at < @week)', { now, week }).changes;
+  gone += p.run('DELETE FROM otp_codes WHERE expires_at < @day OR (used_at IS NOT NULL AND used_at < @day)', { day }).changes;
+  gone += p.run('DELETE FROM password_resets WHERE expires_at < @day OR (used_at IS NOT NULL AND used_at < @day)', { day }).changes;
+  gone += p.run('DELETE FROM auth_throttle WHERE window_start < @day AND (locked_until IS NULL OR locked_until < @now)', { day, now }).changes;
+  return gone;
 }
 
 // rebuilds daily_shop_stats for the last three days of every org from the ledger

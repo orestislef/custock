@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { migrate, openDb, seed, hashPassword, type Db, type SeedResult } from '@custock/db';
 import { ean13, uuidv7, type MovementInput } from '@custock/core';
 import { createApp, type App } from '../src/app';
-import { runJobs } from '../src/worker';
+import { JOB_KEEP_MS, purgeOldJobs, purgeSpent, runJobs } from '../src/worker';
 import { localMinutes } from '../src/lib/time';
 import { DEV_TURNSTILE_TOKEN } from '../src/routes/people-writes';
 
@@ -638,6 +638,33 @@ describe('org settings, audit, dev tools', () => {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Athens' }).format(new Date(clock));
     void today;
     expect(q('SELECT count(*) n FROM daily_shop_stats').n).toBeGreaterThan(0);
+  });
+  it('the rollup runs once a day, not on every tick, and old finished jobs go', async () => {
+    const rollups = () => q("SELECT count(*) n FROM jobs WHERE kind = 'rollup_day'").n;
+    await jobs();
+    const before = rollups();
+    // the worker ticks every 5 seconds: the same day queues nothing new
+    for (let i = 1; i <= 5; i++) await runJobs({ cfg: { db, jwtSecret: SECRET, publicWebUrl: PUBLIC } }, clock + i * 5_000);
+    expect(rollups()).toBe(before);
+    // the next day gets its own
+    await runJobs({ cfg: { db, jwtSecret: SECRET, publicWebUrl: PUBLIC } }, clock + 86_400_000);
+    expect(rollups()).toBe(before + 1);
+    // a week later the finished ones are cleared away
+    const gone = purgeOldJobs(db, clock + 86_400_000 + JOB_KEEP_MS + 60_000);
+    expect(gone).toBeGreaterThan(0);
+    expect(q("SELECT count(*) n FROM jobs WHERE done_at IS NOT NULL AND done_at < ?", clock + 86_400_000).n).toBe(0);
+  });
+  it('spent sign ins, codes and throttle counters are cleared, live sign ins stay', () => {
+    const later = clock + 8 * 86_400_000;
+    const live = q('SELECT count(*) n FROM sessions WHERE replaced_by IS NULL AND revoked_at IS NULL AND expires_at > ?', later).n;
+    db.prepare("INSERT INTO otp_codes (id, email, code_hash, attempts, created_at, expires_at) VALUES ('old-otp', 'x@example.com', 'h', 0, ?, ?)").run(clock, clock + 600_000);
+    db.prepare("INSERT INTO auth_throttle (key, count, window_start) VALUES ('login:x@example.com:203.0.113.9', 2, ?)").run(clock);
+    purgeSpent(db, later);
+    expect(q("SELECT count(*) n FROM otp_codes WHERE id = 'old-otp'").n).toBe(0);
+    expect(q("SELECT count(*) n FROM auth_throttle WHERE key = 'login:x@example.com:203.0.113.9'").n).toBe(0);
+    expect(q('SELECT count(*) n FROM sessions WHERE replaced_by IS NOT NULL AND created_at < ?', later - 7 * 86_400_000).n).toBe(0);
+    // every sign in still in use is untouched
+    expect(q('SELECT count(*) n FROM sessions WHERE replaced_by IS NULL AND revoked_at IS NULL AND expires_at > ?', later).n).toBe(live);
   });
   it('stock_levels still equal the ledger after all of the above', () => {
     expect(
