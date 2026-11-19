@@ -41,13 +41,13 @@ function greeting(t: TFunction, name: string, now: number) {
 function ManagerHome() {
   const { api, org, t, locale, can, me, shops } = useAdmin();
   const shopId = useShopFilter();
-  const cards = useAsync(() => api.dashboard(org.orgId, shopId), [shopId]);
-  const recent = useAsync(() => (can('stock.history.view') ? api.movements(org.orgId, { shopId, limit: 6 }) : Promise.resolve(null)), [shopId]);
+  const cards = useAsync(() => api.dashboard(org.orgId, shopId), [shopId], { refreshOnReturn: true });
+  const recent = useAsync(() => (can('stock.history.view') ? api.movements(org.orgId, { shopId, limit: 6 }) : Promise.resolve(null)), [shopId], { refreshOnReturn: true });
   const names = useNames(api, org.orgId, locale);
   const [now] = useState(Date.now);
   const d = cards.data;
   // what happened to the posts this person wrote: approved and sent, or stopped, in the last 3 days
-  const posted = useAsync(() => (can('posts.create', null) ? api.posts(org.orgId) : Promise.resolve(null)), []);
+  const posted = useAsync(() => (can('posts.create', null) ? api.posts(org.orgId) : Promise.resolve(null)), [], { refreshOnReturn: true });
   const myPosts = (posted.data?.items ?? []).filter((p) => p.authorId === me.user.id && now - (p.sentAt ?? p.createdAt) < 3 * 86_400_000
     && ((['sent', 'sending', 'scheduled'].includes(p.status) && p.approvedBy && p.approvedBy !== me.user.id) || p.status === 'cancelled')).slice(0, 3);
   const shopName = (id: string) => shops.find((s) => s.id === id)?.name ?? '';
@@ -131,8 +131,8 @@ function StaffToday() {
   const [picked, setPicked] = useState<PickedVariant | null>(null);
   // the list needs history access. staff without it still get the actions above
   const canHistory = shopId ? can('stock.history.view', shopId) : shops.some((s) => can('stock.history.view', s.id));
-  const mine = useAsync(() => (canHistory ? api.movements(org.orgId, { shopId: shopId ?? undefined, limit: 60 }).catch(() => null) : Promise.resolve(null)), [shopId, canHistory]);
-  const incoming = useAsync(() => (can('stock.transfer.receive', null) ? api.transfers(org.orgId, { status: 'sent' }) : Promise.resolve([] as Transfer[])), []);
+  const mine = useAsync(() => (canHistory ? api.movements(org.orgId, { shopId: shopId ?? undefined, limit: 60 }).catch(() => null) : Promise.resolve(null)), [shopId, canHistory], { refreshOnReturn: true });
+  const incoming = useAsync(() => (can('stock.transfer.receive', null) ? api.transfers(org.orgId, { status: 'sent' }) : Promise.resolve([] as Transfer[])), [], { refreshOnReturn: true });
   const myMoves = (mine.data?.items ?? []).filter((m) => m.createdBy === me.user.id).slice(0, 10);
   const toMe = (incoming.data ?? []).filter((x) => can('stock.transfer.receive', x.toShopId));
   const shopName = (id: string) => shops.find((s) => s.id === id)?.name ?? '';

@@ -16,7 +16,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const { id } = use(params);
   const { api, org, t, locale, can, shops } = useAdmin();
   const toast = useToast();
-  const post = useAsync(() => api.post(org.orgId, id), [id]);
+  const post = useAsync(() => api.post(org.orgId, id), [id], { refreshOnReturn: true });
   const groups = useAsync(() => api.groups(org.orgId), []);
   const [tab, setTab] = useState<Locale | null>(null);
   const [busy, setBusy] = useState(false);

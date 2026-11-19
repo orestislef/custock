@@ -17,7 +17,7 @@ export default function CountsPage() {
   const { api, org, t, locale, can, shops, shopId } = useAdmin();
   const router = useRouter();
   const allowed = can('stock.count', null) || can('stock.count.approve', null);
-  const list = useAsync(() => (allowed ? api.counts(org.orgId, shopId ? { shopId } : undefined) : Promise.resolve([])), [shopId, allowed]);
+  const list = useAsync(() => (allowed ? api.counts(org.orgId, shopId ? { shopId } : undefined) : Promise.resolve([])), [shopId, allowed], { refreshOnReturn: true });
   const [starting, setStarting] = useState(false);
   const shopName = (id: string) => shops.find((s) => s.id === id)?.name ?? '';
   const canStart = shops.some((s) => can('stock.count', s.id));

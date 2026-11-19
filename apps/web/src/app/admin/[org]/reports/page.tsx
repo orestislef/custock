@@ -15,15 +15,15 @@ export default function ReportsPage() {
   const moneyOk = can('reports.financial.view', shopId ?? null);
   const allowed = can('reports.view', shopId ?? null);
   const none = <T,>(v: T) => Promise.resolve(v);
-  const sales = useAsync(() => (allowed && moneyOk ? api.salesSeries(org.orgId, shopId, 14) : none([])), [shopId, allowed]);
-  const top = useAsync(() => (allowed ? api.topSellers(org.orgId, shopId, 14) : none([])), [shopId, allowed]);
-  const wanted = useAsync(() => (allowed ? api.mostWanted(org.orgId, shopId) : none([])), [shopId, allowed]);
+  const sales = useAsync(() => (allowed && moneyOk ? api.salesSeries(org.orgId, shopId, 14) : none([])), [shopId, allowed], { refreshOnReturn: true });
+  const top = useAsync(() => (allowed ? api.topSellers(org.orgId, shopId, 14) : none([])), [shopId, allowed], { refreshOnReturn: true });
+  const wanted = useAsync(() => (allowed ? api.mostWanted(org.orgId, shopId) : none([])), [shopId, allowed], { refreshOnReturn: true });
   const links = useAsync(() => (allowed && can('customers.view', null) && org.orgPerms.includes('reports.view') ? api.joinLinkStats(org.orgId) : none([])), [allowed]);
   // top sellers carry their unit; the page no longer downloads 200 whole products to look it up
   const uomOf = (_variantId: string, row?: { uom?: Uom }): Uom => row?.uom ?? 'piece';
   const units = (variantId: string, qty: number, row?: { uom?: Uom }) => { const u = uomOf(variantId, row); return u === 'piece' ? number(qty, locale) : `${qtyNumber(qty, u, locale)} ${t(`common:uom.${u}`)}`; };
-  const cards = useAsync(() => (allowed && moneyOk ? api.dashboard(org.orgId, shopId) : Promise.resolve(null)), [shopId, allowed]);
-  const shrink = useAsync(() => (allowed ? api.shrinkage(org.orgId, shopId, 30) : none([])), [shopId, allowed]);
+  const cards = useAsync(() => (allowed && moneyOk ? api.dashboard(org.orgId, shopId) : Promise.resolve(null)), [shopId, allowed], { refreshOnReturn: true });
+  const shrink = useAsync(() => (allowed ? api.shrinkage(org.orgId, shopId, 30) : none([])), [shopId, allowed], { refreshOnReturn: true });
 
   if (!allowed) return <RedirectHome />;
 

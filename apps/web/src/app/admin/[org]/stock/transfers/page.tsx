@@ -19,7 +19,7 @@ export default function TransfersPage() {
   const { api, org, t, locale, can, shops, shopId, transfersPossible } = useAdmin();
   const router = useRouter();
   const allowed = can('stock.transfer.send', null) || can('stock.transfer.receive', null);
-  const list = useAsync(() => (allowed ? api.transfers(org.orgId, shopId ? { shopId } : undefined) : Promise.resolve([])), [shopId, allowed]);
+  const list = useAsync(() => (allowed ? api.transfers(org.orgId, shopId ? { shopId } : undefined) : Promise.resolve([])), [shopId, allowed], { refreshOnReturn: true });
   const [creating, setCreating] = useState(false);
   const canSend = shops.some((s) => can('stock.transfer.send', s.id));
   useShortcuts({ create: useCallback(() => { if (canSend) setCreating(true); }, [canSend]) });

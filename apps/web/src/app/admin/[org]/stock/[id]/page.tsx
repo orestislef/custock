@@ -27,7 +27,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const { id } = use(params);
   const { api, org, t, locale, can, shops, shopId, settings } = useAdmin();
   const toast = useToast();
-  const product = useAsync(() => api.product(org.orgId, id), [id]);
+  const product = useAsync(() => api.product(org.orgId, id), [id], { refreshOnReturn: true });
   // this product's own movements, newest first, in pages. (asking for the shop's latest 30 and
   // filtering them here left busy products with an empty history)
   const mayHistory = can('stock.history.view', null);
