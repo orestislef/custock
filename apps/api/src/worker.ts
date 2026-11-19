@@ -233,8 +233,12 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
       const text = texts.find((x) => x.locale === locale) ?? texts.find((x) => x.locale === def?.default_locale) ?? texts[0];
       const scope = t.get<{ scope_type: string; scope_id: string }>('SELECT scope_type, scope_id FROM post_scopes WHERE org_id = @org AND post_id = @p LIMIT 1', { p: d.post_id });
       const shopName = scope?.scope_type === 'shop' ? t.get<{ name: string }>('SELECT name FROM shops WHERE org_id = @org AND id = @id', { id: scope.scope_id })?.name : null;
-      title = d.channel === 'push' ? (shopName ? `${org.name} ${shopName}` : org.name) : text?.title ?? org.name;
-      body = d.channel === 'push' ? text?.title ?? '' : text?.body ?? '';
+      // a push: the phone already names the business ("from QA Shop"), so the title is the post and
+      // the body its first words, with the shop in front when the post is for one shop
+      const snippet = (text?.body ?? '').replace(/\s+/g, ' ').trim();
+      const short = snippet.length > 140 ? `${snippet.slice(0, 140).replace(/\s+\S*$/, '')}…` : snippet;
+      title = d.channel === 'push' ? text?.title ?? org.name : text?.title ?? org.name;
+      body = d.channel === 'push' ? [shopName, short].filter(Boolean).join(' · ') : text?.body ?? '';
       const cover = t.get<{ storage_key: string | null }>('SELECT f.storage_key FROM posts p LEFT JOIN files f ON f.id = p.cover_file_id WHERE p.org_id = @org AND p.id = @p', { p: d.post_id });
       const sender = senderOf(t, org, scope?.scope_type === 'shop' ? scope.scope_id : null);
       payload = { type: 'post', postId: d.post_id, threadId: org.id, link: `custock://post/${d.post_id}`, image: fileUrl(cover?.storage_key), ...sender };

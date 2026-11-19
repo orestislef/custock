@@ -198,7 +198,9 @@ describe('web push', () => {
     expect(row).toBeTruthy();
     const msg = buildWebPush(row)!;
     const body = JSON.parse(msg.payload);
-    expect(body).toMatchObject({ title: 'Lemoni Kifisia', body: 'Νέα', url: `http://localhost:3000/custock/s/lemoni/news?post=${post.body.id}`, type: 'post', orgId: s.orgId });
+    expect(body).toMatchObject({ title: 'Νέα', url: `http://localhost:3000/custock/s/lemoni/news?post=${post.body.id}`, type: 'post', orgId: s.orgId });
+    // the phone names the business, so the body names the shop instead of repeating it
+    expect(body.body).toMatch(/^Kifisia/);
     expect(msg.options).toMatchObject({ TTL: 172800, urgency: 'normal' });
     expect(msg.options.topic).toMatch(/^[A-Za-z0-9_-]{32}$/);
 

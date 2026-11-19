@@ -440,8 +440,8 @@ describe('posts', () => {
     expect(post.n).toBeGreaterThan(0);
     // anna reads russian, the post has no russian text, so she gets the greek default
     const annaCustomer = q("SELECT id FROM customers WHERE user_id = ? AND org_id = ?", s.users.anna, s.orgId).id;
-    const push = q("SELECT body FROM dev_outbox WHERE customer_id = ? AND json_extract(payload, '$.postId') = ?", annaCustomer, created.body.id);
-    expect(push.body).toBe('Νέο ψωμί');
+    const push = q("SELECT title FROM dev_outbox WHERE customer_id = ? AND channel = 'push' AND json_extract(payload, '$.postId') = ?", annaCustomer, created.body.id);
+    expect(push.title).toBe('Νέο ψωμί');
     const email = q("SELECT body, payload FROM dev_outbox WHERE channel = 'email' AND json_extract(payload, '$.postId') = ? LIMIT 1", created.body.id);
     expect(JSON.parse(email.payload).listUnsubscribe).toContain('/unsubscribe/');
   });

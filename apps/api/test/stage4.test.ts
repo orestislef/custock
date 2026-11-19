@@ -67,10 +67,11 @@ describe('transports: messages are built right and never sent', () => {
     await runJobs({ cfg: { db, jwtSecret: SECRET, publicWebUrl: 'http://localhost:3000' } }, t);
     const annaCustomer = q('SELECT id FROM customers WHERE user_id = ? AND org_id = ?', s.users.anna, s.orgId).id;
     const row = q("SELECT * FROM dev_outbox WHERE customer_id = ? AND channel = 'push' AND json_extract(payload, '$.postId') = ?", annaCustomer, post.body.id) as OutboxRow;
-    expect(row.body).toBe('Новости');
+    expect(row.title).toBe('Новости');
+    expect(row.body).toBe('Kifisia · текст');
     const msg = buildFcmMessage(row, 'device-token-1') as Json;
     expect(msg.message.token).toBe('device-token-1');
-    expect(msg.message.notification).toEqual({ title: 'Lemoni Kifisia', body: 'Новости', image: 'https://example.com/cover.jpg' });
+    expect(msg.message.notification).toEqual({ title: 'Новости', body: 'Kifisia · текст', image: 'https://example.com/cover.jpg' });
     expect(msg.message.apns.payload.aps['thread-id']).toBe(s.orgId);
     expect(msg.message.apns.fcm_options.image).toBe('https://example.com/cover.jpg');
     expect(msg.message.data.link).toBe(`custock://post/${post.body.id}`);
