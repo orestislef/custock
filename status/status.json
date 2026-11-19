@@ -1,6 +1,6 @@
 {
-  "updated": "2026-11-18T21:00:00+02:00",
-  "overall": 98,
+  "updated": "2026-11-19T11:00:00+02:00",
+  "overall": 100,
   "areas": [
     {
       "key": "thinking",
@@ -32,33 +32,33 @@
     },
     {
       "name": "Backend (permissions engine, database, API)",
-      "percent": 98,
-      "state": "building",
-      "note": "365 api tests. Nightly stock check against the ledger, hard bounces stop, restarts never double a message, sign out other devices, safe retries and optimistic saves."
+      "percent": 100,
+      "state": "done",
+      "note": "380 api tests and 100 core tests. One sign in per browser with a device list, spent sign ins, codes and finished jobs cleared on their own so the database stays small, the daily stock check against the ledger."
     },
     {
       "name": "Web app for phone and desktop",
-      "percent": 98,
-      "state": "building",
-      "note": "About 40 percent lighter pages: only the visitor's language loads. Long lists load as you scroll, drafts survive an expired session, a dropped network says so, the open app updates itself cleanly after a deploy."
+      "percent": 100,
+      "state": "done",
+      "note": "The phone app and the admin in one. The camera reads one item at a time inside the frame, a shelf label held still counts once, with a beep. Pages show what is true now when you come back to them. Shops are added from Settings."
     },
     {
       "name": "Production server",
-      "percent": 95,
-      "state": "building",
-      "note": "Live on its own subdomain with its own certificate, security headers, real email and push, photos in a bucket. Clean database with only the super admin, ready for testers."
+      "percent": 100,
+      "state": "done",
+      "note": "Live on its own subdomain with real email, web push and photos in a bucket. Tested end to end with real email, push on an iPhone and the camera, then wiped: only the super admin is left, every option back to its default."
     },
     {
       "name": "Super admin and settings",
-      "percent": 96,
-      "state": "building",
-      "note": "Every business in one place, feature switches, pausing, emergency switches, the free storage meter, errors, server info, every limit from the platform down to one person."
+      "percent": 100,
+      "state": "done",
+      "note": "Every business in one place, feature switches, pausing, emergency switches, the free storage meter, errors, server info, every limit from the platform down to one person, and each signed in device with its own sign out."
     },
     {
       "name": "Testing",
-      "percent": 95,
-      "state": "building",
-      "note": "Two bug hunt rounds, over 70 bugs fixed. 210 end to end tests green on desktop and phone sizes with the iPhone engine, every edge case from the planning notes covered by a test."
+      "percent": 100,
+      "state": "done",
+      "note": "A full live test on production: owner, staff, customer, approvals, transfers, counts, offers, back in stock by email and push, and the camera. 15 issues it found are fixed, each with a test. End to end tests run with a stand-in camera too."
     }
   ],
   "log": [
@@ -165,6 +165,10 @@
     {
       "at": "2026-11-18T21:00:00+02:00",
       "text": "Second bug hunt: edge cases, real life timing (two people, two devices, offline, expiry, deploys, clock changes) and a big busy business. Pages about 40 percent lighter. 210 end to end tests green."
+    },
+    {
+      "at": "2026-11-19T11:00:00+02:00",
+      "text": "Live test on production with real email, push on an iPhone and the camera. Fixed: the camera counting one label many times, a lost scan behind a slow one, push consent from the app switch, back in stock and post push texts, lost in transit in shrinkage, forgot password for customers, sign ins piling up, a job queued every 5 seconds. Test data wiped. 100%."
     }
   ],
   "screens": [

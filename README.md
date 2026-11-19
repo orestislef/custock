@@ -5,7 +5,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
 ![Languages](https://img.shields.io/badge/i18n-EN%20%7C%20EL%20%7C%20RU-B0234F)
-![Status](https://img.shields.io/badge/status-building-B0234F)
+![Status](https://img.shields.io/badge/status-live-2E7D32)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 A clean blend of Customer and Stock.
@@ -72,7 +72,7 @@ channel from the server's settings, see [apps/api](apps/api/README.md).
 **IMS**: product catalog with variants, categories, barcodes and photos. Stock per shop, kept as a
 ledger of movements so nothing gets overwritten. Scan with the phone camera to look up, receive,
 sell, count or transfer: factory barcodes (EAN, UPC, Code 128) and QR codes, or a usb scanner on a
-desk. Works without signal and syncs later. Stock counts, transfers between shops with shortages,
+desk. The camera takes one item at a time inside its frame, and a label held still counts once. Works without signal and syncs later. Stock counts, transfers between shops with shortages,
 low stock alerts, printable shelf labels with barcode, price and a QR for customers.
 
 **CRM**: customers join from a QR code or link. Consent per channel, double opt in, one tap
