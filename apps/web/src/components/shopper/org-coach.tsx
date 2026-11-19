@@ -1,7 +1,7 @@
 'use client';
 
 import { AppIcon, InstallCoach } from '@/components/pwa/install-coach';
-import { basePath } from '@/lib/api-client';
+import { orgIconPath } from '@/lib/manifests';
 import { useT } from '@/lib/i18n-client';
 import { useShopper } from './shopper-context';
 
@@ -22,5 +22,5 @@ export function OrgCoach({ className }: { className?: string }) {
 
 // the same versioned url the manifest uses, so the card shows what the home screen will
 export function orgIconSrc(slug: string, version = '') {
-  return `${basePath}/s/${encodeURIComponent(slug)}/icon/192${version ? `?v=${version}` : ''}`;
+  return orgIconPath(slug, 192, version);
 }
