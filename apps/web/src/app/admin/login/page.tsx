@@ -83,6 +83,7 @@ export default function LoginPage() {
         <p className="text-center mt-4 mb-0">
           <Link href={email.trim() ? `/admin/forgot?email=${encodeURIComponent(email.trim())}` : '/admin/forgot'} className="t-body inline-flex items-center min-h-[44px]">{t('login.forgot')}</Link>
         </p>
+        <p className="t-foot t-2 text-center mt-6 mb-0 px-4">{t('login.shopper')}</p>
 
         {devLogins.length ? <section className="inset-group mt-10">
           <h2 className="inset-group-head">{t('login.devTitle')}</h2>

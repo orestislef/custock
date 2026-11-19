@@ -147,7 +147,8 @@
     "wrong": "Email or password is not right.",
     "devTitle": "Sample team",
     "devFoot": "Development only. Each person has a different role, so you can see what each one can and cannot do.",
-    "forgot": "Forgot password?"
+    "forgot": "Forgot password?",
+    "shopper": "Shopping at a shop? Sign in from its page or app with a code from your email, no password needed."
   },
   "admin": {
     "business": "Business",
