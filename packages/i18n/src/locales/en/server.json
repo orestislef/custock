@@ -138,8 +138,9 @@
   },
   "push": {
     "backInStock": {
-      "title": "{{shop}}",
-      "body": "{{product}} is back in stock."
+      "title": "{{product}} is back",
+      "body": "At {{shop}}. Tap to see it.",
+      "bodyNoShop": "Tap to see it."
     },
     "lowStock": {
       "title": "Low stock at {{shop}}",

@@ -284,8 +284,17 @@ function sendDeliveries(deps: WorkerDeps, now: number) {
           )
         : undefined;
       if (d.channel === 'push') {
-        title = tr('push.backInStock.title', { shop: shopLabel, product });
-        body = tr('push.backInStock.body', { shop: shopLabel, product });
+        // the phone already names the business ("from QA Shop"), so the title is the news and the
+        // body says where. an "any shop" alert names the shop the stock just arrived at.
+        const where = shop ?? (a
+          ? t.get<{ name: string }>(
+              `SELECT s.name FROM stock_movements m JOIN shops s ON s.id = m.shop_id
+                WHERE m.org_id = @org AND m.variant_id = @v AND m.qty_delta > 0 ORDER BY m.recorded_at DESC, m.rowid DESC LIMIT 1`,
+              { v: a.variant_id },
+            )?.name ?? null
+          : null);
+        title = tr('push.backInStock.title', { product });
+        body = where ? tr('push.backInStock.body', { shop: where }) : tr('push.backInStock.bodyNoShop');
       } else {
         const mail = backInStockEmail(locale, {
           shop: shopLabel, product, logoUrl: orgLogoUrl(deps.cfg.db, org.id), org: org.name,

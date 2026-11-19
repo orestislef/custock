@@ -138,8 +138,9 @@
   },
   "push": {
     "backInStock": {
-      "title": "{{shop}}",
-      "body": "{{product}} снова в наличии."
+      "title": "{{product}} снова в наличии",
+      "body": "В магазине {{shop}}. Нажмите, чтобы посмотреть.",
+      "bodyNoShop": "Нажмите, чтобы посмотреть."
     },
     "lowStock": {
       "title": "Мало на складе в {{shop}}",

@@ -181,7 +181,14 @@ describe('back in stock and low stock', () => {
     await jobs();
     const anna = q("SELECT title, body, locale FROM dev_outbox WHERE user_id = ? AND json_extract(payload, '$.type') = 'back_in_stock'", s.users.anna);
     expect(anna.locale).toBe('ru');
-    expect(anna.body).toContain('Тимьяновый мёд');
+    expect(`${anna.title} ${anna.body}`).toContain('Тимьяновый мёд');
+    // a push: the news in the title, where in the body, the business is not repeated
+    const pushes = db.prepare("SELECT title, body FROM dev_outbox WHERE channel = 'push' AND json_extract(payload, '$.type') = 'back_in_stock'").all() as { title: string; body: string }[];
+    for (const p of pushes) {
+      expect(p.body).not.toMatch(/\{\{/);
+      expect(p.title).not.toBe('Lemoni');
+    }
+    expect(pushes.some((p) => /Kifisia|Κηφισιά|Кифисия/.test(p.body))).toBe(true);
     expect(q("SELECT count(*) n FROM deliveries WHERE alert_id IS NOT NULL AND status = 'sent'").n).toBeGreaterThan(0);
     // flapping: down to zero and back up, nobody is told twice
     await move('dimitris', mv(s.shops.kifisia, honey, -6, 'sale'));
