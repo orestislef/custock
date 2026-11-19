@@ -3,6 +3,7 @@
 // development and tests.
 
 import type { OpenApiDoc, ServerInfo } from './server-info';
+import type { SessionDevice } from './devices';
 import type { ClientErrorInput, Issue, IssueDetail, IssuePage, IssueQuery, IssueStatus } from './errors';
 import type {
   AudiencePreview, Audience, Category, CategoryInput, Customer, CustomerDetail, DashboardCards, FeedItem,
@@ -232,8 +233,10 @@ export interface CustockApi {
   // one test notification to the caller's own devices: the staff app (orgId null) or one business's app.
   // devices is how many subscriptions or phones it went to, 0 when none has alerts on
   testPush(orgId?: string | null): Promise<{ devices: number }>;
-  // other devices signed in to this account, and signing them all out (a lost phone)
-  otherSessions(): Promise<{ others: number }>;
+  // the devices signed in to this account (this one marked current), signing one out, or all the
+  // others at once (a lost phone)
+  otherSessions(): Promise<{ others: number; devices: SessionDevice[] }>;
+  signOutDevice(id: string): Promise<void>;
   signOutOthers(): Promise<{ signedOut: number }>;
 
   // ---------------------------------------------------------------- production onboarding

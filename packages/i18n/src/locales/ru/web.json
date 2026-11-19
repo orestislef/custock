@@ -173,6 +173,7 @@
     "changeName": "Изменить имя",
     "nameSaved": "Имя сохранено",
     "nameFoot": "Так вас видят ваша команда и те, кому вы пишете.",
+    "devices": "Устройства",
     "otherDevices": "Другие устройства",
     "otherDevicesCount_one": "Вход выполнен ещё на {{count}} устройстве",
     "otherDevicesCount_few": "Вход выполнен ещё на {{count}} устройствах",
@@ -183,7 +184,37 @@
     "signedOutOthers_one": "Выход выполнен на {{count}} устройстве",
     "signedOutOthers_few": "Выход выполнен на {{count}} устройствах",
     "signedOutOthers_many": "Выход выполнен на {{count}} устройствах",
-    "signedOutOthers_other": "Выход выполнен на {{count}} устройства"
+    "signedOutOthers_other": "Выход выполнен на {{count}} устройства",
+    "thisDevice": "Это устройство",
+    "signOutDevice": "Выйти",
+    "signOutDeviceLabel": "Выйти: {{device}}",
+    "deviceSignedOut": "Выход выполнен: {{device}}",
+    "deviceUsed": "Последний раз {{when}}",
+    "deviceSince": "вход {{date}}",
+    "device": {
+      "on": "{{browser}} на {{os}}",
+      "unknown": "Неизвестное устройство",
+      "browser": {
+        "chrome": "Chrome",
+        "safari": "Safari",
+        "firefox": "Firefox",
+        "edge": "Edge",
+        "opera": "Opera",
+        "samsung": "Samsung Internet",
+        "app": "Приложение на экране «Домой»",
+        "other": "Браузер"
+      },
+      "os": {
+        "windows": "Windows",
+        "mac": "Mac",
+        "iphone": "iPhone",
+        "ipad": "iPad",
+        "android": "Android",
+        "linux": "Linux",
+        "chromeos": "ChromeOS",
+        "other": "другой системе"
+      }
+    }
   },
   "nav": {
     "home": "Главная",
@@ -1494,7 +1525,9 @@
           "invite_accepted": "Новый супер-админ",
           "invite_revoked": "Приглашение супер-админу отозвано",
           "removed": "Супер-админ удалён",
-          "granted_cli": "Супер-админ назначен на сервере"
+          "granted_cli": "Супер-админ назначен на сервере",
+          "device_signed_out": "Вышел на одном из своих устройств",
+          "others_signed_out": "Вышел на всех других своих устройствах"
         },
         "policies": {
           "platform_changed": "Изменены лимиты платформы",

@@ -38,19 +38,35 @@ async function accessToken(cfg: Config, userId: string, sessionId: string): Prom
   return { token, expiresAt };
 }
 
-export async function issueTokens(cfg: Config, userId: string, opts: { familyId?: string; familyStartedAt?: number; userAgent?: string | null } = {}): Promise<Tokens & { sessionId: string }> {
+export async function issueTokens(
+  cfg: Config,
+  userId: string,
+  opts: { familyId?: string; familyStartedAt?: number; userAgent?: string | null; deviceId?: string | null } = {},
+): Promise<Tokens & { sessionId: string }> {
   const db = platform(cfg.db);
   const sessionId = uuidv7(now(cfg));
   const refreshToken = randomToken();
   const started = opts.familyStartedAt ?? now(cfg);
-  db.run(
-    `INSERT INTO sessions (id, user_id, family_id, refresh_hash, user_agent, created_at, expires_at, family_started_at)
-     VALUES (@id, @user, @family, @hash, @ua, @now, @exp, @started)`,
-    {
-      id: sessionId, user: userId, family: opts.familyId ?? sessionId, hash: sha256(refreshToken), ua: opts.userAgent ?? null, now: now(cfg),
-      exp: Math.min(now(cfg) + refreshTtl(cfg, userId), started + SESSION_FAMILY_MAX_MS), started,
-    },
-  );
+  const exp = Math.min(now(cfg) + refreshTtl(cfg, userId), started + SESSION_FAMILY_MAX_MS);
+  cfg.db.transaction(() => {
+    // a new sign in from a browser that was signed in before (it lost its token, or signed in
+    // again on top) ends the session it had. a refresh keeps its family and its device
+    if (!opts.familyId && opts.deviceId) {
+      db.run(
+        `UPDATE sessions SET revoked_at = @now
+          WHERE user_id = @user AND device_id = @device AND revoked_at IS NULL`,
+        { now: now(cfg), user: userId, device: opts.deviceId },
+      );
+    }
+    db.run(
+      `INSERT INTO sessions (id, user_id, family_id, refresh_hash, user_agent, device_id, created_at, expires_at, family_started_at)
+       VALUES (@id, @user, @family, @hash, @ua, @device, @now, @exp, @started)`,
+      {
+        id: sessionId, user: userId, family: opts.familyId ?? sessionId, hash: sha256(refreshToken), ua: opts.userAgent ?? null,
+        device: opts.deviceId ?? null, now: now(cfg), exp, started,
+      },
+    );
+  })();
   const { token, expiresAt } = await accessToken(cfg, userId, sessionId);
   return { accessToken: token, refreshToken, expiresAt, sessionId };
 }
@@ -64,12 +80,13 @@ interface SessionRow {
   expires_at: number;
   replaced_by: string | null;
   revoked_at: number | null;
+  device_id: string | null;
 }
 
 // rotation: the old token is spent. presenting a spent token again kills the whole family.
 export async function rotate(cfg: Config, refreshToken: string, userAgent?: string | null): Promise<Tokens> {
   const db = platform(cfg.db);
-  const row = db.get<SessionRow>('SELECT id, user_id, family_id, family_started_at, created_at, expires_at, replaced_by, revoked_at FROM sessions WHERE refresh_hash = @h', { h: sha256(refreshToken) });
+  const row = db.get<SessionRow>('SELECT id, user_id, family_id, family_started_at, created_at, expires_at, replaced_by, revoked_at, device_id FROM sessions WHERE refresh_hash = @h', { h: sha256(refreshToken) });
   if (!row) throw unauthorized('unknown refresh token');
   if (row.revoked_at || row.replaced_by) {
     db.run('UPDATE sessions SET revoked_at = coalesce(revoked_at, @now) WHERE family_id = @f', { now: now(cfg), f: row.family_id });
@@ -88,7 +105,7 @@ export async function rotate(cfg: Config, refreshToken: string, userAgent?: stri
     db.run('UPDATE sessions SET revoked_at = coalesce(revoked_at, @now) WHERE family_id = @f', { now: now(cfg), f: row.family_id });
     throw unauthorized('refresh token reused, session family revoked');
   }
-  const next = await issueTokens(cfg, row.user_id, { familyId: row.family_id, familyStartedAt: started, userAgent });
+  const next = await issueTokens(cfg, row.user_id, { familyId: row.family_id, familyStartedAt: started, userAgent, deviceId: row.device_id });
   db.run('UPDATE sessions SET replaced_by = @next WHERE id = @id', { next: next.sessionId, id: row.id });
   return { accessToken: next.accessToken, refreshToken: next.refreshToken, expiresAt: next.expiresAt };
 }

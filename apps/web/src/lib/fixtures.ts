@@ -9,7 +9,7 @@ import type {
   ScanResult, ScopeType, SeriesPoint, Shop, ShopGroup, StockLevel, Tokens, Variant,
 } from '@custock/core';
 import { ALL_PERMISSIONS } from './perms';
-import { matches, searchKey } from '@custock/core';
+import { deviceOf, matches, searchKey } from '@custock/core';
 
 const DAY = 86_400_000;
 const NOW = Date.now();
@@ -1159,7 +1159,12 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async savePushSubscription() { /* kept on the real api */ },
     async deletePushSubscription() { /* kept on the real api */ },
     async testPush() { return { devices: 0 }; },
-    async otherSessions() { return { others: 0 }; },
+    // the sample data knows only the device it runs on
+    async otherSessions() {
+      const at = Date.now();
+      return { others: 0, devices: [{ id: 'this', current: true, ...deviceOf(typeof navigator === 'undefined' ? null : navigator.userAgent), lastUsedAt: at, signedInAt: at }] };
+    },
+    async signOutDevice() { throw new FixtureError(404, 'not_found'); },
     async signOutOthers() { return { signedOut: 0 }; },
     // invites from a link: the sample invite belongs to a new person
     async invitePreview(token) {

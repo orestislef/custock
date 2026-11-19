@@ -287,10 +287,10 @@ export function Shell({ children }: { children: ReactNode }) {
         </section>
         {/* which staff alerts this person wants, their own choice */}
         <LevelPolicies level={{ kind: 'me' }} groups={['alerts']} />
+        <OtherDevicesRow api={api} />
         <ul className="list mb-2" role="list">
           <li className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></li>
           <AppearanceRow />
-          <OtherDevicesRow api={api} />
           <li>
             <button type="button" className="row" onClick={() => (unsynced && !confirmOut ? setConfirmOut(true) : void logout())} style={{ color: 'var(--c-error)' }}>
               <IconLogout size={20} />

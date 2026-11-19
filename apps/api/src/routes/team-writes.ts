@@ -293,7 +293,7 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
       );
       claimInvite(db, inv, { id: userId, name: input.displayName }, now);
     })();
-    const { sessionId: _s, ...tokens } = await issueTokens(cfg, userId, { userAgent: c.req.header('User-Agent') });
+    const { sessionId: _s, ...tokens } = await issueTokens(cfg, userId, { userAgent: c.req.header('User-Agent'), deviceId: input.deviceId });
     return c.json({ ...tokens, orgId: inv.org_id }, 201);
   });
 

@@ -120,14 +120,18 @@ export type Problem = z.infer<typeof Problem>;
 
 // ---------------------------------------------------------------- auth and context
 
-export const LoginInput = z.object({ email: zEmail, password: z.string().min(1).max(200) });
+// the random id a browser keeps for itself. a new sign in from the same browser ends the session
+// it had before. a malformed one is dropped, it never stops a sign in
+export const zDeviceId = z.string().regex(/^[A-Za-z0-9_-]{8,64}$/).optional().catch(undefined);
+
+export const LoginInput = z.object({ email: zEmail, password: z.string().min(1).max(200), deviceId: zDeviceId });
 // forgot password. the answer is the same whether or not the email has an account
 export const PasswordForgotInput = z.object({ email: zEmail, locale: Locale.optional() });
 export type PasswordForgotInput = z.infer<typeof PasswordForgotInput>;
-export const PasswordResetInput = z.object({ token: z.string().min(10).max(200), password: zNewPassword });
+export const PasswordResetInput = z.object({ token: z.string().min(10).max(200), password: zNewPassword, deviceId: zDeviceId });
 export type PasswordResetInput = z.infer<typeof PasswordResetInput>;
 export const OtpRequestInput = z.object({ email: zEmail, locale: Locale.optional() });
-export const OtpVerifyInput = z.object({ email: zEmail, code: zOtp });
+export const OtpVerifyInput = z.object({ email: zEmail, code: zOtp, deviceId: zDeviceId });
 
 export const Tokens = z.object({
   accessToken: z.string(),
@@ -904,6 +908,7 @@ export const InviteRegisterInput = z.object({
   displayName: zLine(LIMITS.personName),
   password: zNewPassword,
   locale: Locale.optional(),
+  deviceId: zDeviceId,
 });
 export type InviteRegisterInput = z.infer<typeof InviteRegisterInput>;
 

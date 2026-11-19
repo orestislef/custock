@@ -68,7 +68,7 @@ export function authRoutes(app: Hono<AppEnv>) {
     }
     clearLock(cfg.db, 'login', email, ip);
     linkCustomers(db, user.id, email);
-    const { sessionId: _s, ...tokens } = await issueTokens(cfg, user.id, { userAgent: c.req.header('User-Agent') });
+    const { sessionId: _s, ...tokens } = await issueTokens(cfg, user.id, { userAgent: c.req.header('User-Agent'), deviceId: input.deviceId });
     return c.json(tokens);
   });
 
@@ -130,7 +130,7 @@ export function authRoutes(app: Hono<AppEnv>) {
       db.run('UPDATE users SET email_verified_at = coalesce(email_verified_at, @now) WHERE id = @id', { now, id: user.id });
     }
     linkCustomers(db, user.id, email);
-    const { sessionId: _s, ...tokens } = await issueTokens(cfg, user.id, { userAgent: c.req.header('User-Agent') });
+    const { sessionId: _s, ...tokens } = await issueTokens(cfg, user.id, { userAgent: c.req.header('User-Agent'), deviceId: input.deviceId });
     return c.json(tokens);
   });
 

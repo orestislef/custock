@@ -24,6 +24,8 @@ export interface ApiClientOptions {
   // perms version per org, sent as X-Perms-Version
   getPermsVersion?: (orgId: string) => number | null | undefined;
   onUnauthorized?: () => void | Promise<void>;
+  // the random id this browser keeps, sent with every sign in so a new one ends the old session
+  getDeviceId?: () => string | null | undefined;
   // called when the server says the caller's permissions changed
   onPermsStale?: (orgId: string) => void;
   // called after a request that failed with 5xx (not for the error report itself)
@@ -135,20 +137,21 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
   const put = <T>(path: string, body: unknown) => request<T>('PUT', path, body);
   const del = <T>(path: string, body?: unknown) => request<T>('DELETE', path, body);
   const org = (orgId: string) => `/v1/orgs/${enc(orgId)}`;
+  const device = () => { const id = opts.getDeviceId?.(); return id ? { deviceId: id } : {}; };
 
   return {
     request,
 
     // auth
-    login: (email, password) => post('/v1/auth/login', { email, password }),
+    login: (email, password) => post('/v1/auth/login', { email, password, ...device() }),
     requestOtp: (email, locale) => post('/v1/auth/otp/request', { email, locale }),
-    verifyOtp: (email, code) => post('/v1/auth/otp/verify', { email, code }),
+    verifyOtp: (email, code) => post('/v1/auth/otp/verify', { email, code, ...device() }),
     refresh: (refreshToken) => post('/v1/auth/refresh', { refreshToken }),
     logout: () => post('/v1/auth/logout'),
     me: () => get('/v1/me/context'),
     requestPasswordReset: (email, locale) => post('/v1/auth/password/forgot', { email, locale }),
     passwordResetPreview: (token) => get(`/v1/auth/password/reset/${enc(token)}`),
-    resetPassword: (token, password) => post('/v1/auth/password/reset', { token, password }),
+    resetPassword: (token, password) => post('/v1/auth/password/reset', { token, password, ...device() }),
 
     // org
     orgSettings: (orgId) => get(org(orgId)),
@@ -301,10 +304,11 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     deletePushSubscription: (endpoint) => request('DELETE', '/v1/me/push-subscriptions', { endpoint }),
     testPush: (orgId) => post('/v1/me/push/test', { orgId: orgId ?? null }),
     otherSessions: () => get('/v1/me/sessions'),
+    signOutDevice: (id) => del(`/v1/me/sessions/${enc(id)}`),
     signOutOthers: () => post('/v1/me/sessions/sign-out-others'),
 
     invitePreview: (token) => get(`/v1/invites/${enc(token)}`),
-    registerWithInvite: (input) => post('/v1/invites/register', input),
+    registerWithInvite: (input) => post('/v1/invites/register', { ...input, ...device() }),
     createShop: (orgId, input) => post(`${org(orgId)}/shops`, input),
   
 
@@ -342,7 +346,7 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     businessPolicies: (orgId) => get(`/v1/platform/businesses/${enc(orgId)}/policies`),
     setBusinessPolicies: (orgId, body) => patch(`/v1/platform/businesses/${enc(orgId)}/policies`, body),
     platformInvitePreview: (token) => get(`/v1/platform-invites/${enc(token)}`),
-    registerPlatformInvite: (input) => post('/v1/platform-invites/register', input),
+    registerPlatformInvite: (input) => post('/v1/platform-invites/register', { ...input, ...device() }),
     acceptPlatformInvite: (token) => post('/v1/platform-invites/accept', { token }),
     platformErrors: (q) => get('/v1/platform/errors', q as Query | undefined),
     platformError: (id) => get(`/v1/platform/errors/${enc(id)}`),

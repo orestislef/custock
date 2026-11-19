@@ -21,3 +21,4 @@ export * from './policies';
 export * from './policy-schemas';
 export * from './validate';
 export * from './audit-actions';
+export * from './devices';

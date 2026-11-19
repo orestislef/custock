@@ -167,13 +167,44 @@
     "changeName": "Αλλαγή ονόματος",
     "nameSaved": "Το όνομα αποθηκεύτηκε",
     "nameFoot": "Έτσι σας βλέπουν η ομάδα σας και όσοι λαμβάνουν τα μηνύματά σας.",
+    "devices": "Συσκευές",
     "otherDevices": "Άλλες συσκευές",
     "otherDevicesCount_one": "Συνδεδεμένο σε {{count}} άλλη συσκευή",
     "otherDevicesCount_other": "Συνδεδεμένο σε {{count}} άλλες συσκευές",
     "onlyThisDevice": "Μόνο αυτή η συσκευή είναι συνδεδεμένη",
     "signOutOthers": "Αποσύνδεση των άλλων",
     "signedOutOthers_one": "Έγινε αποσύνδεση από {{count}} άλλη συσκευή",
-    "signedOutOthers_other": "Έγινε αποσύνδεση από {{count}} άλλες συσκευές"
+    "signedOutOthers_other": "Έγινε αποσύνδεση από {{count}} άλλες συσκευές",
+    "thisDevice": "Αυτή η συσκευή",
+    "signOutDevice": "Αποσύνδεση",
+    "signOutDeviceLabel": "Αποσύνδεση: {{device}}",
+    "deviceSignedOut": "Έγινε αποσύνδεση: {{device}}",
+    "deviceUsed": "Τελευταία χρήση {{when}}",
+    "deviceSince": "σύνδεση {{date}}",
+    "device": {
+      "on": "{{browser}} σε {{os}}",
+      "unknown": "Άγνωστη συσκευή",
+      "browser": {
+        "chrome": "Chrome",
+        "safari": "Safari",
+        "firefox": "Firefox",
+        "edge": "Edge",
+        "opera": "Opera",
+        "samsung": "Samsung Internet",
+        "app": "Εφαρμογή αρχικής οθόνης",
+        "other": "Πρόγραμμα περιήγησης"
+      },
+      "os": {
+        "windows": "Windows",
+        "mac": "Mac",
+        "iphone": "iPhone",
+        "ipad": "iPad",
+        "android": "Android",
+        "linux": "Linux",
+        "chromeos": "ChromeOS",
+        "other": "άλλο σύστημα"
+      }
+    }
   },
   "nav": {
     "home": "Αρχική",
@@ -1386,7 +1417,9 @@
           "invite_accepted": "Νέος υπερδιαχειριστής",
           "invite_revoked": "Ανάκληση πρόσκλησης υπερδιαχειριστή",
           "removed": "Αφαίρεση υπερδιαχειριστή",
-          "granted_cli": "Υπερδιαχειριστής από τον διακομιστή"
+          "granted_cli": "Υπερδιαχειριστής από τον διακομιστή",
+          "device_signed_out": "Αποσύνδεσε μία από τις συσκευές του",
+          "others_signed_out": "Αποσύνδεσε όλες τις άλλες συσκευές του"
         },
         "policies": {
           "platform_changed": "Άλλαξε όρια πλατφόρμας",

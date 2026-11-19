@@ -2,21 +2,54 @@
 // an offer below cost, and stock work for a business someone no longer works for.
 
 import { L, api, eq, expect, forget, go, lemoni, login, ok, one, open, see, seed, sleep, test } from '../lib.mjs';
+import cfg from '../e2e.config.mjs';
 
 test('edge', 'a lost phone: the account sheet signs out every other device, this one stays', async (t) => {
   const email = seed.managerGly;
   const other = await login(email, undefined, { fresh: true });
+  // two others, so the one tap for all of them shows (with one, its own sign out is enough)
+  const third = await login(email, undefined, { fresh: true });
   const here = await login(email, undefined, { fresh: true });
   const page = await open(t, { device: 'phone', tokens: here });
   await go(page, '/admin');
   await page.getByRole('button', { name: L('admin.account') }).click();
-  await see(page, L('admin.otherDevices'));
+  await see(page, L('admin.devices'));
   await page.getByRole('button', { name: L('admin.signOutOthers') }).click();
   await see(page, L('admin.onlyThisDevice'));
   eq((await api('/v1/me/context', { token: other })).status, 401, 'the other device');
+  eq((await api('/v1/me/context', { token: third })).status, 401, 'the third device');
   eq((await api('/v1/me/context', { token: here })).status, 200, 'this device');
   // the cached sign in of this person was one of the others
   forget(email);
+});
+
+test('edge', 'the account lists each device in plain words and signs out one of them', async (t) => {
+  const email = seed.viewer;
+  const as = (ua, deviceId) => ok('/v1/auth/login', { method: 'POST', body: { email, password: cfg.password, deviceId }, headers: { 'User-Agent': ua } });
+  const name = (browser, os) => L('admin.device.on', { browser: L(`admin.device.browser.${browser}`), os: L(`admin.device.os.${os}`) });
+  const pc = await as('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36', 'e2e-pc-0000000001');
+  const phone = await as(cfg.iphoneUA, 'e2e-phone-0000000002');
+  const here = await as('Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0', 'e2e-here-0000000003');
+  const page = await open(t, { device: 'phone', tokens: here });
+  await go(page, '/admin');
+  await page.getByRole('button', { name: L('admin.account') }).click();
+  await see(page, L('admin.devices'));
+  await see(page, name('firefox', 'linux'));
+  await see(page, L('admin.thisDevice'));
+  await see(page, name('safari', 'iphone'));
+  const pcName = name('chrome', 'windows');
+  await page.getByRole('button', { name: L('admin.signOutDeviceLabel', { device: pcName }) }).click();
+  await see(page, L('admin.deviceSignedOut', { device: pcName }));
+  eq((await api('/v1/me/context', { token: pc })).status, 401, 'the signed out computer');
+  eq((await api('/v1/me/context', { token: phone })).status, 200, 'the phone');
+  eq((await api('/v1/me/context', { token: here })).status, 200, 'this device');
+  // this device has no sign out button in the list, it signs out from the menu
+  eq(await page.getByRole('button', { name: L('admin.signOutDeviceLabel', { device: name('firefox', 'linux') }) }).count(), 0, 'a button for this device');
+  // the same browser signing in again replaces its session instead of adding one
+  const before = (await ok('/v1/me/sessions', { token: here })).others;
+  await as(cfg.iphoneUA, 'e2e-phone-0000000002');
+  eq((await ok('/v1/me/sessions', { token: here })).others, before, 'devices after the phone signed in again');
+  eq((await api('/v1/me/context', { token: phone })).status, 401, 'the old session of the phone');
 });
 
 test('edge', 'the role editor names the people a change reaches', async (t) => {

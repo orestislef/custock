@@ -185,11 +185,12 @@ export function AccountView() {
         </>
       ) : null}
 
+      <OtherDevicesRow api={api} tight={false} />
+
       <section className="inset-group">
         <ul className="list" role="list">
           <li className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></li>
           <AppearanceRow />
-          <OtherDevicesRow api={api} />
           <InstallRow appName={orgName} icon={icon} render={(open, label) => (
             <li>
               <button type="button" className="row has-icon" onClick={open}>

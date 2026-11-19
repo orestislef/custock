@@ -7,7 +7,7 @@ import { z } from 'zod';
 import {
   Feature, NewBusinessInput, normalizeBarcode, OrgControlsPatch, PlatformInviteInput, PlatformSettingsPatch, uuidv7,
   type PlatformInvitePreview,
-  LIMITS, passwordProblem, zLine, zNewPassword,
+  LIMITS, passwordProblem, zDeviceId, zLine, zNewPassword,
 } from '@custock/core';
 import { hashPasswordAsync } from '@custock/db';
 import type { AppEnv } from '../types';
@@ -238,6 +238,7 @@ export function platformRoutes(app: Hono<AppEnv>) {
       displayName: zLine(LIMITS.personName),
       password: zNewPassword,
       locale: z.enum(['en', 'el', 'ru']).optional(),
+      deviceId: zDeviceId,
     }).parse(await c.req.json());
     const cfg = cfgOf(c);
     if (cfg.auth?.mode === 'jwks') throw notFound('accounts are made on the login server');
@@ -263,7 +264,7 @@ export function platformRoutes(app: Hono<AppEnv>) {
       );
       claimPlatformInvite(db, inv, userId, now);
     })();
-    const { sessionId: _s, ...tokens } = await issueTokens(cfg, userId, { userAgent: c.req.header('User-Agent') });
+    const { sessionId: _s, ...tokens } = await issueTokens(cfg, userId, { userAgent: c.req.header('User-Agent'), deviceId: input.deviceId });
     return c.json(tokens, 201);
   });
 

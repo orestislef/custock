@@ -63,10 +63,10 @@ export function PlatformShell({ children }: { children: ReactNode }) {
             <PushRow api={api} orgId={null} title={t('push.staffTitle')} sub={t('push.platformSub')} onInstall={() => setInstallSteps(true)} />
           </div>
         </section>
+        <OtherDevicesRow api={api} />
         <ul className="list mb-2" role="list">
           <li className="row"><span className="row-main row-title">{t('locale.label')}</span><LocaleSwitch /></li>
           <AppearanceRow />
-          <OtherDevicesRow api={api} />
           <li>
             <button type="button" className="row" onClick={() => void logout()} style={{ color: 'var(--c-error)' }}>
               <IconLogout size={20} />

@@ -167,13 +167,44 @@
     "changeName": "Change name",
     "nameSaved": "Name saved",
     "nameFoot": "This is how your team and the people you write to see you.",
+    "devices": "Devices",
     "otherDevices": "Other devices",
     "otherDevicesCount_one": "Signed in on {{count}} other device",
     "otherDevicesCount_other": "Signed in on {{count}} other devices",
     "onlyThisDevice": "Only this device is signed in",
     "signOutOthers": "Sign out others",
     "signedOutOthers_one": "Signed out on {{count}} other device",
-    "signedOutOthers_other": "Signed out on {{count}} other devices"
+    "signedOutOthers_other": "Signed out on {{count}} other devices",
+    "thisDevice": "This device",
+    "signOutDevice": "Sign out",
+    "signOutDeviceLabel": "Sign out {{device}}",
+    "deviceSignedOut": "Signed out on {{device}}",
+    "deviceUsed": "Last used {{when}}",
+    "deviceSince": "signed in {{date}}",
+    "device": {
+      "on": "{{browser}} on {{os}}",
+      "unknown": "Unknown device",
+      "browser": {
+        "chrome": "Chrome",
+        "safari": "Safari",
+        "firefox": "Firefox",
+        "edge": "Edge",
+        "opera": "Opera",
+        "samsung": "Samsung Internet",
+        "app": "Home screen app",
+        "other": "Browser"
+      },
+      "os": {
+        "windows": "Windows",
+        "mac": "Mac",
+        "iphone": "iPhone",
+        "ipad": "iPad",
+        "android": "Android",
+        "linux": "Linux",
+        "chromeos": "ChromeOS",
+        "other": "another system"
+      }
+    }
   },
   "nav": {
     "home": "Home",
@@ -1386,7 +1417,9 @@
           "invite_accepted": "Super admin joined",
           "invite_revoked": "Super admin invite withdrawn",
           "removed": "Super admin removed",
-          "granted_cli": "Super admin made on the server"
+          "granted_cli": "Super admin made on the server",
+          "device_signed_out": "Signed out one of their devices",
+          "others_signed_out": "Signed out all their other devices"
         },
         "policies": {
           "platform_changed": "Changed platform limits",

@@ -29,6 +29,22 @@ export function saveTokens(tokens: StoredTokens | null) {
   else localStorage.removeItem(TOKENS_KEY);
 }
 
+// a random id this browser keeps for itself, also after signing out. every sign in sends it, so a
+// new sign in ends the session this browser had before instead of leaving it counted as a device
+const DEVICE_KEY = 'custock.device';
+export function deviceId(): string | null {
+  try {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id || !/^[A-Za-z0-9_-]{8,64}$/.test(id)) {
+      id = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+    return id;
+  } catch {
+    return null; // storage off: the sign in still works, it just cannot replace an older one
+  }
+}
+
 // the front door reads who this is to choose where to go. the admin it opens a moment later takes
 // that answer instead of asking again: once, within 10 seconds, for the same session
 let handedMe: { me: MeContext; session: string; at: number } | null = null;
@@ -94,6 +110,7 @@ export function createBrowserApi(opts: {
       getPermsVersion: opts.getPermsVersion,
       onUnauthorized: opts.onUnauthorized,
       onPermsStale: opts.onPermsStale,
+      getDeviceId: deviceId,
       // a 5xx is ours to fix: the super admin sees it on the Errors screen
       onServerError: (e) => reportError({ source: 'api', method: e.method, apiPath: e.path, status: e.status }),
     });

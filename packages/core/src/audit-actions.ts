@@ -64,6 +64,8 @@ export const PLATFORM_AUDIT_ACTIONS = [
   'superadmin.invite_revoked',
   'superadmin.removed',
   'superadmin.granted_cli',
+  'superadmin.device_signed_out',
+  'superadmin.others_signed_out',
   'policies.platform_changed',
   'policies.business_controls_changed',
 ] as const;
