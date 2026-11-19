@@ -2,8 +2,7 @@
 // picture at a time, with positions: a shelf label (barcode and qr code) held still, the reader
 // handing them over in turns, taken away and shown again, a neighbour outside the white frame, and
 // two products one after the other. the database says what was sold.
-import { L, WEB, eq, expect, go, lemoni, login, onHand, open, q, seed, sleep, test } from '../lib.mjs';
-import { pickMode } from './04-stock.mjs';
+import { L, WEB, eq, expect, go, lemoni, login, ok, onHand, open, seed, sleep, test } from '../lib.mjs';
 
 // a stand-in BarcodeDetector: window.__reads lists what is in front of the camera, positions as a
 // share of the picture. alternate: hand over one code per picture, in turns, like the live reader.
@@ -28,29 +27,47 @@ async function fakeCamera(page) {
 
 const show = (page, reads, alternate = false) => page.evaluate(([r, a]) => { window.__reads = r; window.__alternate = a; }, [reads, alternate]);
 
+// the mode chip, waited for and checked: a scan in the wrong mode would open the product instead
+async function useMode(page, mode) {
+  const chip = page.getByRole('button', { name: L(`scanner.mode.${mode}`), exact: true }).or(page.getByRole('radio', { name: L(`scanner.mode.${mode}`), exact: true })).first();
+  await chip.waitFor({ state: 'visible', timeout: 15_000 });
+  await chip.click();
+  await page.waitForFunction((label) => [...document.querySelectorAll('button,[role=radio]')].some((b) => b.textContent?.trim() === label && (b.getAttribute('aria-pressed') === 'true' || b.getAttribute('aria-checked') === 'true')), L(`scanner.mode.${mode}`), { timeout: 5000 });
+}
+
 async function cameraOn(page) {
   const go = page.getByRole('button', { name: L('scanner.useCamera') });
   if (await go.isVisible().catch(() => false)) await go.click();
   await page.locator('.scan-frame').waitFor({ state: 'visible', timeout: 15_000 });
 }
 
-function twoCodes(shopId) {
-  const rows = q(
-    `SELECT b.code, b.variant_id AS v FROM barcodes b JOIN stock_levels s ON s.variant_id = b.variant_id
-      JOIN product_variants pv ON pv.id = b.variant_id JOIN products p ON p.id = pv.product_id
-      WHERE s.shop_id = @s AND s.on_hand > 10 AND length(b.code) = 13 AND p.uom = 'piece' AND b.pack_qty = 1 AND p.name NOT LIKE 'E2E%'
-      GROUP BY b.variant_id ORDER BY b.code LIMIT 3`, { s: shopId });
-  expect(rows.length >= 3, 'three products with stock', '3', String(rows.length));
-  return rows.map((r) => ({ code: r.code, variantId: r.v }));
+// the owner, in Kifisia: other tests change the managers' roles while this one runs.
+// products of its own, with 20 in stock at Kifisia: the other tests run at the same time and sell
+// the shared ones, which would throw the numbers off
+const ean = (twelve) => {
+  const sum = [...twelve].reduce((n, d, i) => n + Number(d) * (i % 2 ? 3 : 1), 0);
+  return twelve + ((10 - (sum % 10)) % 10);
+};
+async function ownProducts(l, n) {
+  const owner = await login(seed.owner);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const code = ean('5209' + String(Date.now()).slice(-7) + i);
+    const p = await ok(`/v1/orgs/${l.orgId}/products`, { method: 'POST', token: owner, body: { name: `E2E camera ${code}`, priceMinor: 300, barcode: code } });
+    const variantId = p.variants[0].id;
+    await ok(`/v1/orgs/${l.orgId}/movements`, { method: 'POST', token: owner, body: { movements: [{ id: crypto.randomUUID(), shopId: l.kifisia, variantId, qtyDelta: 20, kind: 'receive', occurredAt: Date.now() }] } });
+    out.push({ code, variantId });
+  }
+  return out;
 }
 
 test('stock', 'camera: a shelf label held still sells one, shown again sells one more, neighbours and the other code do not count', async (t) => {
   const l = await lemoni();
-  const [a, b, c] = twoCodes(l.kifisia);
-  const page = await open(t, { tokens: await login(seed.managerKif), permissions: ['camera'] });
+  const [a, b, c] = await ownProducts(l, 3);
+  const page = await open(t, { tokens: await login(seed.owner), permissions: ['camera'], storage: { 'custock.shop': l.kifisia } });
   await fakeCamera(page);
   await go(page, '/admin/scan?mode=sell');
-  await pickMode(page, 'sell');
+  await useMode(page, 'sell');
   await cameraOn(page);
   const startA = await onHand(a.variantId, l.kifisia);
   const startC = await onHand(c.variantId, l.kifisia);
@@ -87,8 +104,8 @@ test('stock', 'camera: a shelf label held still sells one, shown again sells one
   eq(await onHand(a.variantId, l.kifisia), startA - 3, 'the first sold');
   eq(await onHand(b.variantId, l.kifisia), startB - 1, 'the second sold too, not lost behind the first');
 
-  t.step('one more of the same with +, no scan');
-  await page.locator(`button[aria-label^="${L('scanner.sellOneMore', { name: '' }).trim()}"]`).first().click();
+  t.step('one more of the same with +, no scan; a quick double tap is still one');
+  await page.locator(`button[aria-label^="${L('scanner.sellOneMore', { name: '' }).trim()}"]`).first().dblclick();
   await sleep(1500);
   const after = (await onHand(a.variantId, l.kifisia)) + (await onHand(b.variantId, l.kifisia));
   eq(after, startA - 3 + startB - 1 - 1, 'one more sold from the list');
@@ -96,11 +113,11 @@ test('stock', 'camera: a shelf label held still sells one, shown again sells one
 
 test('stock', 'camera: in receive mode a label held still is one, the list does not run up', async (t) => {
   const l = await lemoni();
-  const [a] = twoCodes(l.kifisia);
-  const page = await open(t, { tokens: await login(seed.managerKif), permissions: ['camera'] });
+  const [a] = await ownProducts(l, 1);
+  const page = await open(t, { tokens: await login(seed.owner), permissions: ['camera'], storage: { 'custock.shop': l.kifisia } });
   await fakeCamera(page);
   await go(page, '/admin/scan?mode=receive');
-  await pickMode(page, 'receive');
+  await useMode(page, 'receive');
   await cameraOn(page);
   await show(page, [
     { raw: a.code, format: 'ean_13', cx: 0.5, cy: 0.52 },

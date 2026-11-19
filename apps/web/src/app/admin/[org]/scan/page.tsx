@@ -70,6 +70,9 @@ function Scan() {
   const [manual, setManual] = useState(false);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  // + on a sold line: one sale at a time, a quick second tap is not a second sale
+  const [plusFor, setPlusFor] = useState<string | null>(null);
+  const plusBusy = useRef(false);
   const [unknown, setUnknown] = useState<ScanResult | null>(null);
   const [toShop, setToShop] = useState<string | null>(null);
   const [archived, setArchived] = useState<Product | null>(null);
@@ -399,8 +402,15 @@ function Scan() {
                     <button type="button" className="icon-btn" aria-label={t('scanner.more', { name: name(l.product) })} onClick={() => setQty(l, l.qty + 1)}><IconPlus size={20} /></button>
                   ) : l.product.uom === 'piece' ? (
                     // one more of the same, without scanning the same code again
-                    <button type="button" className="icon-btn" aria-label={t('scanner.sellOneMore', { name: name(l.product) })} disabled={busy}
-                      onClick={() => void sellOne(l.product, l.variantId, 1).then(() => scanSound('ok'), () => toast(t('offline.needsSignal')))}><IconPlus size={20} /></button>
+                    <button type="button" className="icon-btn" aria-label={t('scanner.sellOneMore', { name: name(l.product) })} disabled={busy || plusFor !== null} aria-busy={plusFor === l.variantId || undefined}
+                      onClick={() => {
+                        if (plusBusy.current) return;
+                        plusBusy.current = true;
+                        setPlusFor(l.variantId);
+                        void sellOne(l.product, l.variantId, 1)
+                          .then(() => scanSound('ok'), () => toast(t('offline.needsSignal')))
+                          .finally(() => { plusBusy.current = false; setPlusFor(null); });
+                      }}><IconPlus size={20} /></button>
                   ) : null}
                 </li>
               ))}
