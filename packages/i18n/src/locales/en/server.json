@@ -124,6 +124,16 @@
       "heading": "Your email is back",
       "lead": "The email on your Custock account is {{email}} again, and every device was signed out.",
       "note": "If you also lost your password, ask for a new one on the sign in page."
+    },
+    "codeSignIn": {
+      "subject": "How you sign in to Custock",
+      "preheader": "No password needed, just a code by email.",
+      "heading": "You sign in with a code",
+      "lead": "Someone asked to reset the password for {{email}}. This email has no password: you sign in with a 6 digit code we email you each time.",
+      "leadShop": "Open {{shop}} and tap Sign in.",
+      "others": "You also follow {{shops}}. Open their page and sign in the same way.",
+      "button": "Sign in to {{shop}}",
+      "note": "If you did not ask for this, ignore this email. Nothing changed."
     }
   },
   "push": {

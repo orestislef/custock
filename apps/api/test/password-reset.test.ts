@@ -75,6 +75,11 @@ describe('forgot password', () => {
     expect(resetMails('nikos@example.com')).toHaveLength(1);
     expect(resetMails('nobody.here@example.com')).toHaveLength(0);
     expect(resetMails(customer.email)).toHaveLength(0);
+    // the customer hears how to sign in instead, with a link to the shop they follow
+    const howTo = resetMails(customer.email, 'code_sign_in');
+    expect(howTo).toHaveLength(1);
+    expect(howTo[0].body).toMatch(/\/s\/[a-z0-9-]+\/me/);
+    expect(howTo[0].body).not.toMatch(/\/admin\/reset\//);
     // only a hash of the token is kept
     const token = tokenFrom(resetMails('nikos@example.com')[0]);
     const stored = db.prepare('SELECT token_hash FROM password_resets').all() as Json[];

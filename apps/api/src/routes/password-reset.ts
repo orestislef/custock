@@ -1,5 +1,6 @@
 // forgot password for accounts with a password (staff and super admins). customers sign in with
-// an email code and have no password to forget.
+// an email code and have no password to forget: they get an email that says so, with a link to the
+// sign in of the business they follow.
 //
 // - the request always answers the same, whether or not the email has an account, and does the
 //   same work either way (the email is rendered in both cases) so timing does not tell either
@@ -22,7 +23,7 @@ import { clientIp, rateLimit, throttle } from '../lib/ratelimit';
 import { clearAllLocks } from '../lib/lockout';
 import { platform } from '../lib/tenant';
 import { devOutboxTransport, emailMessage } from '../lib/transport';
-import { passwordChangedEmail, passwordResetEmail } from '../email/account';
+import { codeSignInEmail, passwordChangedEmail, passwordResetEmail } from '../email/account';
 
 const MIN = 60_000;
 export const RESET_TTL = 30 * MIN;
@@ -81,6 +82,18 @@ export function passwordResetRoutes(app: Hono<AppEnv>) {
         { id: uuidv7(now), u: user.id, h: sha256(`reset:${token}`), now, exp: now + policyNumber(cfg.db, 'auth.resetMinutes') * MIN, ip },
       );
       devOutboxTransport(cfg.db).send(emailMessage(mail, { to: email, userId: user.id, locale, payload: { type: 'password_reset' } }));
+    } else if (user && !user.deleted_at && !user.password_hash && underLimit) {
+      // a customer: no password to reset, so tell them how to sign in, from the business they follow
+      const follows = db.all<{ slug: string; name: string }>(
+        `SELECT o.slug, o.name FROM customers cu JOIN organizations o ON o.id = cu.org_id
+          WHERE cu.user_id = @u AND cu.erased_at IS NULL AND o.status = 'active' ORDER BY cu.created_at DESC`,
+        { u: user.id },
+      );
+      const [first, ...rest] = follows;
+      if (first) {
+        const howTo = codeSignInEmail(locale, { email, shop: first.name, url: `${web}/s/${first.slug}/me`, others: rest.slice(0, 5).map((o) => o.name) });
+        devOutboxTransport(cfg.db).send(emailMessage(howTo, { to: email, userId: user.id, locale, payload: { type: 'code_sign_in' } }));
+      }
     }
     return c.json({ sent: true as const }, 202);
   });
@@ -122,7 +135,7 @@ export function passwordResetRoutes(app: Hono<AppEnv>) {
     devOutboxTransport(cfg.db).send(
       emailMessage(passwordChangedEmail(locale, { email: user.email, url: `${web}/admin/forgot` }), { to: user.email, userId: user.id, locale, payload: { type: 'password_changed' } }),
     );
-    const { sessionId: _s, ...tokens } = await issueTokens(cfg, user.id, { userAgent: c.req.header('User-Agent') });
+    const { sessionId: _s, ...tokens } = await issueTokens(cfg, user.id, { userAgent: c.req.header('User-Agent'), deviceId: input.deviceId });
     return c.json(tokens);
   });
 }

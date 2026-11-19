@@ -1,4 +1,5 @@
-// mail about the account itself: the forgot password link and the notice once it was changed
+// mail about the account itself: the forgot password link, the notice once it was changed, and how
+// to sign in with a code for an email that has no password
 
 import { pickLocale, translator, type AppLocale } from '@custock/i18n';
 import { renderEmail, type RenderedEmail } from './layout';
@@ -46,5 +47,18 @@ export function emailRevertedEmail(locale: Locale, p: { email: string }, opts?: 
   return renderEmail({
     locale: l, subject: t('email.emailReverted.subject'), preheader: t('email.emailReverted.preheader', p), heading: t('email.emailReverted.heading'),
     paragraphs: [t('email.emailReverted.lead', p)], note: t('email.emailReverted.note'), footer: footer(t),
+  }, opts);
+}
+
+// "forgot password" for an email with no password: customers sign in with a code from their shop's
+// page, so this tells them how and links straight to the sign in of the business they follow
+export function codeSignInEmail(locale: Locale, p: { email: string; shop: string; url: string; others: string[] }, opts?: { forceDark?: boolean }): RenderedEmail {
+  const { l, t } = tr(locale);
+  const paragraphs = [t('email.codeSignIn.lead', { email: p.email }), t('email.codeSignIn.leadShop', { shop: p.shop })];
+  if (p.others.length) paragraphs.push(t('email.codeSignIn.others', { shops: p.others.join(', ') }));
+  return renderEmail({
+    locale: l, subject: t('email.codeSignIn.subject'), preheader: t('email.codeSignIn.preheader'), heading: t('email.codeSignIn.heading'),
+    paragraphs, button: { label: t('email.codeSignIn.button', { shop: p.shop }), url: p.url }, note: t('email.codeSignIn.note'),
+    fallback: { label: t('email.layout.linkFallback'), url: p.url }, footer: footer(t),
   }, opts);
 }
