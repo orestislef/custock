@@ -1,9 +1,7 @@
 // made up "Lemoni" data, the same world as the demo. everything is fictional, emails are on
 // example.com, every dev password is "custock".
 
-import { readFileSync, existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { SAMPLE_IMAGES } from './sample-images';
 import { DEFAULT_ROLES, contactKey, ean13, gtinCheckDigit, makeInternalEan13, normalize, searchKey, toGtin14, transliterate, uuidv7, followsShop, type Topology } from '@custock/core';
 import type { Db } from './open';
 import { hashPassword } from './password';
@@ -55,22 +53,12 @@ function poisson(r: () => number, lambda: number): number {
   return k - 1;
 }
 
-function loadImages(): Record<string, string> {
-  const here = dirname(fileURLToPath(import.meta.url));
-  const file = join(here, '..', '..', '..', 'demo', 'assets', 'js', 'images.js');
-  if (!existsSync(file)) return {};
-  const text = readFileSync(file, 'utf8');
-  const out: Record<string, string> = {};
-  for (const m of text.matchAll(/"([\w-]+)":\s*"([^"]+)"/g)) out[m[1]!] = m[2]!;
-  return out;
-}
-
 type Row = Record<string, string | number | null | undefined>;
 
 export function seed(db: Db, opts: { now?: number; passwordHash?: string } = {}): SeedResult {
   const now = opts.now ?? Date.now();
   const r = rng(20261117);
-  const images = loadImages();
+  const images = SAMPLE_IMAGES;
   const pw = opts.passwordHash ?? hashPassword('custock');
   let movementCount = 0;
 

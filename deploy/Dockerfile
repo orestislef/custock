@@ -60,8 +60,6 @@ COPY packages/i18n/src packages/i18n/src
 COPY packages/tokens/src packages/tokens/src
 COPY apps/api/src apps/api/src
 COPY scripts/db-snapshot.mjs scripts/db-restore-check.mjs scripts/
-# photo urls for the made up demo data (only read with CUSTOCK_SEED=1)
-COPY demo/assets/js/images.js demo/assets/js/images.js
 COPY --from=web /app/apps/web/.next/standalone /app/web
 COPY --from=web /app/apps/web/.next/static /app/web/apps/web/.next/static
 COPY --from=web /app/apps/web/public /app/web/apps/web/public

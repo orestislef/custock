@@ -1,24 +1,14 @@
 // made up content for the dev preview of every email (GET /v1/dev/emails). nothing here comes
 // from a database or reaches anyone.
 
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { SAMPLE_IMAGES } from '@custock/db';
 import { formatMoney } from '@custock/core';
 import { translator, type AppLocale } from '@custock/i18n';
 import type { RenderedEmail } from './layout';
 import { backInStockEmail, changeCodeEmail, emailChangedEmail, inviteEmail, joinConfirmEmail, otpEmail, ownerInviteEmail, postEmail, type EmailKind } from './messages';
 import { passwordChangedEmail, passwordResetEmail } from './account';
 
-let images: Record<string, string> | null = null;
-function image(key: string): string | null {
-  if (!images) {
-    images = {};
-    const file = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'demo', 'assets', 'js', 'images.js');
-    if (existsSync(file)) for (const m of readFileSync(file, 'utf8').matchAll(/"([\w-]+)":\s*"([^"]+)"/g)) images[m[1]!] = m[2]!;
-  }
-  return images[key] ?? null;
-}
+const image = (key: string): string | null => SAMPLE_IMAGES[key] ?? null;
 
 const TEXT: Record<AppLocale, {
   name: string; inviter: string; product: string; shop: string;
