@@ -32,10 +32,11 @@ test('platform', 'create a business from the New business sheet', async (t) => {
   await go(page, '/admin/platform');
   t.step('New business');
   const sheet = await openSheet(page, page.getByRole('button', { name: L('platform.newBusiness') }).first());
-  await sheet.getByPlaceholder(L('platform.new.namePlaceholder')).fill('QA Shop');
-  // the first shop field shows the business name as its placeholder
-  await sheet.locator('input').nth(2).fill('QA Main');
-  await sheet.locator('input[type=email]').fill('qa-owner@example.com');
+  // every field is found by its label: screen readers name them the same way
+  await sheet.getByLabel(L('platform.new.name'), { exact: true }).fill('QA Shop');
+  expect(await sheet.getByLabel(L('platform.new.slug'), { exact: true }).count() === 1, 'web address field by its label', '1', '0');
+  await sheet.getByLabel(L('platform.new.shop'), { exact: true }).fill('QA Main');
+  await sheet.getByLabel(L('platform.new.ownerEmail'), { exact: true }).fill('qa-owner@example.com');
   await page.waitForTimeout(600);
   t.step('Create');
   await primary(page).click();

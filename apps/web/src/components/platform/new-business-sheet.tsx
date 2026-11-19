@@ -3,7 +3,7 @@
 // a new business from the platform: its name, web address, first shop and the owner's email.
 // the owner gets a "set your password" link, by email when mail is live, and here to share.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { BusinessCreated, Locale } from '@custock/core';
 import { usePlatform } from '@/components/admin/admin-context';
 import { Picker, Sheet } from '@/components/ui/client-kit';
@@ -15,6 +15,8 @@ import { EmailInput } from '@/components/ui/field-kit';
 
 export function NewBusinessSheet({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const { api, t, locale } = usePlatform();
+  // every field is tied to its label, so screen readers and tools name it
+  const fid = useId();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
@@ -77,25 +79,25 @@ export function NewBusinessSheet({ open, onClose, onCreated }: { open: boolean; 
       ) : (
         <>
           <div className="list mb-2">
-            <label className="block">
+            <label className="block" htmlFor={`${fid}-name`}>
               <span className="field-label">{t('platform.new.name')}</span>
-              <input className="field pt-1" autoComplete="organization" autoCapitalize="words" enterKeyHint="next" maxLength={80} placeholder={t('platform.new.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setName((v) => cleanLine(v))} />
+              <input id={`${fid}-name`} className="field pt-1" autoComplete="organization" autoCapitalize="words" enterKeyHint="next" maxLength={80} placeholder={t('platform.new.namePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setName((v) => cleanLine(v))} />
             </label>
-            <label className="block row-sep relative">
+            <label className="block row-sep relative" htmlFor={`${fid}-slug`}>
               <span className="field-label">{t('platform.new.slug')}</span>
-              <input className="field pt-1" inputMode="url" autoCapitalize="none" spellCheck={false} maxLength={40} value={slug}
+              <input id={`${fid}-slug`} className="field pt-1" inputMode="url" autoCapitalize="none" spellCheck={false} maxLength={40} value={slug}
                 onChange={(e) => { setSlugTouched(true); setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); }} />
             </label>
-            <label className="block row-sep relative">
+            <label className="block row-sep relative" htmlFor={`${fid}-shop`}>
               <span className="field-label">{t('platform.new.shop')}</span>
-              <input className="field pt-1" autoComplete="off" autoCapitalize="words" enterKeyHint="next" maxLength={80} placeholder={name.trim() || t('platform.new.shopPlaceholder')} value={shop} onChange={(e) => setShop(e.target.value)} onBlur={() => setShop((v) => cleanLine(v))} />
+              <input id={`${fid}-shop`} className="field pt-1" autoComplete="off" autoCapitalize="words" enterKeyHint="next" maxLength={80} placeholder={name.trim() || t('platform.new.shopPlaceholder')} value={shop} onChange={(e) => setShop(e.target.value)} onBlur={() => setShop((v) => cleanLine(v))} />
             </label>
           </div>
           <p className="t-foot t-2 m-0 mb-4 px-4 break-all">{t('platform.new.slugHint', { url: `${host}${slug || '...'}` })}</p>
           <div className="list mb-2">
-            <label className="block">
+            <label className="block" htmlFor={`${fid}-email`}>
               <span className="field-label">{t('platform.new.ownerEmail')}</span>
-              <EmailInput value={email} onChange={setEmail} enterKeyHint="done" />
+              <EmailInput id={`${fid}-email`} value={email} onChange={setEmail} enterKeyHint="done" />
             </label>
             <div className="row row-sep">
               <span className="row-main row-title">{t('platform.new.language')}</span>
