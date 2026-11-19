@@ -639,7 +639,7 @@
       "exact": "Exact number"
     },
     "stockFoot": {
-      "off": "Customers see nothing about quantities.",
+      "off": "Customers see nothing about quantities, so they cannot ask to hear when something is back.",
       "availability": "In stock, only a few left, or out of stock, per shop.",
       "exact": "The real number per shop, for example 7 in stock."
     },
