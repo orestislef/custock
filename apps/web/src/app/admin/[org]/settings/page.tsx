@@ -16,6 +16,7 @@ import { PolicyGroups, policyText, usePolicySaver } from '@/components/policy/po
 import { LIMITS, cleanLine, policyDef, type PolicyEntry } from '@custock/core';
 import { LOCALE_NAMES } from '@custock/i18n/client';
 import { IconChevronRight } from '@/components/ui/icons';
+import { ShopsGroup } from '@/components/admin/shops-group';
 
 export default function SettingsPage() {
   const { api, org, t, can, refresh } = useAdmin();
@@ -86,6 +87,11 @@ export default function SettingsPage() {
       <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_340px] gap-x-8">
         <div>
           {canOrg ? <BusinessGroup s={s} onPatch={(p) => void patch(p)} /> : null}
+          <ShopsGroup shops={shops} onChanged={(shop, created) => {
+            setShops((x) => (created ? [...(x ?? []), shop] : (x ?? []).map((y) => (y.id === shop.id ? shop : y))));
+            // the frame reloads the person's shops: picker, stock, scan, transfers and QR codes
+            void refresh();
+          }} />
 
           <h2 className="t-title3 m-0 mb-1">{t('settings.customerPage')}</h2>
           {canOrg ? <p className="t-sub t-2 m-0 mb-5">{t('settings.customerPageLead')}</p> : <div className="mb-5" />}

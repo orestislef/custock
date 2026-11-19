@@ -490,6 +490,8 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
       .parse(await c.req.json());
     const cols: Record<string, string> = { name: 'name', city: 'city', address: 'address', phone: 'phone', timezone: 'timezone', customerVisible: 'customer_visible', customerStock: 'customer_stock' };
     const { t } = orgOf(c);
+    // a shop of another business, or none at all, is not found (and nothing is audited)
+    if (!t.get('SELECT 1 FROM shops WHERE org_id = @org AND id = @id', { id: shopId })) throw notFound('shop');
     for (const [k, v] of Object.entries(patch)) {
       if (v === undefined) continue;
       t.run(`UPDATE shops SET ${cols[k]} = @v WHERE org_id = @org AND id = @id`, { v: typeof v === 'boolean' ? (v ? 1 : 0) : v, id: shopId });

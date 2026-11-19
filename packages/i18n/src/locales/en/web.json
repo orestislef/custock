@@ -663,6 +663,22 @@
       "language": "Language for customers",
       "timezone": "Time zone",
       "foot": "Dates, quiet hours and reports follow this time zone. Customers whose own language is unknown get emails in this language."
+    },
+    "shops": {
+      "title": "Shops",
+      "foot": "Each shop has its own stock, staff and QR codes. Customers see a shop's name and address on its pages.",
+      "add": "Add shop",
+      "addButton": "Add shop",
+      "newTitle": "New shop",
+      "editTitle": "Shop details",
+      "editLabel": "{{shop}}, change details",
+      "name": "Shop name",
+      "city": "City",
+      "address": "Address",
+      "phone": "Phone",
+      "added": "{{shop}} added",
+      "newFoot": "The new shop starts with no stock. People with business wide roles can work in it right away.",
+      "editFoot": "The new details show on the shop's pages and QR posters at once."
     }
   },
   "links": {
