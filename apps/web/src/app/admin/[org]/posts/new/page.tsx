@@ -9,7 +9,8 @@ import { Page } from '@/components/admin/shell';
 import { Chips, Group, Row, Segmented, Switch } from '@/components/ui/kit';
 import { Photo, useToast } from '@/components/ui/client-kit';
 import { ProductPicker } from '@/components/admin/product-picker';
-import { IconBell, IconMail, IconPlus, IconClose, IconInfo } from '@/components/ui/icons';
+import { IconBell, IconMail, IconPlus, IconClose, IconInfo, IconCamera } from '@/components/ui/icons';
+import { uploadPhoto } from '@/lib/upload';
 import { useAsync } from '@/lib/use-async';
 import { productName } from '@/lib/names';
 import { money, number } from '@/lib/format';
@@ -24,7 +25,7 @@ const KINDS: PostKind[] = ['news', 'offer', 'new_arrival', 'back_in_stock', 'eve
 
 interface Line { product: Product; variantId: string; offer: string }
 interface Draft {
-  kind: PostKind; texts: Partial<Record<Locale, { title: string; body: string }>>; lines: Line[];
+  kind: PostKind; texts: Partial<Record<Locale, { title: string; body: string }>>; lines: Line[]; cover?: string | null;
   scopes: { scopeType: ScopeType; scopeId: string }[]; push: boolean; email: boolean; when: 'now' | 'later'; at: number | null; until: number | null;
 }
 
@@ -58,7 +59,10 @@ export default function ComposerPage() {
   // both as moments in time, picked in the business's time zone
   const [at, setAt] = useState<number | null>(draft?.at ?? null);
   const [until, setUntil] = useState<number | null>(draft?.until ?? null);
-  useDraft(draftKey, { kind, texts, lines, scopes, push, email, when, at, until } satisfies Draft,
+  // the post's own photo. without one, the first product's photo is the cover
+  const [cover, setCover] = useState<string | null>(draft?.cover ?? null);
+  const [coverBusy, setCoverBusy] = useState(false);
+  useDraft(draftKey, { kind, texts, lines, cover, scopes, push, email, when, at, until } satisfies Draft,
     { kind: 'news', texts: {}, lines: [], scopes: startScopes, push: startPush, email: false, when: 'now', at: null, until: null } satisfies Draft);
   const zone = settings?.timezone ?? org.timezone;
   const [picker, setPicker] = useState(false);
@@ -116,7 +120,7 @@ export default function ComposerPage() {
       const input: PostInput = {
         kind, defaultLocale: org.defaultLocale, translations, channels, audience,
         products: lines.map((l) => ({ variantId: l.variantId, offerPriceMinor: offers[l.variantId] ?? null })),
-        coverUrl: lines[0]?.product.images[0]?.url ?? null,
+        coverUrl: cover ?? lines[0]?.product.images[0]?.url ?? null,
         scheduledAt: when === 'later' && at != null ? at : null,
         validFrom: kind === 'offer' ? (firstTry.current ??= Date.now()) : null,
         validUntil: kind === 'offer' && until != null ? until : null,
@@ -172,6 +176,32 @@ export default function ComposerPage() {
               </div>
             </div>
             <p className="inset-group-foot">{tab === org.defaultLocale ? t('composer.defaultLangFoot') : t('composer.otherLangFoot')}</p>
+          </section>
+
+          <section className="inset-group">
+            <h2 className="inset-group-head">{t('composer.photo')}</h2>
+            <div className="list">
+              <div className="row has-icon">
+                {cover ? <Photo src={cover} alt="" size={56} /> : <span className="icon-tile"><IconCamera size={18} /></span>}
+                <span className="row-main flex flex-wrap gap-x-4">
+                  <label className="btn btn-plain p-0 cursor-pointer" style={{ minHeight: 36 }}>
+                    {coverBusy ? t('composer.photoUploading') : cover ? t('composer.photoChange') : t('composer.photoAdd')}
+                    <input type="file" accept="image/*" className="sr-only" aria-label={t('composer.photo')} disabled={coverBusy}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        setCoverBusy(true);
+                        void uploadPhoto(api, org.orgId, file, 'post')
+                          .then(setCover, (err: { code?: string }) => setError(t(`common:error.${err?.code ?? 'internal'}`)))
+                          .finally(() => setCoverBusy(false));
+                      }} />
+                  </label>
+                  {cover ? <button type="button" className="btn btn-plain p-0" style={{ minHeight: 36, color: 'var(--c-error)' }} onClick={() => setCover(null)}>{t('composer.photoRemove')}</button> : null}
+                </span>
+              </div>
+            </div>
+            <p className="inset-group-foot">{t('composer.photoFoot')}</p>
           </section>
 
           <section className="inset-group">
