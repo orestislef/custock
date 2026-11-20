@@ -75,6 +75,10 @@ export type CustomerStockMode = z.infer<typeof CustomerStockMode>;
 export const CustomerCatalogMode = z.enum(['off', 'subscribers', 'public']);
 export type CustomerCatalogMode = z.infer<typeof CustomerCatalogMode>;
 
+// orders from customers: off, every order asks for a price, or orders at the shown prices
+export const CustomerOrdersMode = z.enum(['off', 'quote', 'priced']);
+export type CustomerOrdersMode = z.infer<typeof CustomerOrdersMode>;
+
 export const MovementKind = z.enum([
   'initial', 'receive', 'sale', 'return', 'adjust', 'damage',
   'count', 'transfer_out', 'transfer_in', 'reversal',
@@ -105,6 +109,8 @@ export const ErrorCode = z.enum([
   'feature_off', 'org_suspended', 'limit_reached', 'platform_paused', 'last_superadmin', 'storage_full',
   // a forgot password link that was used, expired or never existed
   'reset_expired',
+  // orders: the business or shop takes no orders, a price changed since it was shown, a quote ran out
+  'orders_off', 'prices_changed', 'quote_expired',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 
@@ -212,6 +218,8 @@ export const OrgSettings = z.object({
   customerPrices: z.boolean(),
   customerStock: CustomerStockMode,
   fewLeftThreshold: z.number(),
+  // orders from customers (policy orders.mode). optional so older clients and fixtures still fit
+  customerOrders: CustomerOrdersMode.optional(),
 });
 export type OrgSettings = z.infer<typeof OrgSettings>;
 
@@ -227,6 +235,8 @@ export const Shop = z.object({
   imageUrl: z.string().nullable(),
   customerVisible: z.boolean(),
   customerStock: CustomerStockMode.nullable(),
+  // null: the business setting. off: this shop takes no orders
+  customerOrders: z.enum(['off']).nullable().optional(),
   groupIds: z.array(z.string()),
 });
 export type Shop = z.infer<typeof Shop>;
@@ -345,6 +355,9 @@ export const StockLevel = z.object({
   priceOverrideMinor: z.number().int().nullable().optional(),
   lastMovementAt: z.number().nullable(),
   waiting: z.number(), // customers waiting with notify me, for this shop or any shop
+  // what confirmed or ready orders of this shop hold of it, only for people with orders.view there.
+  // a promise, never taken off on hand (see OrderHold for the orders themselves)
+  onOrderQty: z.number().optional(),
 });
 export type StockLevel = z.infer<typeof StockLevel>;
 
@@ -653,6 +666,8 @@ export const DashboardCards = z.object({
   countsInReview: z.number(),
   transfersOnTheWay: z.number(),
   unknownCodes: z.number(),
+  // orders waiting for the shop (requested), only with orders.view
+  newOrders: z.number().optional(),
   stockValueCostMinor: z.number().nullable(), // null without reports.financial.view
   salesTodayMinor: z.number().nullable(),
 });

@@ -31,6 +31,7 @@ export function orgSettings(db: Db, org: OrgRow): OrgSettings {
     customerPrices: !!org.customer_prices,
     customerStock: org.customer_stock,
     fewLeftThreshold: org.few_left_threshold,
+    customerOrders: org.customer_orders,
   };
 }
 
@@ -45,11 +46,12 @@ interface ShopRow {
   storage_key: string | null;
   customer_visible: number;
   customer_stock: Shop['customerStock'];
+  customer_orders: 'off' | null;
 }
 
 export function loadShops(t: Tenant, onlyIds?: string[]): Shop[] {
   const rows = t.all<ShopRow>(
-    `SELECT s.id, s.name, s.slug, s.city, s.address, s.phone, s.timezone, f.storage_key, s.customer_visible, s.customer_stock
+    `SELECT s.id, s.name, s.slug, s.city, s.address, s.phone, s.timezone, f.storage_key, s.customer_visible, s.customer_stock, s.customer_orders
        FROM shops s LEFT JOIN files f ON f.id = s.image_file_id
       WHERE s.org_id = @org AND s.archived_at IS NULL ORDER BY s.created_at, s.name`,
   );
@@ -68,6 +70,7 @@ export function loadShops(t: Tenant, onlyIds?: string[]): Shop[] {
       imageUrl: fileUrl(r.storage_key),
       customerVisible: !!r.customer_visible,
       customerStock: r.customer_stock,
+      customerOrders: r.customer_orders,
       groupIds: groups.filter((g) => g.shop_id === r.id).map((g) => g.group_id),
     }));
 }

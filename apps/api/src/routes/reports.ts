@@ -115,6 +115,9 @@ export function reportRoutes(app: Hono<AppEnv>) {
         has(c, 'products.create') || has(c, 'products.edit') || has(c, 'stock.settings.manage')
           ? count('SELECT count(*) AS n FROM unknown_scans WHERE org_id = @org AND resolved_at IS NULL AND shop_id IN (SELECT value FROM json_each(@shops))', { shops })
           : 0,
+      newOrders: with_('orders.view').length
+        ? count("SELECT count(*) AS n FROM orders WHERE org_id = @org AND status = 'requested' AND shop_id IN (SELECT value FROM json_each(@shops))", { shops: with_('orders.view') })
+        : 0,
       stockValueCostMinor: money.length
         ? Math.round(
             t.get<{ v: number | null }>(

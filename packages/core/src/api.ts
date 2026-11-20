@@ -15,6 +15,9 @@ import type {
   StockCountLine, SyncResult, Transfer, TransferInput, UncountedPolicy, UnsubscribePage, PresignInput, PresignResult,
   PushSubscriptionInput, InviteCreated, InvitePreview, InviteRegisterInput, ShopInput,
 } from './contract';
+import type {
+  Order, OrderCounts, OrderCreateInput, OrderHold, OrderListStatus, OrderPreview, OrderPreviewInput, OrderQuoteInput, OrderSummary, PublicOrderOptions,
+} from './orders';
 import type { BusinessPolicyControl, PlatformPolicyEntry, PolicyEntry, PolicyValue } from './policies';
 import type { BusinessPolicyControlsPatch, PolicyPatch } from './policy-schemas';
 
@@ -75,7 +78,9 @@ export interface CustockApi {
   updateCategory(orgId: string, categoryId: string, patch: Partial<CategoryInput>): Promise<Category>;
   deleteCategory(orgId: string, categoryId: string): Promise<void>;
   products(orgId: string, query?: ProductQuery): Promise<Page<Product & { levels: StockLevel[] }>>;
-  product(orgId: string, productId: string): Promise<Product & { levels: StockLevel[] }>;
+  // levels carry onOrderQty and orderHolds lists the confirmed or ready orders holding it, both only
+  // for shops where the caller has orders.view
+  product(orgId: string, productId: string): Promise<Product & { levels: StockLevel[]; orderHolds?: OrderHold[] }>;
   createProduct(orgId: string, input: ProductInput): Promise<Product>;
   updateProduct(orgId: string, productId: string, patch: Partial<ProductInput>): Promise<Product>;
   setShopPrice(orgId: string, shopId: string, variantId: string, priceMinor: number | null): Promise<void>;
@@ -308,6 +313,42 @@ export interface CustockApi {
   setPlatformErrorStatus(id: string, status: IssueStatus): Promise<Issue>;
   // public: a browser reports its own error. fire and forget, rate limited, no personal data
   reportClientError(input: ClientErrorInput): Promise<void>;
+
+  // ---------------------------------------------------------------- orders (thinking/19-orders.md)
+
+  // staff: orders of the shops where the caller has orders.view, newest change first.
+  // status: one status, or open / closed
+  orders(orgId: string, query?: { status?: OrderListStatus; shopId?: string; cursor?: string; limit?: number }): Promise<Page<OrderSummary>>;
+  // open orders per status, for the menu badge and Home
+  orderCounts(orgId: string, shopId?: string): Promise<OrderCounts>;
+  order(orgId: string, orderId: string): Promise<Order>;
+  // orders.quote: a price for every line (quantities may change). the customer answers
+  quoteOrder(orgId: string, orderId: string, input: OrderQuoteInput): Promise<Order>;
+  // orders.quote: a priced order as it is
+  confirmOrder(orgId: string, orderId: string): Promise<Order>;
+  // orders.quote: before any price, with a reason the customer reads
+  declineOrder(orgId: string, orderId: string, reason: string): Promise<Order>;
+  // orders.fulfil
+  readyOrder(orgId: string, orderId: string): Promise<Order>;
+  // orders.fulfil: picked up. takes the stock off as sales when policy orders.takeStock is on.
+  // 409 negative_stock_blocked when the business does not sell below zero and stock is short
+  completeOrder(orgId: string, orderId: string): Promise<Order>;
+  // orders.quote: any open order, with a reason the customer reads
+  cancelOrder(orgId: string, orderId: string, reason: string): Promise<Order>;
+
+  // customer side, in one business's app. 403 orders_off when it takes no orders
+  orderOptions(orgSlug: string): Promise<PublicOrderOptions>;
+  previewOrder(orgSlug: string, input: OrderPreviewInput): Promise<OrderPreview>;
+  // 409 prices_changed when a price differs from the one the app showed (preview again),
+  // 403 limit_reached over a limit, 403 forbidden when not following the business
+  placeOrder(orgSlug: string, input: OrderCreateInput): Promise<Order>;
+  myOrders(orgSlug: string, query?: { status?: OrderListStatus; cursor?: string; limit?: number }): Promise<Page<OrderSummary>>;
+  myOrder(orgSlug: string, orderId: string): Promise<Order>;
+  // 410 quote_expired when the price ran out
+  acceptQuote(orgSlug: string, orderId: string): Promise<Order>;
+  rejectQuote(orgSlug: string, orderId: string): Promise<Order>;
+  // while requested or quoted
+  cancelMyOrder(orgSlug: string, orderId: string, reason?: string | null): Promise<Order>;
 
   // ---------------------------------------------------------------- developer (super admin)
   // the api description. public in dev, super admins only in production

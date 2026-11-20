@@ -962,7 +962,15 @@
       "variant.archived": "archived a variant",
       "org.created": "set up the business",
       "shop.created": "added a shop",
-      "joinlink.created": "made a QR code"
+      "joinlink.created": "made a QR code",
+      "order": {
+        "quoted": "sent a price for an order",
+        "confirmed": "confirmed an order",
+        "declined": "declined an order",
+        "ready": "marked an order ready",
+        "completed": "handed over an order",
+        "cancelled": "cancelled an order"
+      }
     },
     "aProduct": "a product",
     "s": {
@@ -1524,6 +1532,10 @@
       "uploads": {
         "title": "Photo uploads",
         "sub": "Photos for products, posts and shops"
+      },
+      "orders": {
+        "title": "Orders",
+        "sub": "Customers order or ask for a price, the shop answers."
       }
     },
     "limits": {
@@ -1628,7 +1640,8 @@
           "push": "Notifications",
           "dev": "Development only",
           "files": "Files",
-          "system": "System"
+          "system": "System",
+          "orders": "Orders"
         }
       },
       "server": {

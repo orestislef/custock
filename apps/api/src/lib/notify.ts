@@ -12,6 +12,7 @@ import { policyIn } from './policy';
 const ALERT_POLICY: Record<string, string> = {
   lowStock: 'alerts.lowStock', transferSent: 'alerts.transfers', transferReceived: 'alerts.transfers', approvalNeeded: 'alerts.approvals',
   postPublished: 'alerts.approvals', postScheduled: 'alerts.approvals', postReturned: 'alerts.approvals', countReady: 'alerts.counts',
+  orderNew: 'alerts.orders', orderAnswered: 'alerts.orders', orderExpired: 'alerts.orders',
 };
 
 export function notifyMembers(

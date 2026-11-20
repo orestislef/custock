@@ -64,7 +64,7 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
   const REPLAY_MS = 120_000;
   // only the creates where the same thing twice is a mistake. a count line or a scan sent twice on
   // purpose (the same item scanned again) must count twice, so those never get a key
-  const ONCE = /^\/v1\/orgs\/[^/]+\/(products|posts|customers|join-links|transfers|invites|shops\/[^/]+\/counts)$/;
+  const ONCE = /^\/v1\/(orgs\/[^/]+\/(products|posts|customers|join-links|transfers|invites|shops\/[^/]+\/counts)|c\/orgs\/[^/]+\/orders)$/;
   function idempotencyKey(path: string, body: unknown): string {
     const now = Date.now();
     for (const [sig, v] of recentKeys) if (now - v.at > REPLAY_MS) recentKeys.delete(sig);
@@ -352,6 +352,27 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
     platformError: (id) => get(`/v1/platform/errors/${enc(id)}`),
     setPlatformErrorStatus: (id, status) => patch(`/v1/platform/errors/${enc(id)}`, { status }),
     reportClientError: (input) => post('/v1/client-errors', input),
+    // orders, staff side
+    orders: (orgId, q) => get(`${org(orgId)}/orders`, q as Query),
+    orderCounts: (orgId, shopId) => get(`${org(orgId)}/orders/counts`, { shopId }),
+    order: (orgId, id) => get(`${org(orgId)}/orders/${enc(id)}`),
+    quoteOrder: (orgId, id, input) => post(`${org(orgId)}/orders/${enc(id)}/quote`, input),
+    confirmOrder: (orgId, id) => post(`${org(orgId)}/orders/${enc(id)}/confirm`),
+    declineOrder: (orgId, id, reason) => post(`${org(orgId)}/orders/${enc(id)}/decline`, { reason }),
+    readyOrder: (orgId, id) => post(`${org(orgId)}/orders/${enc(id)}/ready`),
+    completeOrder: (orgId, id) => post(`${org(orgId)}/orders/${enc(id)}/complete`),
+    cancelOrder: (orgId, id, reason) => post(`${org(orgId)}/orders/${enc(id)}/cancel`, { reason }),
+
+    // orders, customer side
+    orderOptions: (slug) => get(`/v1/public/orgs/${enc(slug)}/order-options`),
+    previewOrder: (slug, input) => post(`/v1/c/orgs/${enc(slug)}/orders/preview`, input),
+    placeOrder: (slug, input) => post(`/v1/c/orgs/${enc(slug)}/orders`, input),
+    myOrders: (slug, q) => get(`/v1/c/orgs/${enc(slug)}/orders`, q as Query),
+    myOrder: (slug, id) => get(`/v1/c/orgs/${enc(slug)}/orders/${enc(id)}`),
+    acceptQuote: (slug, id) => post(`/v1/c/orgs/${enc(slug)}/orders/${enc(id)}/accept`),
+    rejectQuote: (slug, id) => post(`/v1/c/orgs/${enc(slug)}/orders/${enc(id)}/reject`),
+    cancelMyOrder: (slug, id, reason) => post(`/v1/c/orgs/${enc(slug)}/orders/${enc(id)}/cancel`, { reason: reason ?? null }),
+
     openApi: () => get('/v1/openapi.json'),
     platformServer: () => get('/v1/platform/server'),
   };

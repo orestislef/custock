@@ -131,7 +131,7 @@ export function loadAssignments(t: Tenant, membershipId: string, org: Pick<OrgRo
 
 export const ORG_COLUMNS = `id, name, slug, country, currency, timezone, default_locale, logo_file_id, brand_color,
   allow_negative_stock, posts_need_approval, push_daily_cap, quiet_hours, customer_catalog, customer_prices,
-  customer_stock, few_left_threshold, customer_offer_prices`;
+  customer_stock, few_left_threshold, customer_offer_prices, customer_orders`;
 
 // everything buildContextFor reads for many businesses at once, in a handful of queries. used by
 // /v1/me/context, where a super admin gets every business: one by one that was ten queries each

@@ -3,6 +3,7 @@
 // recipient's language), rollup_day (daily stats from the ledger).
 
 import { followsShop, formatMoney, shopsInScope, uuidv7, type Audience, type Channel } from '@custock/core';
+import { expireQuotes } from './services/orders';
 import { translator, pickLocale } from '@custock/i18n';
 import type { Db } from '@custock/db';
 import type { Config, OrgRow } from './types';
@@ -100,6 +101,8 @@ export async function runJobs(deps: WorkerDeps, now: number = Date.now()): Promi
     expireTokenMessages(db, now);
     purgeOldJobs(db, now);
     purgeSpent(db, now);
+    // prices that ran out without an answer
+    expireQuotes(db, deps.cfg.publicWebUrl, now);
     purgeUnconfirmedFiles(db, now, deps.removeObject);
   }
   if (deps.live) {

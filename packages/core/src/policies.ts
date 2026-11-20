@@ -17,7 +17,7 @@
 export type PolicyLevel = 'platform' | 'limit' | 'business' | 'shop' | 'role' | 'user';
 export type PolicyValue = number | boolean | string;
 export type PolicyType = 'int' | 'bool' | 'enum' | 'window';
-export type PolicyGroup = 'messages' | 'posts' | 'stock' | 'customers' | 'alerts' | 'security' | 'lifetimes' | 'uploads' | 'retention';
+export type PolicyGroup = 'messages' | 'posts' | 'stock' | 'customers' | 'orders' | 'alerts' | 'security' | 'lifetimes' | 'uploads' | 'retention';
 
 // how a narrower value is held by a wider one
 //   max      never above the wider value (0 means "no limit" when noneIsZero)
@@ -77,10 +77,20 @@ export const POLICIES: readonly PolicyDef[] = [
   { key: 'catalog.offerPrices', group: 'customers', type: 'bool', default: true, levels: ['platform', 'limit', 'business'], cap: 'free', permission: 'org.settings.manage', column: 'customer_offer_prices', delegatedByDefault: true },
   { key: 'catalog.stock', group: 'customers', type: 'enum', default: 'off', options: ['off', 'availability', 'exact'], levels: ['platform', 'limit', 'business'], cap: 'free', permission: 'org.settings.manage', column: 'customer_stock', delegatedByDefault: true },
 
+  // orders from customers (thinking/19-orders.md). mode: off, every order asks for a price, or orders
+  // at the shown prices. maxQty is in pieces, or kg/l/m for products sold by measure
+  { key: 'orders.mode', group: 'orders', type: 'enum', default: 'off', options: ['off', 'quote', 'priced'], levels: ['platform', 'limit', 'business'], cap: 'free', permission: 'org.settings.manage', column: 'customer_orders', delegatedByDefault: true },
+  { key: 'orders.maxLines', group: 'orders', type: 'int', default: 30, min: 1, max: 100, unit: 'count', levels: ['platform', 'limit', 'business'], cap: 'max', permission: 'org.settings.manage', delegatedByDefault: true },
+  { key: 'orders.maxQty', group: 'orders', type: 'int', default: 999, min: 1, max: 100000, unit: 'count', levels: ['platform', 'limit', 'business'], cap: 'max', permission: 'org.settings.manage', delegatedByDefault: true },
+  { key: 'orders.openPerCustomer', group: 'orders', type: 'int', default: 5, min: 1, max: 50, unit: 'count', levels: ['platform', 'limit', 'business'], cap: 'max', permission: 'org.settings.manage', delegatedByDefault: true },
+  { key: 'orders.quoteDays', group: 'orders', type: 'int', default: 3, min: 1, max: 30, unit: 'days', levels: ['platform', 'limit', 'business'], cap: 'max', permission: 'org.settings.manage', delegatedByDefault: true },
+  { key: 'orders.takeStock', group: 'orders', type: 'bool', default: true, levels: ['platform', 'limit', 'business', 'shop'], cap: 'free', permission: 'org.settings.manage', shopPermission: 'shop.settings.manage', delegatedByDefault: true },
+
   // staff alerts, a person's own choice. the business and roles set the starting point
   { key: 'alerts.lowStock', group: 'alerts', type: 'bool', default: true, levels: ['platform', 'limit', 'business', 'role', 'user'], cap: 'free', selfService: true, permission: 'org.settings.manage', delegatedByDefault: true },
   { key: 'alerts.transfers', group: 'alerts', type: 'bool', default: true, levels: ['platform', 'limit', 'business', 'role', 'user'], cap: 'free', selfService: true, permission: 'org.settings.manage', delegatedByDefault: true },
   { key: 'alerts.approvals', group: 'alerts', type: 'bool', default: true, levels: ['platform', 'limit', 'business', 'role', 'user'], cap: 'free', selfService: true, permission: 'org.settings.manage', delegatedByDefault: true },
+  { key: 'alerts.orders', group: 'alerts', type: 'bool', default: true, levels: ['platform', 'limit', 'business', 'role', 'user'], cap: 'free', selfService: true, permission: 'org.settings.manage', delegatedByDefault: true },
   { key: 'alerts.counts', group: 'alerts', type: 'bool', default: true, levels: ['platform', 'limit', 'business', 'role', 'user'], cap: 'free', selfService: true, permission: 'org.settings.manage', delegatedByDefault: true },
 
   // sign in and safety. the minimums keep them from ever being switched off
@@ -110,7 +120,7 @@ export const POLICIES: readonly PolicyDef[] = [
 ];
 
 export const POLICY_KEYS: readonly string[] = POLICIES.map((p) => p.key);
-export const POLICY_GROUPS: readonly PolicyGroup[] = ['messages', 'posts', 'stock', 'customers', 'alerts', 'security', 'lifetimes', 'uploads', 'retention'];
+export const POLICY_GROUPS: readonly PolicyGroup[] = ['messages', 'posts', 'stock', 'customers', 'orders', 'alerts', 'security', 'lifetimes', 'uploads', 'retention'];
 
 const byKey = new Map(POLICIES.map((p) => [p.key, p]));
 export function policyDef(key: string): PolicyDef | undefined {

@@ -36,6 +36,7 @@ import { setEmailAssetBase } from './email/layout';
 import { captureServerErrors, setErrorWebBase } from './lib/errors';
 import { errorRoutes } from './routes/errors';
 import { policyRoutes } from './routes/policies';
+import { orderRoutes } from './routes/orders';
 
 export function createApp(cfg: Config) {
   const app = new Hono<AppEnv>();
@@ -104,6 +105,7 @@ export function createApp(cfg: Config) {
   sessionRoutes(app);
   platformRoutes(app);
   policyRoutes(app);
+  orderRoutes(app);
   errorRoutes(app);
 
   // the api description (super admins only in production) and the state of this server. last, so

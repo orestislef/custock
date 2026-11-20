@@ -121,6 +121,23 @@ const IO: Record<string, [Schema | null, Schema | null]> = {
   'GET /v1/platform/errors': [null, ref('IssuePage')],
   'GET /v1/platform/server': [null, ref('ServerInfo')],
   'GET /v1/openapi.json': [null, obj({ openapi: str, info: { type: 'object' }, paths: { type: 'object' } })],
+  'GET /v1/orgs/{org}/orders': [null, paged('OrderSummary')],
+  'GET /v1/orgs/{org}/orders/counts': [null, ref('OrderCounts')],
+  'GET /v1/orgs/{org}/orders/{id}': [null, ref('Order')],
+  'POST /v1/orgs/{org}/orders/{id}/quote': [ref('OrderQuoteInput'), ref('Order')],
+  'POST /v1/orgs/{org}/orders/{id}/confirm': [null, ref('Order')],
+  'POST /v1/orgs/{org}/orders/{id}/decline': [ref('OrderReasonInput'), ref('Order')],
+  'POST /v1/orgs/{org}/orders/{id}/ready': [null, ref('Order')],
+  'POST /v1/orgs/{org}/orders/{id}/complete': [null, ref('Order')],
+  'POST /v1/orgs/{org}/orders/{id}/cancel': [ref('OrderReasonInput'), ref('Order')],
+  'GET /v1/public/orgs/{slug}/order-options': [null, ref('PublicOrderOptions')],
+  'POST /v1/c/orgs/{slug}/orders/preview': [ref('OrderPreviewInput'), ref('OrderPreview')],
+  'POST /v1/c/orgs/{slug}/orders': [ref('OrderCreateInput'), ref('Order')],
+  'GET /v1/c/orgs/{slug}/orders': [null, paged('OrderSummary')],
+  'GET /v1/c/orgs/{slug}/orders/{id}': [null, ref('Order')],
+  'POST /v1/c/orgs/{slug}/orders/{id}/accept': [null, ref('Order')],
+  'POST /v1/c/orgs/{slug}/orders/{id}/reject': [null, ref('Order')],
+  'POST /v1/c/orgs/{slug}/orders/{id}/cancel': [ref('OrderCustomerCancelInput'), ref('Order')],
 };
 
 // names a person reads instead of a guess from the path
@@ -135,6 +152,13 @@ const SUMMARY: Record<string, string> = {
   'POST /v1/me/email/verify': 'Confirm my new email',
   'POST /v1/me/push/test': 'Send me a test notification',
   'POST /v1/orgs/{org}/scan': 'Look up a scanned code',
+  'GET /v1/orgs/{org}/orders/counts': 'Open orders per status',
+  'POST /v1/orgs/{org}/orders/{id}/quote': 'Send the price of an order',
+  'POST /v1/orgs/{org}/orders/{id}/complete': 'Hand over an order',
+  'POST /v1/c/orgs/{slug}/orders/preview': 'Price an order before sending it',
+  'POST /v1/c/orgs/{slug}/orders': 'Send an order',
+  'POST /v1/c/orgs/{slug}/orders/{id}/accept': 'Say yes to a price',
+  'POST /v1/c/orgs/{slug}/orders/{id}/reject': 'Say no to a price',
   'POST /v1/orgs/{org}/movements': 'Record stock movements',
   'GET /v1/orgs/{org}/shops/{shop}/sync': 'Changes since the last sync',
   'POST /v1/orgs/{org}/posts/audience-preview': 'Who a post would reach',
@@ -220,7 +244,7 @@ export function tagOf(path: string): string {
       products: 'products', variants: 'products', categories: 'products', barcodes: 'products', scan: 'stock', 'unknown-scans': 'stock',
       movements: 'stock', review: 'stock', counts: 'counts', transfers: 'transfers', customers: 'customers', 'join-links': 'join-links',
       posts: 'posts', members: 'team', roles: 'team', invites: 'team', audit: 'business', reports: 'reports', uploads: 'uploads',
-      groups: 'business', controls: 'business',
+      groups: 'business', controls: 'business', orders: 'orders',
     };
     return map[area] ?? 'business';
   }

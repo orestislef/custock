@@ -49,7 +49,7 @@ async function rawMail(row: OutboxRow): Promise<string> {
 }
 
 // mail a business sends its customers
-const BUSINESS_KINDS = new Set<string>(['joinConfirm', 'backInStock', 'post']);
+const BUSINESS_KINDS = new Set<string>(['joinConfirm', 'backInStock', 'post', 'orderReceived', 'orderQuote', 'orderConfirmed', 'orderReady', 'orderDeclined', 'orderCancelled', 'orderExpired']);
 
 describe('templates', () => {
   it('every kind in every language: html and text, nothing left untranslated, no tracking', () => {

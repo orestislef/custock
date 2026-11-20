@@ -5,8 +5,12 @@ import { formatMoney, intlLocale } from '@custock/core';
 import { pickLocale, translator, type AppLocale } from '@custock/i18n';
 import { renderEmail, type EmailProduct, type RenderedEmail } from './layout';
 
-export type EmailKind = 'otp' | 'joinConfirm' | 'invite' | 'ownerInvite' | 'changeCode' | 'emailChanged' | 'post' | 'backInStock' | 'passwordReset' | 'passwordChanged';
-export const EMAIL_KINDS: readonly EmailKind[] = ['otp', 'joinConfirm', 'invite', 'ownerInvite', 'changeCode', 'emailChanged', 'post', 'backInStock', 'passwordReset', 'passwordChanged'];
+export type EmailKind = 'otp' | 'joinConfirm' | 'invite' | 'ownerInvite' | 'changeCode' | 'emailChanged' | 'post' | 'backInStock' | 'passwordReset' | 'passwordChanged'
+  | 'orderReceived' | 'orderQuote' | 'orderConfirmed' | 'orderReady' | 'orderDeclined' | 'orderCancelled' | 'orderExpired';
+export const EMAIL_KINDS: readonly EmailKind[] = [
+  'otp', 'joinConfirm', 'invite', 'ownerInvite', 'changeCode', 'emailChanged', 'post', 'backInStock', 'passwordReset', 'passwordChanged',
+  'orderReceived', 'orderQuote', 'orderConfirmed', 'orderReady', 'orderDeclined', 'orderCancelled', 'orderExpired',
+];
 
 type Locale = AppLocale | string | null | undefined;
 const tr = (locale: Locale) => {
@@ -150,5 +154,79 @@ export function postEmail(
     extraLine: p.kind === 'offer' ? until : null,
     button: p.url ? { label: t(p.kind === 'offer' ? 'email.post.buttonOffer' : 'email.post.buttonNews'), url: p.url } : null,
     footer: { lines: [t('email.layout.followReason', { scope: p.sender }), t('email.layout.sentWith')], unsubscribe: { label: t('email.layout.unsubscribe'), url: p.unsubscribeUrl } },
+  }, opts);
+}
+
+// ---------------------------------------------------------------- orders
+
+export type OrderMailEvent = 'received' | 'quote' | 'confirmed' | 'ready' | 'declined' | 'cancelled' | 'expired';
+
+export interface OrderMailLine {
+  name: string;
+  imageUrl: string | null;
+  // "10" or "1,5 kg", already in the reader's language
+  qty: string;
+  // the line total, formatted, when known
+  total: string | null;
+}
+
+// one builder for every step of an order the customer hears about by email. the shop's look, its
+// logo on top, the lines with their totals when known, and a button to the order in its app
+export function orderEmail(
+  locale: Locale,
+  p: {
+    event: OrderMailEvent;
+    org: string;
+    shop: string;
+    logoUrl?: string | null;
+    number: number;
+    lines: OrderMailLine[];
+    // formatted, null while the price is not known
+    total: string | null;
+    // received: the order went in at the shown prices
+    priced?: boolean;
+    url: string;
+    reason?: string | null;
+    message?: string | null;
+    // formatted date the price holds until
+    until?: string | null;
+    address?: string | null;
+  },
+  opts?: { forceDark?: boolean },
+): RenderedEmail {
+  const { l, t } = tr(locale);
+  const k = `email.order.${p.event}`;
+  const params = { number: p.number, shop: p.shop, total: p.total ?? '', reason: p.reason ?? '', until: p.until ?? '', address: p.address ?? '' };
+  const lead = p.event === 'received' ? t(p.priced ? `${k}.leadPriced` : `${k}.leadQuote`, params) : t(`${k}.lead`, params);
+  const paragraphs = [lead];
+  if (p.event === 'quote' && p.message) paragraphs.push(t('email.order.shopWrote', { message: p.message }));
+  if ((p.event === 'declined' || p.event === 'cancelled') && p.reason) paragraphs.push(t('email.order.shopWrote', { message: p.reason }));
+  if (p.event === 'ready' && p.address) paragraphs.push(p.address);
+  const items: EmailProduct[] = p.lines.map((x) => ({
+    name: t('email.order.lineName', { qty: x.qty, name: x.name }),
+    url: null,
+    imageUrl: x.imageUrl,
+    price: x.total,
+    offerPrice: null,
+    was: null,
+  }));
+  const extra = [
+    p.total ? t('email.order.total', { total: p.total }) : null,
+    p.event === 'quote' && p.until ? t('email.order.until', { until: p.until }) : null,
+  ].filter(Boolean).join(' · ');
+  return renderEmail({
+    locale: l,
+    subject: t(`${k}.subject`, params),
+    preheader: t(`${k}.preheader`, params),
+    eyebrow: p.shop,
+    brand: { name: p.org, logoUrl: p.logoUrl ?? null },
+    heading: t(`${k}.heading`, params),
+    paragraphs,
+    products: items.length ? { title: t('email.order.lines', { number: p.number }), items } : null,
+    extraLine: extra || null,
+    button: { label: t(p.event === 'quote' ? 'email.order.answer' : 'email.order.see'), url: p.url },
+    note: t('email.order.note', { shop: p.shop }),
+    fallback: { label: t('email.layout.linkFallback'), url: p.url },
+    footer: business(t, p.shop),
   }, opts);
 }

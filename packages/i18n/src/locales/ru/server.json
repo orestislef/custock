@@ -134,6 +134,59 @@
       "others": "Вы также подписаны на: {{shops}}. Откройте их страницу и войдите так же.",
       "button": "Войти в {{shop}}",
       "note": "Если вы этого не запрашивали, просто проигнорируйте письмо. Ничего не изменилось."
+    },
+    "order": {
+      "lines": "Заказ №{{number}}",
+      "lineName": "{{qty}} × {{name}}",
+      "total": "Итого {{total}}, с НДС",
+      "until": "Цена действует до {{until}}",
+      "shopWrote": "Вам написали: {{message}}",
+      "see": "Открыть заказ",
+      "answer": "Ответить",
+      "note": "Вы получили это письмо, потому что сделали заказ в {{shop}}.",
+      "received": {
+        "subject": "Мы получили ваш заказ №{{number}}",
+        "preheader": "{{shop}} скоро ответит.",
+        "heading": "Спасибо, мы получили ваш заказ",
+        "leadPriced": "{{shop}} скоро его подтвердит.",
+        "leadQuote": "{{shop}} посмотрит его и пришлёт цену."
+      },
+      "quote": {
+        "subject": "Цена заказа №{{number}}: {{total}}",
+        "preheader": "Согласитесь, и его подготовят.",
+        "heading": "Ваша цена {{total}}",
+        "lead": "{{shop}} прислал цену заказа №{{number}}. Согласитесь, и его подготовят."
+      },
+      "confirmed": {
+        "subject": "Заказ №{{number}} подтверждён",
+        "preheader": "Мы сообщим, когда он будет готов.",
+        "heading": "Ваш заказ подтверждён",
+        "lead": "{{shop}} готовит его. Мы сообщим, когда его можно будет забрать."
+      },
+      "ready": {
+        "subject": "Заказ №{{number}} готов к выдаче",
+        "preheader": "В {{shop}}.",
+        "heading": "Готов к выдаче",
+        "lead": "Ваш заказ №{{number}} готов в {{shop}}."
+      },
+      "declined": {
+        "subject": "Заказ №{{number}} отклонён",
+        "preheader": "{{shop}} не может его принять.",
+        "heading": "{{shop}} не может принять этот заказ",
+        "lead": "Заказ №{{number}} отклонён."
+      },
+      "cancelled": {
+        "subject": "Заказ №{{number}} отменён",
+        "preheader": "Магазином {{shop}}.",
+        "heading": "Ваш заказ отменён",
+        "lead": "{{shop}} отменил заказ №{{number}}."
+      },
+      "expired": {
+        "subject": "Цена заказа №{{number}} истекла",
+        "preheader": "Можно заказать снова в любое время.",
+        "heading": "Цена истекла",
+        "lead": "Цена, которую {{shop}} прислал для заказа №{{number}}, больше не действует. Можно заказать снова в любое время."
+      }
     }
   },
   "push": {
@@ -219,6 +272,47 @@
     "postReturned": {
       "title": "Ваша публикация не отправлена",
       "body": "«{{title}}» остановлена до отправки."
+    },
+    "order": {
+      "quote": {
+        "title": "Ваша цена: {{total}}",
+        "body": "Заказ №{{number}} в {{shop}}. Нажмите, чтобы ответить."
+      },
+      "confirmed": {
+        "title": "Заказ №{{number}} подтверждён",
+        "body": "{{shop}} готовит его."
+      },
+      "ready": {
+        "title": "Заказ №{{number}} готов",
+        "body": "Заберите его в {{shop}}."
+      },
+      "declined": {
+        "title": "Заказ №{{number}} отклонён",
+        "body": "{{reason}}"
+      },
+      "cancelled": {
+        "title": "Заказ №{{number}} отменён",
+        "body": "{{reason}}"
+      },
+      "expired": {
+        "title": "Цена заказа №{{number}} истекла",
+        "body": "Можно заказать снова в любое время."
+      }
+    },
+    "orderNew": {
+      "title": "Новый заказ №{{number}}",
+      "body": "{{customer}}: {{items}}",
+      "bodyPriced": "{{customer}}: {{items}}, {{total}}"
+    },
+    "orderAnswered": {
+      "title": "Заказ №{{number}}",
+      "bodyAccepted": "{{customer}} согласился на {{total}}.",
+      "bodyRejected": "{{customer}} отказался от цены.",
+      "bodyCancelled": "{{customer}} отменил его."
+    },
+    "orderExpired": {
+      "title": "Заказ №{{number}}",
+      "body": "Цена истекла без ответа."
     }
   }
 }

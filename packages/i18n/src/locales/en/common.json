@@ -140,7 +140,10 @@
     "last_superadmin": "The last super admin cannot be removed.",
     "storage_full": "Photos cannot be added right now. Everything already uploaded stays.",
     "reset_expired": "This link no longer works. Ask for a new one.",
-    "upload_failed": "The photo could not be added. Try again."
+    "upload_failed": "The photo could not be added. Try again.",
+    "orders_off": "This shop does not take orders right now.",
+    "prices_changed": "A price changed in the meantime. Check the order again.",
+    "quote_expired": "This price no longer holds. You can order again."
   },
   "permGroup": {
     "org": "Business",
@@ -150,7 +153,8 @@
     "stock": "Stock",
     "customers": "Customers",
     "comms": "Posts and messages",
-    "reports": "Reports"
+    "reports": "Reports",
+    "orders": "Orders"
   },
   "perm": {
     "org.settings.manage": "Change business settings",
@@ -204,7 +208,10 @@
     "joinlinks.manage": "Manage QR codes and join links",
     "reports.view": "See reports",
     "reports.financial.view": "See money in reports",
-    "reports.staff.view": "See staff activity"
+    "reports.staff.view": "See staff activity",
+    "orders.view": "See orders",
+    "orders.quote": "Send prices, confirm and decline orders",
+    "orders.fulfil": "Prepare orders and hand them over"
   },
   "why": {
     "rankBelow": "You can give roles below {{role}}",
@@ -325,6 +332,34 @@
     },
     "retention.unconfirmedDays": {
       "title": "Remove unconfirmed signups after"
+    },
+    "orders.mode": {
+      "title": "Orders from customers",
+      "foot": "Ask for a price: the shop answers every order with a price. At shown prices: orders go in at the prices customers see, the shop confirms."
+    },
+    "orders.maxLines": {
+      "title": "Products in one order",
+      "foot": "The most different products one order can hold."
+    },
+    "orders.maxQty": {
+      "title": "Most of one product",
+      "foot": "In pieces, or kg and litres for products sold by weight."
+    },
+    "orders.openPerCustomer": {
+      "title": "Open orders per customer",
+      "foot": "Orders one customer can have going at once."
+    },
+    "orders.quoteDays": {
+      "title": "A price holds for",
+      "foot": "After that the customer has to ask again."
+    },
+    "orders.takeStock": {
+      "title": "Take stock when picked up",
+      "foot": "Picked up orders count as sales and the stock goes down."
+    },
+    "alerts.orders": {
+      "title": "Orders",
+      "foot": "When a customer orders, answers a price or cancels."
     }
   },
   "policyGroup": {
@@ -336,7 +371,8 @@
     "security": "Sign in and safety",
     "lifetimes": "How long links and codes work",
     "uploads": "Photos",
-    "retention": "What the server keeps"
+    "retention": "What the server keeps",
+    "orders": "Orders from customers"
   },
   "policyValue": {
     "on": "On",
@@ -369,6 +405,11 @@
       "off": "Hidden",
       "availability": "In stock or not",
       "exact": "Exact number"
+    },
+    "orders.mode": {
+      "off": "Off",
+      "quote": "Ask for a price",
+      "priced": "At shown prices"
     }
   },
   "field": {

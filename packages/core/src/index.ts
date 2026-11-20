@@ -1,4 +1,5 @@
 export * from './contract';
+export * from './orders';
 export type * from './api';
 export * from './permissions';
 export * from './access';

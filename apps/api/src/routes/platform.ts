@@ -37,6 +37,7 @@ const mail = (c: Context<AppEnv>) => ({ webUrl: cfgOf(c).publicWebUrl, emailed: 
 function featureFor(method: string, rest: string): Feature | null {
   if (/^\/posts(\/|$)/.test(rest)) return 'posts';
   if (/^\/transfers(\/|$)/.test(rest)) return 'transfers';
+  if (/^\/orders(\/|$)/.test(rest)) return 'orders';
   if (/^\/counts(\/|$)/.test(rest) || /^\/shops\/[^/]+\/counts$/.test(rest)) return 'counts';
   if (/^\/reports\/(sales|top-sellers|most-wanted|join-links|shrinkage)$/.test(rest)) return 'reports';
   if (method === 'POST' && rest === '/uploads/presign') return 'uploads';

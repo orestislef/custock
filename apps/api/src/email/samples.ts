@@ -5,7 +5,7 @@ import { SAMPLE_IMAGES } from '@custock/db';
 import { formatMoney } from '@custock/core';
 import { translator, type AppLocale } from '@custock/i18n';
 import type { RenderedEmail } from './layout';
-import { backInStockEmail, changeCodeEmail, emailChangedEmail, inviteEmail, joinConfirmEmail, otpEmail, ownerInviteEmail, postEmail, type EmailKind } from './messages';
+import { backInStockEmail, changeCodeEmail, emailChangedEmail, inviteEmail, joinConfirmEmail, orderEmail, otpEmail, ownerInviteEmail, postEmail, type EmailKind, type OrderMailEvent } from './messages';
 import { passwordChangedEmail, passwordResetEmail } from './account';
 
 const image = (key: string): string | null => SAMPLE_IMAGES[key] ?? null;
@@ -57,6 +57,26 @@ export function sampleEmail(kind: EmailKind, locale: AppLocale, web: string, opt
       return ownerInviteEmail(locale, { org: 'Lemoni', url: `${web}/invite/sample-owner-token` }, opts);
     case 'backInStock':
       return backInStockEmail(locale, { shop: x.shop, org: 'Lemoni', product: x.product, url: `${web}/s/lemoni/p/sample`, imageUrl: image('p-thyme-honey'), price: formatMoney(1290, 'EUR', locale) }, opts);
+    case 'orderReceived':
+    case 'orderQuote':
+    case 'orderConfirmed':
+    case 'orderReady':
+    case 'orderDeclined':
+    case 'orderCancelled':
+    case 'orderExpired': {
+      const event = (kind.slice(5, 6).toLowerCase() + kind.slice(6)) as OrderMailEvent;
+      const priced = event !== 'received';
+      const money = (m: number) => formatMoney(m, 'EUR', locale);
+      return orderEmail(locale, {
+        event, org: 'Lemoni', shop: x.shop, logoUrl: image('s-kifisia'), number: 1042, priced, url: `${web}/s/lemoni/orders/sample`,
+        total: priced ? money(4590) : null, reason: event === 'declined' || event === 'cancelled' ? x.postTitle : null, message: event === 'quote' ? x.postBody.split('\n')[0]! : null,
+        until: event === 'quote' ? '22 November, 18:00' : null, address: event === 'ready' ? 'Kassavetis 12, Kifisia' : null,
+        lines: [
+          { name: x.oil, imageUrl: image('p-olive-oil'), qty: '10', total: priced ? money(3290) : null },
+          { name: x.honey, imageUrl: image('p-thyme-honey'), qty: '2', total: priced ? money(1300) : null },
+        ],
+      }, opts);
+    }
     case 'post':
       return postEmail(locale, {
         sender: x.shop, org: 'Lemoni', senderLogo: image('s-kifisia'), kind: 'offer', title: x.postTitle, body: x.postBody, coverUrl: image('post-offer'), url: `${web}/s/lemoni?post=sample`,

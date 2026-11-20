@@ -56,6 +56,10 @@
     { "key": "offers.price.set", "level": "shop", "group": "comms" },
     { "key": "joinlinks.manage", "level": "shop", "group": "comms" },
 
+    { "key": "orders.view", "level": "shop", "group": "orders" },
+    { "key": "orders.quote", "level": "shop", "group": "orders" },
+    { "key": "orders.fulfil", "level": "shop", "group": "orders" },
+
     { "key": "reports.view", "level": "shop", "group": "reports" },
     { "key": "reports.financial.view", "level": "shop", "group": "reports" },
     { "key": "reports.staff.view", "level": "shop", "group": "reports" }

@@ -97,6 +97,10 @@ export function seed(db: Db, opts: { now?: number; passwordHash?: string } = {})
       push_daily_cap: 2, quiet_hours: '22:00-09:00', customer_catalog: 'subscribers', customer_prices: 1,
       customer_stock: 'availability', few_left_threshold: 3, created_at: now - 62 * DAY,
     });
+    // the sample business takes orders at its shown prices (migration 0019; older schemas in tests lack it)
+    if ((db.prepare('PRAGMA table_info(organizations)').all() as { name: string }[]).some((c) => c.name === 'customer_orders')) {
+      db.prepare("UPDATE organizations SET customer_orders = 'priced' WHERE id = ?").run(orgId);
+    }
     const insertFile = (key: string, purpose: string) => {
       if (fileIds[key]) return fileIds[key]!;
       const url = images[key];

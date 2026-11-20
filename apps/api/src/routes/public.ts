@@ -13,6 +13,7 @@ import { CATEGORY_PICTURE_SQL, pictureOf } from './categories';
 import { storefrontProducts } from '../services/storefront';
 import { catalogIds, followingOf } from './customer';
 import { dayKey } from './reports';
+import { orderOptions } from '../services/orders';
 
 // a product as a visitor who does not follow a followers only business sees it on the shelf page
 export function shelfTeaser(p: PublicProduct): PublicProduct {
@@ -143,6 +144,14 @@ export function publicRoutes(app: Hono<AppEnv>) {
             { loc: readerLocale(c, org.default_locale) },
           )
           .map((x) => ({ id: x.id, name: x.name, ...pictureOf(x) }));
-    return c.json({ slug: org.slug, name: org.name, catalog: org.customer_catalog, joinCode: link?.code ?? null, logoUrl: fileUrl(logo?.storage_key), timezone: org.timezone, quietHours: org.quiet_hours, pushDailyCap: org.push_daily_cap, categories });
+    return c.json({ slug: org.slug, name: org.name, catalog: org.customer_catalog, joinCode: link?.code ?? null, logoUrl: fileUrl(logo?.storage_key), timezone: org.timezone, quietHours: org.quiet_hours, pushDailyCap: org.push_daily_cap, categories, orders: orderOptions(db, org) });
+  });
+
+  // whether the business takes orders, from which shops, and the limits (PublicOrderOptions)
+  app.get('/v1/public/orgs/:slug/order-options', (c) => {
+    const db = cfgOf(c).db;
+    const org = platform(db).get<OrgRow>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE slug = @s AND archived_at IS NULL`, { s: c.req.param('slug') });
+    if (!org) throw notFound('organization');
+    return c.json(orderOptions(db, org));
   });
 }

@@ -25,6 +25,7 @@ interface LinkPayload {
   variantId?: string;
   countId?: string;
   transferId?: string;
+  orderId?: string;
   shopId?: string;
   membershipId?: string;
   [k: string]: unknown;
@@ -55,6 +56,16 @@ export function pushPath(db: Db, orgId: string | null, customer: boolean, p: Lin
       if (customer && slug && p.postId) return `/s/${enc(slug)}/news?post=${enc(p.postId)}`;
       if (!customer && p.postId) return staffPath(`/admin/posts/${enc(p.postId)}`, orgId, null, {}, slug);
       break;
+    // an order: the customer's own order in the business's app, the staff's in the admin
+    case 'order':
+      if (customer && slug && p.orderId) return `/s/${enc(slug)}/orders/${enc(p.orderId)}`;
+      if (!customer && p.orderId) return staffPath(`/admin/orders/${enc(p.orderId)}`, orgId, shop, {}, slug);
+      break;
+    case 'orderNew':
+    case 'orderAnswered':
+    case 'orderExpired':
+      if (p.orderId) return staffPath(`/admin/orders/${enc(p.orderId)}`, orgId, shop, {}, slug);
+      return staffPath('/admin/orders', orgId, shop, {}, slug);
     case 'back_in_stock':
       if (slug && p.productId) return `/s/${enc(slug)}/p/${enc(p.productId)}`;
       break;
@@ -125,10 +136,10 @@ export interface WebPushMessage {
   options: { TTL: number; urgency: 'very-low' | 'low' | 'normal' | 'high'; topic: string };
 }
 
-const STAFF_TYPES = new Set(['approvalNeeded', 'postPublished', 'postScheduled', 'postReturned', 'countReady', 'transferSent', 'transferReceived', 'lowStock', 'inviteAccepted', 'platform_alert']);
+const STAFF_TYPES = new Set(['approvalNeeded', 'postPublished', 'postScheduled', 'postReturned', 'countReady', 'transferSent', 'transferReceived', 'lowStock', 'inviteAccepted', 'platform_alert', 'orderNew', 'orderAnswered', 'orderExpired']);
 
 function idOf(p: LinkPayload): string {
-  return String(p.postId ?? p.productId ?? p.variantId ?? p.countId ?? p.transferId ?? p.membershipId ?? p.tag ?? '');
+  return String(p.postId ?? p.orderId ?? p.productId ?? p.variantId ?? p.countId ?? p.transferId ?? p.membershipId ?? p.tag ?? '');
 }
 
 const absUrl = (v: unknown, max = 500): string | null => (typeof v === 'string' && /^https?:\/\//.test(v) && v.length <= max ? v : null);

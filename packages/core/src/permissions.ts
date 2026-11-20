@@ -3,7 +3,7 @@
 import catalog from './permissions.json';
 
 export type PermLevel = 'org' | 'shop' | 'any';
-export type PermGroup = 'org' | 'team' | 'catalog' | 'prices' | 'stock' | 'customers' | 'comms' | 'reports';
+export type PermGroup = 'org' | 'team' | 'catalog' | 'prices' | 'stock' | 'customers' | 'orders' | 'comms' | 'reports';
 
 export interface PermissionDef {
   key: string;
@@ -47,6 +47,7 @@ const MANAGER = [
   'customers.view', 'customers.contact.view', 'customers.add', 'customers.edit',
   'posts.view', 'posts.create', 'posts.publish', 'posts.channel.push', 'posts.channel.email',
   'offers.price.set', 'joinlinks.manage',
+  'orders.view', 'orders.quote', 'orders.fulfil',
   'reports.view', 'reports.staff.view',
 ];
 
@@ -54,6 +55,7 @@ const STAFF = [
   'products.view',
   'stock.view', 'stock.receive', 'stock.sell', 'stock.return', 'stock.count', 'stock.transfer.receive',
   'customers.view', 'customers.add',
+  'orders.view', 'orders.fulfil',
   'posts.view',
 ];
 
@@ -61,6 +63,7 @@ const VIEWER = [
   'products.view', 'products.cost.view',
   'stock.view', 'stock.history.view',
   'customers.view',
+  'orders.view',
   'posts.view',
   'reports.view', 'reports.financial.view',
 ];

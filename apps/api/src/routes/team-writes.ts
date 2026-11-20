@@ -36,6 +36,7 @@ import { confirmFiles } from '../lib/files';
 const SETTING_POLICIES: Record<string, string> = {
   pushDailyCap: 'push.dailyCap', quietHours: 'push.quietHours', postsNeedApproval: 'posts.needApproval', allowNegativeStock: 'stock.allowNegative',
   fewLeftThreshold: 'stock.fewLeft', customerCatalog: 'catalog.mode', customerPrices: 'catalog.prices', customerStock: 'catalog.stock',
+  customerOrders: 'orders.mode',
 };
 
 
@@ -418,6 +419,7 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
         customerCatalog: z.enum(['off', 'subscribers', 'public']),
         customerPrices: z.boolean(),
         customerStock: z.enum(['off', 'availability', 'exact']),
+        customerOrders: z.enum(['off', 'quote', 'priced']),
         fewLeftThreshold: z.number().int().min(0).max(100),
         // a 'logo' upload of this business, or null to take the logo off
         logoFileId: z.string().max(64).nullable(),
@@ -485,10 +487,11 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
       .object({
         name: zLine(LIMITS.shopName), city: zLine(LIMITS.city, 0).nullable(), address: zLine(LIMITS.address, 0).nullable(), phone: zPhone.or(z.literal('')).nullable(),
         timezone: z.string().refine(isTimezone, 'unknown timezone').nullable(), customerVisible: z.boolean(), customerStock: z.enum(['off', 'availability', 'exact']).nullable(),
+        customerOrders: z.enum(['off']).nullable(),
       })
       .partial()
       .parse(await c.req.json());
-    const cols: Record<string, string> = { name: 'name', city: 'city', address: 'address', phone: 'phone', timezone: 'timezone', customerVisible: 'customer_visible', customerStock: 'customer_stock' };
+    const cols: Record<string, string> = { name: 'name', city: 'city', address: 'address', phone: 'phone', timezone: 'timezone', customerVisible: 'customer_visible', customerStock: 'customer_stock', customerOrders: 'customer_orders' };
     const { t } = orgOf(c);
     // a shop of another business, or none at all, is not found (and nothing is audited)
     if (!t.get('SELECT 1 FROM shops WHERE org_id = @org AND id = @id', { id: shopId })) throw notFound('shop');

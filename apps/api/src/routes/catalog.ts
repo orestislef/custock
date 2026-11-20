@@ -10,6 +10,19 @@ import { clampLimit, decodeCursor, page } from '../lib/tenant';
 import { loadProducts, variantLabel } from '../services/catalog';
 import { searchClause } from '../services/search';
 import { lowSql } from '../lib/low-stock';
+import { orderHolds, promisedQty } from '../services/orders';
+import type { Context } from 'hono';
+import type { Product, StockLevel } from '@custock/core';
+
+// what confirmed or ready orders hold of each product, on the stock levels of the shops where the
+// caller sees orders. a promise, never taken off on hand
+function withOnOrders<T extends Product & { levels: StockLevel[] }>(c: Context<AppEnv>, items: T[]): T[] {
+  const shops = has(c, 'orders.view') ? shopsFor(c, 'orders.view') : [];
+  if (!shops.length || !items.length) return items;
+  const held = promisedQty(orgOf(c).t, shops, items.flatMap((p) => p.variants.map((v) => v.id)));
+  const mine = new Set(shops);
+  return items.map((p) => ({ ...p, levels: p.levels.map((l) => (mine.has(l.shopId) ? { ...l, onOrderQty: held.get(`${l.shopId}|${l.variantId}`) ?? 0 } : l)) }));
+}
 
 export function catalogRoutes(app: Hono<AppEnv>) {
   app.get('/v1/orgs/:org/products', (c) => {
@@ -58,7 +71,7 @@ export function catalogRoutes(app: Hono<AppEnv>) {
     const ids = t
       .all<{ id: string }>(`SELECT p.id FROM products p WHERE ${where.join(' AND ')} ORDER BY p.name LIMIT @lim OFFSET @off`, { ...named, lim: limit + 1, off: offset }, positional)
       .map((r) => r.id);
-    const items = loadProducts(t, ids, { withCost: has(c, 'products.cost.view'), levelShops: stockShops, fillLevels: true, locale: readerLocale(c, orgOf(c).org.default_locale) });
+    const items = withOnOrders(c, loadProducts(t, ids, { withCost: has(c, 'products.cost.view'), levelShops: stockShops, fillLevels: true, locale: readerLocale(c, orgOf(c).org.default_locale) }));
     return c.json(page(items, offset, limit));
   });
 
@@ -70,7 +83,11 @@ export function catalogRoutes(app: Hono<AppEnv>) {
     if (!p) throw notFound('product');
     const stamp = t.get<{ updated_at: number }>('SELECT updated_at FROM products WHERE org_id = @org AND id = @id', { id: p.id });
     if (stamp) c.header('ETag', `W/"p-${stamp.updated_at}"`);
-    return c.json(p);
+    const [withOrders] = withOnOrders(c, [p]);
+    const orderShopsSeen = has(c, 'orders.view') ? shopsFor(c, 'orders.view') : [];
+    if (!orderShopsSeen.length) return c.json(withOrders);
+    const namesAt = new Set(orderShopsSeen.filter((s) => has(c, 'customers.view', s)));
+    return c.json({ ...withOrders, orderHolds: orderHolds(t, orderShopsSeen, p.variants.map((v) => v.id), namesAt) });
   });
 
   // a scan: normalise, look up, remember unknown codes for the manager
