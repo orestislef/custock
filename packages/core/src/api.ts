@@ -340,6 +340,8 @@ export interface CustockApi {
   orderOptions(orgSlug: string): Promise<PublicOrderOptions>;
   // the shops customers can see, with address, phone and opening hours (no sign in needed)
   publicShops(orgSlug: string): Promise<PublicShop[]>;
+  // the business's posts for visitors, when it shows them to everyone (policy catalog.news). 404 otherwise
+  publicPosts(orgSlug: string, cursor?: string): Promise<Page<FeedItem>>;
   previewOrder(orgSlug: string, input: OrderPreviewInput): Promise<OrderPreview>;
   // 409 prices_changed when a price differs from the one the app showed (preview again),
   // 403 limit_reached over a limit, 403 forbidden when not following the business

@@ -360,6 +360,10 @@
     "alerts.orders": {
       "title": "Orders",
       "foot": "When a customer orders, answers a price or cancels."
+    },
+    "catalog.news": {
+      "title": "News and offers",
+      "foot": "Who sees the posts on the shop page."
     }
   },
   "policyGroup": {
@@ -410,6 +414,10 @@
       "off": "Off",
       "quote": "Ask for a price",
       "priced": "At shown prices"
+    },
+    "catalog.news": {
+      "followers": "Followers",
+      "everyone": "Everyone"
     }
   },
   "field": {

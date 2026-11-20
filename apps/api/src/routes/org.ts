@@ -33,6 +33,7 @@ export function orgSettings(db: Db, org: OrgRow): OrgSettings {
     customerStock: org.customer_stock,
     fewLeftThreshold: org.few_left_threshold,
     customerOrders: org.customer_orders,
+    customerNews: org.customer_news,
   };
 }
 

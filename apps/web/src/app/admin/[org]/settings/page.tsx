@@ -1,6 +1,6 @@
 'use client';
 
-import type { CustomerCatalogMode, CustomerOrdersMode, CustomerStockMode, OrgSettings, Product, Shop, StockLevel } from '@custock/core';
+import type { CustomerCatalogMode, CustomerNewsMode, CustomerOrdersMode, CustomerStockMode, OrgSettings, Product, Shop, StockLevel } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { Group, Row, Segmented, StockBadge, Switch } from '@/components/ui/kit';
@@ -52,7 +52,7 @@ export default function SettingsPage() {
     return e && def ? <Row title={title} value={policyText(t, def, e.effective)} /> : null;
   };
   // shown in their own places on this page, the rest of the engine's keys get the list below
-  const OWN_PLACE = new Set(['catalog.mode', 'catalog.prices', 'catalog.stock', 'stock.allowNegative', 'posts.needApproval', 'orders.mode']);
+  const OWN_PLACE = new Set(['catalog.mode', 'catalog.news', 'catalog.prices', 'catalog.stock', 'stock.allowNegative', 'posts.needApproval', 'orders.mode']);
   const ordersMode: CustomerOrdersMode = s?.customerOrders ?? 'off';
   const ordersFeature = featureOn(org, 'orders');
 
@@ -112,6 +112,20 @@ export default function SettingsPage() {
               ) : <p className="t-body m-0">{t(`settings.catalogMode.${s.customerCatalog}`)}</p>}
             </div>
             <p className="inset-group-foot">{t(`settings.catalogFoot.${s.customerCatalog}`)}</p>
+          </section>
+          ) : null}
+
+          {/* who sees the posts on the shop page. not there when posts are switched off for the business */}
+          {canOrg && featureOn(org, 'posts') && s.customerCatalog !== 'off' ? (
+          <section className="inset-group">
+            <h3 className="inset-group-head">{t('settings.news')}</h3>
+            <div className="mb-2 overflow-x-auto">
+              {editable('catalog.news') ? (
+                <Segmented label={t('settings.news')} value={s.customerNews ?? 'followers'} onChange={(v: CustomerNewsMode) => void patch({ customerNews: v })}
+                  options={(['followers', 'everyone'] as const).map((v) => ({ value: v, label: t(`settings.newsMode.${v}`) }))} />
+              ) : <p className="t-body m-0">{t(`settings.newsMode.${s.customerNews ?? 'followers'}`)}</p>}
+            </div>
+            <p className="inset-group-foot">{t(`settings.newsFoot.${s.customerNews ?? 'followers'}`)}</p>
           </section>
           ) : null}
 

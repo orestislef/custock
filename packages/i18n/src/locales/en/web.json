@@ -101,7 +101,9 @@
     "transferTip": "Some of this is on the way from another shop. It counts once it is received.",
     "archive": "Archive product",
     "archiveConfirm": "Archiving hides it from lists and scans. Its history stays and you can still find it in reports.",
-    "archived": "Product archived"
+    "archived": "Product archived",
+    "notTracked": "Stock is not counted for this product",
+    "notTrackedSub": "Turn on Track stock in Edit to count it per shop."
   },
   "catalog": {
     "title": "Catalog",
@@ -748,7 +750,16 @@
     "ordersPricesHidden": "Prices are hidden on the shop page, so every order asks for a price.",
     "ordersPerShop": "Orders per shop",
     "ordersPerShopFoot": "A shop that is off is not offered for pick up.",
-    "ordersAt": "Orders at {{shop}}"
+    "ordersAt": "Orders at {{shop}}",
+    "news": "News and offers",
+    "newsMode": {
+      "followers": "Followers",
+      "everyone": "Everyone"
+    },
+    "newsFoot": {
+      "followers": "Posts show to people who follow the business and signed in.",
+      "everyone": "Anyone with the link sees the posts, followers still get them by notification and email."
+    }
   },
   "links": {
     "title": "QR codes",
@@ -1275,7 +1286,10 @@
       "signInTitle": "Sign in for the news",
       "signInLead": "News and offers from {{org}}, for the people who follow it. No password, a code by email.",
       "notFollowingTitle": "You do not follow {{org}} yet",
-      "notFollowingBody": "Join to get their news and offers. You choose how you hear from them."
+      "notFollowingBody": "Join to get their news and offers. You choose how you hear from them.",
+      "visitorTitle": "Hear it first",
+      "visitorBody": "Follow {{org}} to get news and offers by notification and email. You choose how.",
+      "visitorFollow": "Follow {{org}}"
     },
     "me": {
       "title": "You",

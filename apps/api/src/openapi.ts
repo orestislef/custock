@@ -131,6 +131,7 @@ const IO: Record<string, [Schema | null, Schema | null]> = {
   'POST /v1/orgs/{org}/orders/{id}/complete': [null, ref('Order')],
   'POST /v1/orgs/{org}/orders/{id}/cancel': [ref('OrderReasonInput'), ref('Order')],
   'GET /v1/public/orgs/{slug}/order-options': [null, ref('PublicOrderOptions')],
+  'GET /v1/public/orgs/{slug}/posts': [null, paged('FeedItem')],
   'POST /v1/c/orgs/{slug}/orders/preview': [ref('OrderPreviewInput'), ref('OrderPreview')],
   'POST /v1/c/orgs/{slug}/orders': [ref('OrderCreateInput'), ref('Order')],
   'GET /v1/c/orgs/{slug}/orders': [null, paged('OrderSummary')],

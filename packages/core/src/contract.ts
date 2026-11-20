@@ -75,6 +75,9 @@ export type CustomerStockMode = z.infer<typeof CustomerStockMode>;
 
 export const CustomerCatalogMode = z.enum(['off', 'subscribers', 'public']);
 export type CustomerCatalogMode = z.infer<typeof CustomerCatalogMode>;
+// who sees the business's posts on its shop page: followers who signed in, or everyone
+export const CustomerNewsMode = z.enum(['followers', 'everyone']);
+export type CustomerNewsMode = z.infer<typeof CustomerNewsMode>;
 
 // orders from customers: off, every order asks for a price, or orders at the shown prices
 export const CustomerOrdersMode = z.enum(['off', 'quote', 'priced']);
@@ -223,6 +226,8 @@ export const OrgSettings = z.object({
   fewLeftThreshold: z.number(),
   // orders from customers (policy orders.mode). optional so older clients and fixtures still fit
   customerOrders: CustomerOrdersMode.optional(),
+  // who sees the posts on the shop page (policy catalog.news). optional like customerOrders
+  customerNews: CustomerNewsMode.optional(),
 });
 export type OrgSettings = z.infer<typeof OrgSettings>;
 

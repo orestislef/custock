@@ -34,6 +34,7 @@ export const organizations = sqliteTable('organizations', {
   customerCatalog: text('customer_catalog').notNull(),
   customerPrices: integer('customer_prices').notNull(),
   customerStock: text('customer_stock').notNull(),
+  customerNews: text('customer_news').notNull(),
   fewLeftThreshold: integer('few_left_threshold').notNull(),
   supportAccessUntil: integer('support_access_until'),
   createdAt: integer('created_at').notNull(),

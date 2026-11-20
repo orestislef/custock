@@ -71,6 +71,7 @@ export interface OrgRow {
   few_left_threshold: number;
   customer_offer_prices: number;
   customer_orders: 'off' | 'quote' | 'priced';
+  customer_news: 'followers' | 'everyone';
 }
 
 export interface OrgContext {

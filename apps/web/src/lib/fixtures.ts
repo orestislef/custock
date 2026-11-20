@@ -69,7 +69,7 @@ const settings: OrgSettings = {
   id: ORG, name: 'Lemoni', slug: 'lemoni', country: 'GR', currency: 'EUR', timezone: 'Europe/Athens',
   defaultLocale: 'el', brandColor: '#B0234F', logoUrl: null, allowNegativeStock: true, postsNeedApproval: false,
   pushDailyCap: 2, quietHours: '22:00-09:00', customerCatalog: 'public', customerPrices: true,
-  customerStock: 'availability', fewLeftThreshold: 3, customerOrders: 'priced',
+  customerStock: 'availability', fewLeftThreshold: 3, customerOrders: 'priced', customerNews: 'everyone',
 };
 
 // opening hours: a long day, a greek lunch break, open every day
@@ -1565,6 +1565,20 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
       logAudit(me(), 'order.cancelled', 'order', o.id);
       tellCustomer(o, 'orderCancelled');
       return orderOut(o, 'staff');
+    },
+
+    // posts for visitors, like the api: sent, not narrowed to some customers, no audience or author
+    async publicPosts(orgSlug) {
+      if (orgSlug !== settings.slug || settings.customerNews !== 'everyone' || settings.customerCatalog === 'off') throw new FixtureError(404, 'not_found');
+      const items: FeedItem[] = posts
+        .filter((p) => p.status === 'sent' && !p.audience.tags.length && !p.audience.interests.length && !p.audience.locales.length && !p.audience.savedAnyLinked && p.audience.joinedWithinDays == null && !(p.kind === 'offer' && p.validUntil != null && p.validUntil <= Date.now()))
+        .sort((a, b) => (b.sentAt ?? 0) - (a.sentAt ?? 0))
+        .map((post) => ({
+          post: { ...post, products: settings.customerCatalog === 'public' ? post.products : [], audience: { ...post.audience, scopes: [] }, authorId: '', authorName: null, approvedBy: null, recipientsCount: null, stats: null },
+          orgName: settings.name,
+          shopNames: post.audience.scopes.map((sc) => scopeName(sc.scopeType, sc.scopeId)),
+        }));
+      return { items, nextCursor: null };
     },
 
     // ---------------------------------------------------------------- orders, customer side

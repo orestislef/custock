@@ -1,7 +1,8 @@
 'use client';
 
 // news and offers from this business, newest first. people who follow it see everything that was
-// sent to the shops they follow; everyone else is invited in.
+// sent to the shops they follow. a business that shows its posts to everyone (policy catalog.news)
+// shows visitors those too, with a soft invite to follow; otherwise everyone else is invited in.
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -18,8 +19,11 @@ import { useShopper } from './shopper-context';
 
 export function NewsView() {
   const t = useT();
-  const { api, status, follow, me, orgName, joinCode } = useShopper();
+  const { api, status, follow, me, orgName, joinCode, slug } = useShopper();
   const [items, setItems] = useState<FeedItem[] | null>(null);
+  // for a visitor or someone who does not follow: the posts shown to everyone. undefined while
+  // loading, null when the business keeps them for its followers
+  const [open, setOpen] = useState<FeedItem[] | null | undefined>(undefined);
   // ?post=<id> from a notification: that post, scrolled to and marked
   const focus = useSearchParams().get('post');
 
@@ -29,11 +33,37 @@ export function NewsView() {
   }, [api, follow]);
 
   useEffect(() => {
-    if (!focus || !items) return;
+    if (status === 'loading' || follow) return;
+    let alive = true;
+    void api.publicPosts(slug).then((p) => { if (alive) setOpen(p.items); }, () => { if (alive) setOpen(null); });
+    return () => { alive = false; };
+  }, [api, slug, status, follow]);
+
+  const shown = follow ? items : open;
+  useEffect(() => {
+    if (!focus || !shown) return;
     document.getElementById(`post-${focus}`)?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-  }, [focus, items]);
+  }, [focus, shown]);
 
   if (status === 'loading') return <div className="h-40 rounded-[16px] skel" aria-busy="true" />;
+  if (!follow && open === undefined) return <div className="h-40 rounded-[16px] skel" aria-busy="true" />;
+  if (!follow && open) {
+    return (
+      <>
+        <div className="card p-4 mb-5 flex flex-col gap-3">
+          <div>
+            <p className="t-headline m-0">{t('shopper.news.visitorTitle')}</p>
+            <p className="t-sub t-2 m-0 mt-1">{t('shopper.news.visitorBody', { org: orgName })}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {joinCode ? <Link href={`/j/${joinCode}`} className="btn btn-primary">{t('shopper.news.visitorFollow', { org: orgName })}</Link> : null}
+            {status === 'signedOut' ? <Link href={`/s/${slug}/me`} className="btn btn-plain">{t('shopper.signIn.already')}</Link> : null}
+          </div>
+        </div>
+        <PostList items={open} focus={focus} />
+      </>
+    );
+  }
   if (status === 'signedOut') return <SignInCard title={t('shopper.news.signInTitle')} lead={t('shopper.news.signInLead', { org: orgName })} />;
   if (!follow) {
     return (
@@ -46,6 +76,16 @@ export function NewsView() {
   return (
     <>
       {first ? <p className="t-body t-2 mt-0 mb-5">{t('shopper.news.hello', { name: first })}</p> : null}
+      <PostList items={items} focus={focus} />
+    </>
+  );
+}
+
+function PostList({ items, focus }: { items: FeedItem[]; focus: string | null }) {
+  const t = useT();
+  const { orgName } = useShopper();
+  return (
+    <>
       {/* a notification for a post that was taken down since: one quiet line, the news as usual */}
       {focus && !items.some((i) => i.post.id === focus) ? <p className="t-sub t-2 mt-0 mb-4" role="status">{t('gone.shopPost')}</p> : null}
       {items.length ? (

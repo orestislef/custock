@@ -36,7 +36,7 @@ import { confirmFiles } from '../lib/files';
 const SETTING_POLICIES: Record<string, string> = {
   pushDailyCap: 'push.dailyCap', quietHours: 'push.quietHours', postsNeedApproval: 'posts.needApproval', allowNegativeStock: 'stock.allowNegative',
   fewLeftThreshold: 'stock.fewLeft', customerCatalog: 'catalog.mode', customerPrices: 'catalog.prices', customerStock: 'catalog.stock',
-  customerOrders: 'orders.mode',
+  customerOrders: 'orders.mode', customerNews: 'catalog.news',
 };
 
 
@@ -420,6 +420,7 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
         customerPrices: z.boolean(),
         customerStock: z.enum(['off', 'availability', 'exact']),
         customerOrders: z.enum(['off', 'quote', 'priced']),
+        customerNews: z.enum(['followers', 'everyone']),
         fewLeftThreshold: z.number().int().min(0).max(100),
         // a 'logo' upload of this business, or null to take the logo off
         logoFileId: z.string().max(64).nullable(),

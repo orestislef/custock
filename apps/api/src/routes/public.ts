@@ -1,15 +1,17 @@
 // public endpoints, no login, rate limited: join page, shelf product page, public catalog
 
 import type { Hono } from 'hono';
-import { normalizeBarcode, type JoinPage, type PublicProduct, type PublicShop } from '@custock/core';
+import { normalizeBarcode, type Audience, type FeedItem, type JoinPage, type PublicProduct, type PublicShop } from '@custock/core';
 import type { Db } from '@custock/db';
 import { readHours } from '../lib/shop-hours';
 import type { AppEnv, OrgRow } from '../types';
-import { categoryNameSql, cfgOf, nowOf, optionalAuth, ORG_COLUMNS, readerLocale } from '../lib/context';
+import { categoryNameSql, cfgOf, loadTopology, nowOf, optionalAuth, ORG_COLUMNS, readerLocale } from '../lib/context';
 import { forbidden, notFound } from '../lib/problem';
 import { rateLimit } from '../lib/ratelimit';
 import { policyNumber } from '../lib/policy';
-import { platform, Tenant } from '../lib/tenant';
+import { clampLimit, decodeCursor, page, parseJson, platform, Tenant } from '../lib/tenant';
+import { orgFeatureOn } from '../lib/platform-access';
+import { loadPosts, postShops } from '../services/posts';
 import { fileUrl } from '../services/catalog';
 import { CATEGORY_PICTURE_SQL, pictureOf } from './categories';
 import { storefrontProducts } from '../services/storefront';
@@ -27,6 +29,44 @@ function publicShops(db: Db, org: OrgRow): PublicShop[] {
   return new Tenant(db, org.id).all<{ id: string; name: string; address: string | null; city: string | null; phone: string | null; timezone: string | null; opening_hours: string | null }>(
     `SELECT id, name, address, city, phone, timezone, opening_hours FROM shops WHERE org_id = @org AND archived_at IS NULL AND customer_visible = 1 ORDER BY created_at, name`,
   ).map(({ timezone, opening_hours, ...s }) => ({ ...s, timezone: timezone || org.timezone, hours: readHours(opening_hours) }));
+}
+
+// a post narrowed to some customers (tags, interests, languages, saved products, new followers)
+// stays with the followers it was meant for
+function targeted(raw: string): boolean {
+  const a = parseJson<Partial<Audience>>(raw, {});
+  return !!(a.tags?.length || a.interests?.length || a.locales?.length || a.savedAnyLinked || a.joinedWithinDays != null);
+}
+
+// the posts a visitor sees: sent, in the feed, not an ended offer, reaching a shop customers see.
+// no audience, author or numbers; products only when the catalog is open to everyone
+function publicFeed(db: Db, org: OrgRow, now: number, locale: string): FeedItem[] {
+  const t = new Tenant(db, org.id);
+  const rows = t.all<{ id: string; audience: string }>(
+    `SELECT id, audience FROM posts WHERE org_id = @org AND status = 'sent' AND deleted_at IS NULL
+       AND EXISTS (SELECT 1 FROM json_each(posts.channels) WHERE value = 'feed')
+       AND NOT (kind = 'offer' AND valid_until IS NOT NULL AND valid_until <= @now)
+     ORDER BY sent_at DESC LIMIT 500`,
+    { now },
+  );
+  const ids = rows.filter((r) => !targeted(r.audience)).map((r) => r.id);
+  const { topology, shopNames } = loadTopology(db, org.id);
+  const visible = new Set(t.all<{ id: string }>('SELECT id FROM shops WHERE org_id = @org AND customer_visible = 1 AND archived_at IS NULL').map((s) => s.id));
+  const withProducts = org.customer_catalog === 'public';
+  const out: FeedItem[] = [];
+  const posts = loadPosts(t, ids, { withStats: false, showPrices: !!org.customer_prices, offerPrices: !!org.customer_offer_prices, hideArchived: true, publicAudience: true, locale });
+  for (const full of posts) {
+    const reach = postShops(t, full, topology).filter((s) => visible.has(s));
+    if (!reach.length) continue;
+    // the reader's language and the post's own, for when it was not written in theirs
+    const translations = Object.fromEntries(Object.entries(full.translations).filter(([l]) => l === locale || l === full.defaultLocale));
+    out.push({
+      post: { ...full, translations, products: withProducts ? full.products : [], audience: { ...full.audience, scopes: [] }, authorId: '', authorName: null, approvedBy: null, recipientsCount: null, stats: null },
+      orgName: org.name,
+      shopNames: reach.map((s) => shopNames[s] ?? s),
+    });
+  }
+  return out;
 }
 
 export function publicRoutes(app: Hono<AppEnv>) {
@@ -162,6 +202,18 @@ export function publicRoutes(app: Hono<AppEnv>) {
     const org = platform(db).get<OrgRow>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE slug = @s AND archived_at IS NULL`, { s: c.req.param('slug') });
     if (!org) throw notFound('organization');
     return c.json(publicShops(db, org));
+  });
+
+  // the business's posts for everyone, when it chose so (policy catalog.news) and its catalog is not
+  // off: what was sent and shows in the feed, newest first, never a draft, a scheduled or targeted one
+  app.get('/v1/public/orgs/:slug/posts', (c) => {
+    const db = cfgOf(c).db;
+    const org = platform(db).get<OrgRow>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE slug = @s AND archived_at IS NULL`, { s: c.req.param('slug') });
+    if (!org || org.customer_news !== 'everyone' || org.customer_catalog === 'off' || !orgFeatureOn(db, org.id, 'posts')) throw notFound('posts');
+    const offset = decodeCursor(c.req.query('cursor'));
+    const limit = clampLimit(c.req.query('limit'), 20, 50);
+    const all = publicFeed(db, org, nowOf(c), readerLocale(c, org.default_locale));
+    return c.json(page(all.slice(offset, offset + limit + 1), offset, limit));
   });
 
   // whether the business takes orders, from which shops, and the limits (PublicOrderOptions)

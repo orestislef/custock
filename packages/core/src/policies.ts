@@ -76,6 +76,8 @@ export const POLICIES: readonly PolicyDef[] = [
   { key: 'catalog.prices', group: 'customers', type: 'bool', default: true, levels: ['platform', 'limit', 'business'], cap: 'free', permission: 'org.settings.manage', column: 'customer_prices', delegatedByDefault: true },
   { key: 'catalog.offerPrices', group: 'customers', type: 'bool', default: true, levels: ['platform', 'limit', 'business'], cap: 'free', permission: 'org.settings.manage', column: 'customer_offer_prices', delegatedByDefault: true },
   { key: 'catalog.stock', group: 'customers', type: 'enum', default: 'off', options: ['off', 'availability', 'exact'], levels: ['platform', 'limit', 'business'], cap: 'free', permission: 'org.settings.manage', column: 'customer_stock', delegatedByDefault: true },
+  // who sees the posts on the shop page: followers who signed in, or everyone (like an open catalog)
+  { key: 'catalog.news', group: 'customers', type: 'enum', default: 'followers', options: ['followers', 'everyone'], levels: ['platform', 'limit', 'business'], cap: 'free', permission: 'org.settings.manage', column: 'customer_news', delegatedByDefault: true },
 
   // orders from customers (thinking/19-orders.md). mode: off, every order asks for a price, or orders
   // at the shown prices. maxQty is in pieces, or kg/l/m for products sold by measure
