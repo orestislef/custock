@@ -100,6 +100,16 @@ For a shop scoped member, "customers" means customers whose subscriptions reach 
 | `offers.price.set` | set offer prices on products linked to an offer post, for the post's shops |
 | `joinlinks.manage` | create, print and disable QR codes and join links |
 
+### orders (level shop)
+
+Orders and price requests from customers, see [19](19-orders.md).
+
+| key | allows |
+|-----|--------|
+| `orders.view` | see the orders of the shop, and what confirmed orders hold of a product |
+| `orders.quote` | send a price, confirm an order at its prices, decline, cancel |
+| `orders.fulfil` | mark an order ready and hand it over (the stock goes down as a sale) |
+
 ### reports (level shop)
 
 | key | allows |
@@ -166,6 +176,9 @@ edit its own admin, manager, staff and viewer roles. The owner role is locked.
 | posts.delete | x | x | | | |
 | offers.price.set | x | x | x | | |
 | joinlinks.manage | x | x | x | | |
+| orders.view | x | x | x | x | x |
+| orders.quote | x | x | x | | |
+| orders.fulfil | x | x | x | x | |
 | reports.view | x | x | x | | x |
 | reports.financial.view | x | x | | | x |
 | reports.staff.view | x | x | x | | |
