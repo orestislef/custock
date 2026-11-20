@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-20T17:00:00+02:00",
+  "updated": "2026-11-20T19:00:00+02:00",
   "overall": 100,
   "areas": [
     {
@@ -188,6 +188,10 @@
     {
       "at": "2026-11-20T17:00:00+02:00",
       "text": "Product names in Greek, English and Russian, prices per kg say so on the shop page. The first real business set up with its menu."
+    },
+    {
+      "at": "2026-11-20T19:00:00+02:00",
+      "text": "Opening hours per shop with open now on the shop page, a photo of its own on a post, news that a business can show to everyone, business logos beside their names, chip rows that wrap on a computer, and products that do not count stock say so."
     }
   ],
   "screens": [
