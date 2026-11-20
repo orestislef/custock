@@ -5,7 +5,7 @@
 // under /s/<org> work without an account too, they just offer to join or sign in.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { CustockApi, Locale, MeContext } from '@custock/core';
+import type { CustockApi, Locale, MeContext, PublicOrderOptions } from '@custock/core';
 import { createBrowserApi, loadTokens, saveTokens } from '@/lib/api-client';
 import { useLocale } from '@/lib/i18n-client';
 import { wipeLocal } from '@/lib/outbox';
@@ -28,6 +28,8 @@ interface ShopperState {
   status: 'loading' | 'signedOut' | 'signedIn';
   me: MeContext | null;
   follow: Follow | null; // this business, when the signed in person follows it
+  // ordering: the business's choice and the shops to pick up from. undefined while loading, null when off
+  orders: PublicOrderOptions | null | undefined;
   requestCode: (email: string) => Promise<{ devCode?: string }>;
   verifyCode: (email: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -77,6 +79,14 @@ export function ShopperProvider({ slug, orgName, joinCode, iconVersion = '', tim
 
   const follow = me?.following.find((f) => f.orgSlug === slug) ?? null;
 
+  // whether and where this business takes orders. asked once per visit, nothing changes for an error
+  const [orders, setOrders] = useState<PublicOrderOptions | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    getApi().orderOptions(slug).then((o) => { if (alive) setOrders(o.mode !== 'off' && o.shops.length ? o : null); }, () => { if (alive) setOrders(null); });
+    return () => { alive = false; };
+  }, [slug]);
+
   // a subscription the browser rotated goes to the api again
   useEffect(() => {
     if (follow) void refreshSubscription(getApi(), { orgId: follow.orgId, locale });
@@ -103,8 +113,8 @@ export function ShopperProvider({ slug, orgName, joinCode, iconVersion = '', tim
   }, []);
 
   const value = useMemo<ShopperState>(() => ({
-    api: getApi(), slug, orgName, joinCode, iconVersion, quietHours, pushDailyCap, status, me, follow, requestCode, verifyCode, signOut, reload: () => setVersion((v) => v + 1),
-  }), [slug, orgName, joinCode, iconVersion, quietHours, pushDailyCap, status, me, follow, requestCode, verifyCode, signOut]);
+    api: getApi(), slug, orgName, joinCode, iconVersion, quietHours, pushDailyCap, status, me, follow, orders, requestCode, verifyCode, signOut, reload: () => setVersion((v) => v + 1),
+  }), [slug, orgName, joinCode, iconVersion, quietHours, pushDailyCap, status, me, follow, orders, requestCode, verifyCode, signOut]);
 
   return <Ctx.Provider value={value}><div className="has-tabbar">{children}</div></Ctx.Provider>;
 }

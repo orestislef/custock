@@ -10,9 +10,10 @@ import { useAsync } from './use-async';
 
 interface More<T> { key: string; items: T[]; next: string | null | undefined; busy: boolean; failed: boolean }
 
-export function usePaged<T>(load: (cursor: string | undefined) => Promise<Page<T>>, deps: unknown[]) {
+// refreshOnReturn: the first page loads again quietly when the page comes back (see useAsync)
+export function usePaged<T>(load: (cursor: string | undefined) => Promise<Page<T>>, deps: unknown[], opts?: { refreshOnReturn?: boolean }) {
   const key = JSON.stringify(deps);
-  const first = useAsync(() => load(undefined), deps);
+  const first = useAsync(() => load(undefined), deps, opts);
   const [more, setMore] = useState<More<T>>({ key, items: [], next: undefined, busy: false, failed: false });
   const cur: More<T> = useMemo(() => (more.key === key ? more : { key, items: [], next: undefined, busy: false, failed: false }), [more, key]);
   const next = cur.next === undefined ? first.data?.nextCursor ?? null : cur.next;

@@ -457,5 +457,16 @@
     "barcode": {
       "invalid": "Letters, numbers and simple symbols only."
     }
+  },
+  "orderStatus": {
+    "requested": "New",
+    "quoted": "Waiting for the customer",
+    "confirmed": "To prepare",
+    "ready": "Ready",
+    "completed": "Picked up",
+    "declined": "Declined",
+    "rejected": "Turned down",
+    "cancelled": "Cancelled",
+    "expired": "Expired"
   }
 }

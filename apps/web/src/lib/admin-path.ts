@@ -4,7 +4,7 @@
 
 // sections of a business. a business slug can never be one of these (see RESERVED_SLUGS in core)
 export const ADMIN_SECTIONS = [
-  'stock', 'scan', 'customers', 'posts', 'reports', 'team', 'join-links', 'settings', 'audit', 'dev-outbox', 'print',
+  'stock', 'scan', 'orders', 'customers', 'posts', 'reports', 'team', 'join-links', 'settings', 'audit', 'dev-outbox', 'print',
 ] as const;
 
 // pages of the staff app that belong to no business

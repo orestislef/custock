@@ -13,7 +13,7 @@ import { Chips, Empty, Group, Row, StockBadge, stockState, IconTile, type StockS
 import { Photo, Picker, Tip, isMac, useShortcuts, useToast } from '@/components/ui/client-kit';
 import { CategoryPicture } from '@/components/ui/category-picture';
 import { Tally } from '@/components/ui/tally';
-import { IconBarcode, IconBell, IconPlus, IconSearch, IconChevronDown, IconTag } from '@/components/ui/icons';
+import { IconBag, IconBarcode, IconBell, IconPlus, IconSearch, IconChevronDown, IconTag } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
 import { usePaged } from '@/lib/use-paged';
 import { MoreRows } from '@/components/ui/more-rows';
@@ -63,6 +63,8 @@ function StockList() {
   const visibleShops = shops.filter((s) => !shopId || s.id === shopId);
   const newTitle = `${t('stock.newProduct')} (${isMac() ? '⌘' : 'Ctrl+'}N)`;
 
+  // what confirmed and ready orders promise in the shops shown (only there when this person sees orders)
+  const onOrders = (p: Row_) => p.levels.filter((l) => !shopId || l.shopId === shopId).reduce((n, l) => n + (l.onOrderQty ?? 0), 0);
   const stateOf = (p: Row_): { state: StockState; label: string; onHand: number; waiting: number } => {
     const levels = p.levels.filter((l) => !shopId || l.shopId === shopId);
     const onHand = levels.reduce((a, l) => a + l.onHand, 0);
@@ -169,6 +171,7 @@ function StockList() {
                     <span className="inline-flex gap-1.5 flex-wrap">
                       <StockBadge state={st.state} label={st.label} />
                       {st.waiting > 0 ? <span className="badge badge-gray"><IconBell size={13} />{t('common:stock.waiting', { count: st.waiting })}</span> : null}
+                      {onOrders(p) > 0 ? <span className="badge badge-info"><IconBag size={13} />{t('orders.onOrdersPill', { qty: qtyNumber(onOrders(p), p.uom, locale) })}</span> : null}
                     </span>
                   </td>
                 </tr>
@@ -191,6 +194,7 @@ function StockList() {
                         <span className="truncate">{p.categoryName}</span>
                         <StockBadge state={st.state} label={st.label} />
                         {st.waiting > 0 ? <span className="badge badge-gray"><IconBell size={13} />{t('common:stock.waiting', { count: st.waiting })}</span> : null}
+                      {onOrders(p) > 0 ? <span className="badge badge-info"><IconBag size={13} />{t('orders.onOrdersPill', { qty: qtyNumber(onOrders(p), p.uom, locale) })}</span> : null}
                       </span>
                     </span>
                     {can('stock.view', shopId ?? null) ? (

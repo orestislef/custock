@@ -88,6 +88,7 @@ export function demoParams(segment: string): Record<string, string | string[]>[]
     case 'admin/[org]': return one('org', ids.orgSlugs);
     case 'admin/[org]/[...rest]': return [{ rest: ['demo'] }];
     case 'admin/[org]/customers/[id]': return one('id', ids.customers);
+    case 'admin/[org]/orders/[id]': return one('id', ids.orders);
     case 'admin/[org]/posts/[id]': return one('id', ids.posts);
     case 'admin/[org]/print/[id]': return one('id', ids.joinLinks);
     case 'admin/[org]/print/label/[id]': return one('id', ids.products);
@@ -99,6 +100,7 @@ export function demoParams(segment: string): Record<string, string | string[]>[]
     case 'j/[code]': return one('code', ids.joinCodes);
     case 'p/[code]': return one('code', ids.productCodes);
     case 's/[org]': return one('org', ids.orgSlugs);
+    case 's/[org]/orders/[id]': return one('id', ids.orders);
     case 's/[org]/p/[id]': return one('id', ids.products);
     default: {
       // links with a one time token (invites, resets, confirmations): one sample page

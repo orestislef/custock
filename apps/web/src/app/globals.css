@@ -549,6 +549,8 @@
   }
   .toast .btn-plain { color: var(--c-toast-action); font-weight: 600; }
   @media (min-width: 768px) { .toast { bottom: 24px; } }
+  /* the order pill of a business's app sits above the tab bar: toasts go above it */
+  html[data-order-pill] .toast { bottom: calc(158px + env(safe-area-inset-bottom)); }
 
   /* tips and empty states */
   .tip {
@@ -588,6 +590,8 @@
   .nav-link { color: var(--c-ink); }
   .nav-link:hover { background: var(--c-fill); text-decoration: none; }
   .nav-link[aria-current="page"] { color: var(--c-accent); background: var(--c-accent-tint); font-weight: 600; }
+  /* a count on a menu item (new orders) */
+  .count-dot { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--c-accent-fill); color: var(--c-on-accent); font-size: 11px; line-height: 1; font-weight: 600; }
 
   /* phone sizes: 44 pt targets for segmented controls and pickers */
   @media (max-width: 767px) {

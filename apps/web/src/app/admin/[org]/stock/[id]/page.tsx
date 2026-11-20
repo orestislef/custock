@@ -8,16 +8,18 @@ import { StockSheet, type StockMode } from '@/components/admin/stock-sheet';
 import { ShopSettingsSheet } from '@/components/admin/shop-settings-sheet';
 import { useOrgRouter as useRouter } from '@/components/admin/org-link';
 import { Group, Row, StockBadge, signed, stockState } from '@/components/ui/kit';
-import { Photo, useToast } from '@/components/ui/client-kit';
+import { Photo, Sheet, useToast } from '@/components/ui/client-kit';
 import { CategoryPlaceholder } from '@/components/ui/category-picture';
 import { Tally } from '@/components/ui/tally';
-import { IconBell, IconChevronLeft, IconPlus, IconEdit, IconTruck, IconGear, IconPrint } from '@/components/ui/icons';
+import { IconBag, IconBell, IconChevronLeft, IconChevronRight, IconPlus, IconEdit, IconTruck, IconGear, IconPrint } from '@/components/ui/icons';
+import { OrderStatusBadge } from '@/components/orders/order-bits';
+import { dayText } from '@/lib/order-format';
 import { useAsync } from '@/lib/use-async';
 import { usePaged } from '@/lib/use-paged';
 import { MoreRows } from '@/components/ui/more-rows';
 import { StaffMissing, missingFrom } from '@/components/ui/gone';
 import { productName, variantLabel } from '@/lib/names';
-import { money, qtyNumber, relative } from '@/lib/format';
+import { displayTimeZone, money, qtyNumber, relative } from '@/lib/format';
 
 function variantIdsOf(p: { variants: { id: string }[] }): Set<string> {
   return new Set(p.variants.map((v) => v.id));
@@ -38,6 +40,8 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const [sheet, setSheet] = useState<StockMode | null>(null);
   const [told, setTold] = useState<Record<string, number>>({});
   const [shopEdit, setShopEdit] = useState<StockLevel | null>(null);
+  // the orders that hold some of it at one shop (confirmed or ready, never taken off)
+  const [holdsFor, setHoldsFor] = useState<StockLevel | null>(null);
   const [archiving, setArchiving] = useState(false);
   const router = useRouter();
 
@@ -115,6 +119,11 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                           <span className="badge badge-ok told-pop">{t('common:stock.told', { count: toldN })}</span>
                         ) : l.waiting > 0 ? (
                           <span className="badge badge-gray"><IconBell size={13} />{t('common:stock.waiting', { count: l.waiting })}</span>
+                        ) : null}
+                        {l.onOrderQty ? (
+                          <button type="button" className="badge badge-info cursor-pointer border-0" onClick={() => setHoldsFor(l)} aria-label={t('orders.onOrdersOpen', { qty: qtyNumber(l.onOrderQty, p.uom, locale), shop: shop?.name ?? '' })}>
+                            <IconBag size={13} />{t('orders.onOrdersPill', { qty: qtyNumber(l.onOrderQty, p.uom, locale) })}
+                          </button>
                         ) : null}
                         {l.lastMovementAt ? <span className="t-foot t-2">{relative(l.lastMovementAt, locale)}</span> : null}
                       </span>
@@ -197,6 +206,27 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
           )}
         </div>
       ) : null}
+      <Sheet open={holdsFor !== null} onClose={() => setHoldsFor(null)} title={t('orders.holdsTitle', { shop: shops.find((x) => x.id === holdsFor?.shopId)?.name ?? '' })}>
+        <ul className="list mb-2" role="list">
+          {(p.orderHolds ?? []).filter((h) => h.shopId === holdsFor?.shopId && h.variantId === holdsFor?.variantId).map((h) => {
+            const day = dayText(h.wantedOn, locale, displayTimeZone());
+            return (
+              <li key={h.orderId}>
+                <Link href={`/admin/orders/${h.orderId}`} className="row has-icon hover:no-underline" style={{ color: 'var(--c-ink)' }} onClick={() => setHoldsFor(null)}>
+                  <span className="icon-tile"><IconBag size={18} /></span>
+                  <span className="row-main min-w-0">
+                    <span className="flex items-center gap-2 flex-wrap"><span className="row-title">#{h.number}</span><OrderStatusBadge status={h.status} side="staff" /></span>
+                    <span className="row-sub block truncate">{[h.customerName, day ? t('orders.forDay', { day }) : null].filter(Boolean).join(' · ')}</span>
+                  </span>
+                  <span className="t-body tnum">{qtyNumber(h.qty, p.uom, locale)}</span>
+                  <IconChevronRight size={16} className="chev" />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="inset-group-foot">{t('orders.holdsFoot')}</p>
+      </Sheet>
       {shopEdit ? <ShopSettingsSheet product={p} level={shopEdit} onClose={() => setShopEdit(null)} onSaved={() => void product.reload()} /> : null}
       {sheet ? <StockSheet open={Boolean(sheet)} mode={sheet} product={p} onClose={() => setSheet(null)} onDone={onDone} /> : null}
     </div>

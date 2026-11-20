@@ -469,5 +469,16 @@
     "barcode": {
       "invalid": "Только буквы, цифры и простые символы."
     }
+  },
+  "orderStatus": {
+    "requested": "Новый",
+    "quoted": "Ждёт покупателя",
+    "confirmed": "Собрать",
+    "ready": "Готов",
+    "completed": "Выдан",
+    "declined": "Отклонён",
+    "rejected": "Не принят",
+    "cancelled": "Отменён",
+    "expired": "Истёк"
   }
 }

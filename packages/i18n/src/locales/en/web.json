@@ -218,7 +218,8 @@
     "more": "More",
     "audit": "Audit log",
     "outbox": "Dev outbox",
-    "scan": "Scan"
+    "scan": "Scan",
+    "orders": "Orders"
   },
   "dash": {
     "morning": "Good morning, {{name}}",
@@ -244,7 +245,9 @@
       "negative_one": "{{count}} product with negative stock",
       "negative_other": "{{count}} products with negative stock",
       "transfers_one": "{{count}} transfer on the way",
-      "transfers_other": "{{count}} transfers on the way"
+      "transfers_other": "{{count}} transfers on the way",
+      "orders_one": "{{count}} new order",
+      "orders_other": "{{count}} new orders"
     },
     "recent": "Latest stock changes",
     "tipQr": "Print the window QR from QR codes. People join in 30 seconds, no app needed.",
@@ -711,7 +714,22 @@
       "added": "{{shop}} added",
       "newFoot": "The new shop starts with no stock. People with business wide roles can work in it right away.",
       "editFoot": "The new details show on the shop's pages and QR posters at once."
-    }
+    },
+    "orders": "Orders from customers",
+    "ordersMode": {
+      "off": "Off",
+      "quote": "Ask for a price",
+      "priced": "At shown prices"
+    },
+    "ordersFoot": {
+      "off": "Customers can not order from the app.",
+      "quote": "Customers send what they want, the shop answers with a price, they say yes or no.",
+      "priced": "Orders go in at the prices customers see and the shop confirms them. A product without a price makes it a request for a price."
+    },
+    "ordersPricesHidden": "Prices are hidden on the shop page, so every order asks for a price.",
+    "ordersPerShop": "Orders per shop",
+    "ordersPerShopFoot": "A shop that is off is not offered for pick up.",
+    "ordersAt": "Orders at {{shop}}"
   },
   "links": {
     "title": "QR codes",
@@ -1962,5 +1980,258 @@
   "draft": {
     "restored": "Picked up where you left off.",
     "startOver": "Start over"
+  },
+  "qty": {
+    "less": "Less {{name}}",
+    "more": "More {{name}}"
+  },
+  "order": {
+    "addTitle": "Order this",
+    "howMany": "How many",
+    "qtyOf": "Quantity of {{name}}",
+    "add": "Add to order",
+    "added": "{{name}} is in your order",
+    "view": "View",
+    "full": "An order holds up to {{count}} products.",
+    "inOrder": "In your order: {{qty}} {{unit}}",
+    "pill": "Your order",
+    "products_one": "{{count}} product",
+    "products_other": "{{count}} products"
+  },
+  "orders": {
+    "status": {
+      "requested": "Sent",
+      "quoted": "Price to answer",
+      "confirmed": "Confirmed",
+      "ready": "Ready to pick up",
+      "completed": "Picked up",
+      "declined": "Declined",
+      "rejected": "Not taken",
+      "cancelled": "Cancelled",
+      "expired": "Price ran out"
+    },
+    "qtyChanged": "You asked for {{asked}}",
+    "stockLine": "In stock {{onHand}}",
+    "onOtherOrders": "{{qty}} already on orders",
+    "total": "Total",
+    "priceToCome": "Price to come",
+    "history": "History",
+    "reason": "Reason: {{reason}}",
+    "event": {
+      "customer": {
+        "requested": {
+          "any": "You sent the order"
+        },
+        "quoted": {
+          "any": "The shop sent a price: {{total}}"
+        },
+        "confirmed": {
+          "any": "The shop confirmed the order"
+        },
+        "accepted": {
+          "any": "You accepted the price"
+        },
+        "rejected": {
+          "any": "You said no to the price"
+        },
+        "declined": {
+          "any": "The shop could not take the order"
+        },
+        "ready": {
+          "any": "Ready to pick up"
+        },
+        "completed": {
+          "any": "Picked up"
+        },
+        "cancelled": {
+          "customer": "You cancelled the order",
+          "any": "The shop cancelled the order"
+        },
+        "expired": {
+          "any": "The price ran out"
+        }
+      },
+      "staff": {
+        "requested": {
+          "any": "The customer sent the order"
+        },
+        "quoted": {
+          "any": "{{name}} sent a price: {{total}}"
+        },
+        "confirmed": {
+          "any": "{{name}} confirmed the order"
+        },
+        "accepted": {
+          "any": "The customer accepted the price"
+        },
+        "rejected": {
+          "any": "The customer said no to the price"
+        },
+        "declined": {
+          "any": "{{name}} declined the order"
+        },
+        "ready": {
+          "any": "{{name}} marked it ready"
+        },
+        "completed": {
+          "any": "{{name}} handed it over"
+        },
+        "cancelled": {
+          "customer": "The customer cancelled the order",
+          "any": "{{name}} cancelled the order"
+        },
+        "expired": {
+          "any": "The price ran out"
+        }
+      }
+    },
+    "offTitle": "{{org}} does not take orders here",
+    "offBody": "Ask in the shop, they will gladly help.",
+    "browse": "Browse the shop",
+    "emptyTitle": "Your order is empty",
+    "emptyBody": "Add products from the shop with Add to order.",
+    "removed": "{{name}} removed",
+    "error": {
+      "prices_changed": "A price changed in the meantime. Check the total and send again.",
+      "limit_reached": "You already have as many open orders as this shop takes. Wait for one to finish.",
+      "orders_off": "This shop does not take orders right now.",
+      "quote_expired": "This price no longer holds. You can order again.",
+      "forbidden": "Join the shop first to send orders."
+    },
+    "sentToast": "Order #{{number}} sent",
+    "askedToast": "Price asked, order #{{number}}",
+    "linesLabel": "Products in your order",
+    "problem": {
+      "unavailable": "No longer available, remove it to send",
+      "too_many": "Too many for one order"
+    },
+    "remove": "Remove {{name}}",
+    "shopPrices": "The shop sends the price",
+    "askFoot": "{{org}} looks at your order and sends you a price. You say yes or no.",
+    "pricedFoot": "Prices with VAT. The shop confirms your order.",
+    "pickUp": "Pick up at",
+    "payFoot": "You pay when you pick up. Nothing is charged now.",
+    "details": "Details",
+    "wantedOn": "Needed by",
+    "wantedAny": "Any day",
+    "note": "Note for the shop",
+    "notePlaceholder": "For example: sliced, or deliver to …",
+    "fixLines": "Remove the products that can not be ordered, then send.",
+    "signInToSend": "Sign in to send",
+    "joinToSend": "Join {{org}} to send",
+    "send": "Send order",
+    "ask": "Ask for a price",
+    "sendFoot": "The shop confirms it and tells you when it is ready.",
+    "askSendFoot": "Nothing to pay now. You decide when you see the price.",
+    "cartTitle": "Your order",
+    "mineTitle": "Your orders",
+    "oneTitle": "Order",
+    "forDay": "for {{day}}",
+    "noneTitle": "No orders yet",
+    "noneBody": "Orders you send to the shop show up here.",
+    "openHead": "Open",
+    "doneHead": "Earlier",
+    "goneTitle": "This order is not here",
+    "goneBody": "It may belong to another account.",
+    "goneStaffBody": "It may be at a shop you do not see.",
+    "number": "Order #{{number}}",
+    "quoteTitle": "Your price",
+    "holdsUntil": "Holds until {{at}}",
+    "accept": "Accept the price",
+    "reject": "No thanks",
+    "acceptedToast": "Accepted. The shop prepares your order.",
+    "rejectedToast": "Done. The shop knows.",
+    "state": {
+      "requested": "The shop is looking at your order and will send you a price.",
+      "requestedPriced": "Sent. The shop will confirm your order.",
+      "confirmed": "Confirmed. You hear from us when it is ready.",
+      "ready": "Ready to pick up at {{shop}}.",
+      "completed": "Picked up. Thank you!",
+      "declined": "The shop could not take this order.",
+      "rejected": "You said no to the price.",
+      "cancelled": "This order was cancelled.",
+      "expired": "The price ran out. You can order again."
+    },
+    "linesHead": "Products",
+    "yourNote": "Your note: {{note}}",
+    "cancel": "Cancel the order",
+    "orderAgain": "Order again",
+    "cancelTitle": "Cancel order #{{number}}?",
+    "cancelConfirm": "Cancel the order",
+    "cancelBody": "The shop is told. This can not be undone.",
+    "cancelReason": "Why (optional)",
+    "optional": "Optional",
+    "cancelledToast": "Order cancelled",
+    "all": "All orders",
+    "staffTitle": "Orders",
+    "erasedCustomer": "Former customer",
+    "noPriceYet": "No price yet",
+    "filter": "Show",
+    "filters": {
+      "requested": "New",
+      "quoted": "Waiting for the customer",
+      "confirmed": "To prepare",
+      "ready": "Ready",
+      "closed": "Done",
+      "all": "All"
+    },
+    "emptyStaff": {
+      "requested": "No new orders",
+      "quoted": "Nobody to answer",
+      "confirmed": "Nothing to prepare",
+      "ready": "Nothing ready to hand over",
+      "closed": "No finished orders yet",
+      "all": "No orders yet"
+    },
+    "emptyStaffBody": "When a customer orders from the shop's app, it shows up here and you get a notification.",
+    "newCount_one": "{{count}} new order",
+    "newCount_other": "{{count}} new orders",
+    "sentAt": "Sent {{at}}",
+    "customerNote": "Note from the customer",
+    "linesPriced": "Ordered at shown prices",
+    "linesAsk": "Asks for a price",
+    "quoteSentFoot": "Price sent by {{name}}, holds until {{at}}.",
+    "askStaffFoot": "Send a price for every product. The customer says yes or no.",
+    "confirm": "Confirm order",
+    "changePrice": "Change the price",
+    "changePrices": "Change prices",
+    "sendPrice": "Send a price",
+    "markReady": "Ready to pick up",
+    "markPicked": "Picked up",
+    "decline": "Decline",
+    "cancelStaff": "Cancel order",
+    "pickedFoot": "Picked up takes the products off the stock as sales.",
+    "customer": "Customer",
+    "customerOpen": "Open",
+    "reads": "Reads {{language}}",
+    "confirmedToast": "Confirmed. The customer is told.",
+    "readyToast": "Marked ready. The customer is told.",
+    "completedToast": "Handed over",
+    "quotedToast": "Price sent to the customer",
+    "declinedToast": "Declined. The customer is told.",
+    "cancelledStaffToast": "Cancelled. The customer is told.",
+    "quoteSheetTitle": "Price for order #{{number}}",
+    "sendPriceTo": "Send {{total}}",
+    "asked": "Asked {{qty}}",
+    "pricePiece": "Price each",
+    "pricePer": "Price per {{unit}}",
+    "priceOf": "Price of {{name}}",
+    "priceInvalid": "Write a price, like 12,50",
+    "lineTotal": "Line {{total}}",
+    "vatFoot": "Prices with VAT, like on the shelf.",
+    "holdsTill": "Price holds until",
+    "message": "Message to the customer",
+    "messagePlaceholder": "For example: for 20 we can do 9 € each.",
+    "quoteFoot": "The customer gets it by notification and email and says yes or no.",
+    "declineTitle": "Decline order #{{number}}",
+    "cancelStaffTitle": "Cancel order #{{number}}",
+    "declineBody": "Tell the customer why. They read it in their notification and email.",
+    "cancelStaffBody": "Tell the customer why. They read it in their notification and email.",
+    "reasonLabel": "Reason",
+    "reasonPlaceholder": "For example: we are out of it until next week.",
+    "onOrdersPill": "{{qty}} on orders",
+    "onOrdersOpen": "{{qty}} on orders at {{shop}}, show them",
+    "holdsTitle": "On orders at {{shop}}",
+    "holdsFoot": "Confirmed and ready orders. The stock goes down when they are picked up."
   }
 }

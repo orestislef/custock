@@ -12,6 +12,7 @@ export function featureForRoute(pathname: string): Feature | null {
   if (pathname.startsWith('/admin/reports')) return 'reports';
   if (pathname.startsWith('/admin/stock/counts')) return 'counts';
   if (pathname.startsWith('/admin/stock/transfers')) return 'transfers';
+  if (pathname.startsWith('/admin/orders')) return 'orders';
   return null;
 }
 

@@ -26,8 +26,6 @@ export function snapshot() {
   cpSync(r('apps', 'web'), b('web'), { recursive: true, filter: keep });
   cpSync(r('apps', 'api'), b('api'), { recursive: true, filter: keep });
   for (const p of ['core', 'db', 'i18n', 'tokens']) cpSync(r('packages', p), b('pkgs', p), { recursive: true, filter: keep });
-  mkdirSync(b('demo', 'assets', 'js'), { recursive: true });
-  cpSync(r('demo', 'assets', 'js', 'images.js'), b('demo', 'assets', 'js', 'images.js'));
   for (const p of ['core', 'i18n', 'tokens']) link(b('pkgs', p), b('web', 'node_modules', '@custock', p));
   for (const p of ['core', 'db', 'i18n']) link(b('pkgs', p), b('api', 'node_modules', '@custock', p));
   link(b('pkgs', 'core'), b('pkgs', 'db', 'node_modules', '@custock', 'core'));

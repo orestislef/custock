@@ -294,7 +294,7 @@ export function normalizeOtp(input: string): string {
 export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   'admin', 'login', 'forgot', 'reset', 'platform', 'print', 'stock', 'scan', 'customers', 'posts', 'reports', 'team',
   'join-links', 'settings', 'audit', 'dev-outbox', 'api', 'files', 'email', 'v1', 's', 'p', 'j', 'invite',
-  'platform-invite', 'account', 'confirm', 'unsubscribe', 'offline', 'icons', 'wasm', 'new', 'me',
+  'platform-invite', 'account', 'confirm', 'unsubscribe', 'offline', 'icons', 'wasm', 'new', 'me', 'orders', 'order',
 ]);
 
 export function slugProblem(input: string): FieldError | null {

@@ -1,6 +1,6 @@
 'use client';
 
-import type { CustomerCatalogMode, CustomerStockMode, OrgSettings, Product, Shop, StockLevel } from '@custock/core';
+import type { CustomerCatalogMode, CustomerOrdersMode, CustomerStockMode, OrgSettings, Product, Shop, StockLevel } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Page } from '@/components/admin/shell';
 import { Group, Row, Segmented, StockBadge, Switch } from '@/components/ui/kit';
@@ -13,10 +13,11 @@ import { uploadLogo } from '@/lib/upload';
 import { useRef, useState } from 'react';
 import { RedirectHome } from '@/components/admin/redirect-home';
 import { PolicyGroups, policyText, usePolicySaver } from '@/components/policy/policy-list';
-import { LIMITS, cleanLine, policyDef, type PolicyEntry } from '@custock/core';
+import { LIMITS, cleanLine, featureOn, policyDef, type PolicyEntry } from '@custock/core';
 import { LOCALE_NAMES } from '@custock/i18n/client';
 import { IconChevronRight } from '@/components/ui/icons';
 import { ShopsGroup } from '@/components/admin/shops-group';
+import { isOrdersPolicy } from '@/lib/orders-on';
 
 export default function SettingsPage() {
   const { api, org, t, can, refresh } = useAdmin();
@@ -51,7 +52,9 @@ export default function SettingsPage() {
     return e && def ? <Row title={title} value={policyText(t, def, e.effective)} /> : null;
   };
   // shown in their own places on this page, the rest of the engine's keys get the list below
-  const OWN_PLACE = new Set(['catalog.mode', 'catalog.prices', 'catalog.stock', 'stock.allowNegative', 'posts.needApproval']);
+  const OWN_PLACE = new Set(['catalog.mode', 'catalog.prices', 'catalog.stock', 'stock.allowNegative', 'posts.needApproval', 'orders.mode']);
+  const ordersMode: CustomerOrdersMode = s?.customerOrders ?? 'off';
+  const ordersFeature = featureOn(org, 'orders');
 
   async function patch(p: Partial<OrgSettings>) {
     if (!s) return;
@@ -137,6 +140,20 @@ export default function SettingsPage() {
             <p className="inset-group-foot">{t(`settings.stockFoot.${s.customerStock}`)}</p>
             {s.customerStock === 'exact' ? <div className="tip mt-3"><IconInfo size={18} /><span className="t-sub">{t('settings.competitors')}</span></div> : null}
           </section>
+
+          {ordersFeature ? (
+            <section className="inset-group">
+              <h3 className="inset-group-head">{t('settings.orders')}</h3>
+              <div className="mb-2 overflow-x-auto">
+                {editable('orders.mode') ? (
+                  <Segmented label={t('settings.orders')} value={ordersMode} onChange={(v: CustomerOrdersMode) => void patch({ customerOrders: v })}
+                    options={(['off', 'quote', 'priced'] as const).map((v) => ({ value: v, label: t(`settings.ordersMode.${v}`) }))} />
+                ) : <p className="t-body m-0">{t(`settings.ordersMode.${ordersMode}`)}</p>}
+              </div>
+              <p className="inset-group-foot">{t(`settings.ordersFoot.${ordersMode}`)}</p>
+              {ordersMode === 'priced' && !s.customerPrices ? <div className="tip mt-3"><IconInfo size={18} /><span className="t-sub">{t('settings.ordersPricesHidden')}</span></div> : null}
+            </section>
+          ) : null}
           </>
           ) : null}
 
@@ -162,6 +179,15 @@ export default function SettingsPage() {
             })}
           </Group>
 
+          {ordersFeature && ordersMode !== 'off' && shops.length > 1 ? (
+            <Group title={t('settings.ordersPerShop')} footer={t('settings.ordersPerShopFoot')}>
+              {shops.filter((sh) => canOrg || can('shop.settings.manage', sh.id)).map((sh) => (
+                <Row key={sh.id} leading={<span className="icon-tile"><IconShop size={18} /></span>} title={sh.name}
+                  trailing={<Switch checked={sh.customerOrders !== 'off'} label={t('settings.ordersAt', { shop: sh.name })} onChange={(v) => void patchShop(sh.id, { customerOrders: v ? null : 'off' })} />} />
+              ))}
+            </Group>
+          ) : null}
+
           {canOrg ? (
             <>
               <h2 className="t-title3 m-0 mb-4 mt-10">{t('settings.policies')}</h2>
@@ -176,7 +202,7 @@ export default function SettingsPage() {
                   : valueRow('posts.needApproval', t('settings.approval'))}
               </Group>
               {entries.length ? (
-                <PolicyGroups entries={entries.filter((e) => !OWN_PLACE.has(e.key))} busyKey={saver.busyKey} onChange={(k, v) => void saver.change(k, v)} />
+                <PolicyGroups entries={entries.filter((e) => !OWN_PLACE.has(e.key) && (ordersFeature && ordersMode !== 'off' || !isOrdersPolicy(e.key)))} busyKey={saver.busyKey} onChange={(k, v) => void saver.change(k, v)} />
               ) : (
                 <Group title={t('settings.push')} footer={t('settings.pushFoot')}>
                   <Row title={t('settings.cap')} value={t('settings.capValue', { count: s.pushDailyCap })} />

@@ -12,6 +12,7 @@ import { Group, Row, IconTile, signed } from '@/components/ui/kit';
 import { ProductPicker, type PickedVariant } from '@/components/admin/product-picker';
 import { StockSheet, type StockMode } from '@/components/admin/stock-sheet';
 import {
+  IconBag,
   IconBarcode, IconBell, IconCheck, IconHalf, IconPeople, IconSlash, IconTruck, IconWarning, IconMegaphone, IconClipboard, IconMinus, IconPlus,
 } from '@/components/ui/icons';
 import { useAsync } from '@/lib/use-async';
@@ -54,6 +55,8 @@ function ManagerHome() {
 
   const needs = d
     ? [
+        // orders from customers waiting for a price or a yes come first: a customer is waiting
+        can('orders.quote', null) && (d.newOrders ?? 0) > 0 && { key: 'orders', n: d.newOrders ?? 0, href: '/admin/orders', icon: <IconBag size={18} /> },
         can('posts.publish', null) && d.pendingApprovals > 0 && { key: 'approvals', n: d.pendingApprovals, href: '/admin/posts?status=pending_approval', icon: <IconMegaphone size={18} /> },
         can('stock.count.approve', null) && d.countsInReview > 0 && { key: 'counts', n: d.countsInReview, href: '/admin/stock/counts', icon: <IconClipboard size={18} /> },
         (can('products.create', null) || can('products.edit', null)) && d.unknownCodes > 0 && { key: 'unknown', n: d.unknownCodes, href: '/admin/stock?filter=unknown', icon: <IconBarcode size={18} /> },
@@ -62,7 +65,7 @@ function ManagerHome() {
       ].filter(Boolean) as { key: string; n: number; href: string; icon: React.ReactNode; tone?: 'neg' }[]
     : [];
   // someone who never has anything to act on gets no "needs you" section at all
-  const actsOnThings = ['posts.publish', 'stock.count.approve', 'products.create', 'products.edit', 'stock.adjust', 'stock.transfer.receive'].some((p) => can(p, null));
+  const actsOnThings = ['orders.quote', 'posts.publish', 'stock.count.approve', 'products.create', 'products.edit', 'stock.adjust', 'stock.transfer.receive'].some((p) => can(p, null));
 
   const stats: { key: string; value: number | null; href: string; icon: React.ReactNode }[] = [
     { key: 'waiting', value: d?.peopleWaiting ?? null, href: '/admin/stock?filter=waiting', icon: <IconBell size={18} /> },

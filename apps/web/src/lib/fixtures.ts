@@ -7,9 +7,10 @@ import type {
   GrantableRole, JoinInput, JoinLink, JoinPage, Locale, MeContext, Member, Movement, MovementBatchResult,
   MovementInput, OrgAccess, OrgSettings, Page, Post, PostInput, Product, ProductInput, PublicProduct, Role,
   ScanResult, ScopeType, SeriesPoint, Shop, ShopGroup, StockAlertItem, StockLevel, Tokens, Variant,
+  Order, OrderAction, OrderEvent, OrderHold, OrderLine, OrderStatus, OrderSummary, PublicOrderOptions,
 } from '@custock/core';
 import { ALL_PERMISSIONS } from './perms';
-import { deviceOf, matches, searchKey } from '@custock/core';
+import { deviceOf, matches, orderLineTotal, searchKey } from '@custock/core';
 
 const DAY = 86_400_000;
 const NOW = Date.now();
@@ -68,7 +69,7 @@ const settings: OrgSettings = {
   id: ORG, name: 'Lemoni', slug: 'lemoni', country: 'GR', currency: 'EUR', timezone: 'Europe/Athens',
   defaultLocale: 'el', brandColor: '#B0234F', logoUrl: null, allowNegativeStock: true, postsNeedApproval: false,
   pushDailyCap: 2, quietHours: '22:00-09:00', customerCatalog: 'public', customerPrices: true,
-  customerStock: 'availability', fewLeftThreshold: 3,
+  customerStock: 'availability', fewLeftThreshold: 3, customerOrders: 'priced',
 };
 
 const shops: Shop[] = [
@@ -104,10 +105,10 @@ const roles: Role[] = [
     permissions: ['members.view', 'members.invite', 'members.manage', 'shop.settings.manage', 'products.view', 'products.create', 'products.edit', 'prices.shop.edit',
       'stock.view', 'stock.history.view', 'stock.receive', 'stock.sell', 'stock.return', 'stock.adjust', 'stock.count', 'stock.count.approve', 'stock.transfer.send', 'stock.transfer.receive', 'stock.settings.manage',
       'customers.view', 'customers.contact.view', 'customers.add', 'customers.edit', 'posts.view', 'posts.create', 'posts.publish', 'posts.channel.push', 'posts.channel.email',
-      'offers.price.set', 'joinlinks.manage', 'reports.view', 'reports.staff.view'],
+      'offers.price.set', 'joinlinks.manage', 'orders.view', 'orders.quote', 'orders.fulfil', 'reports.view', 'reports.staff.view'],
   },
-  { id: 'role-staff', templateKey: 'staff', name: 'staff', rank: 40, locked: false, memberCount: 2, permissions: ['products.view', 'stock.view', 'stock.receive', 'stock.sell', 'stock.return', 'stock.count', 'stock.transfer.receive', 'customers.view', 'customers.add', 'posts.view'] },
-  { id: 'role-viewer', templateKey: 'viewer', name: 'viewer', rank: 20, locked: false, memberCount: 1, permissions: ['products.view', 'products.cost.view', 'stock.view', 'stock.history.view', 'customers.view', 'posts.view', 'reports.view', 'reports.financial.view'] },
+  { id: 'role-staff', templateKey: 'staff', name: 'staff', rank: 40, locked: false, memberCount: 2, permissions: ['products.view', 'stock.view', 'stock.receive', 'stock.sell', 'stock.return', 'stock.count', 'stock.transfer.receive', 'customers.view', 'customers.add', 'orders.view', 'orders.fulfil', 'posts.view'] },
+  { id: 'role-viewer', templateKey: 'viewer', name: 'viewer', rank: 20, locked: false, memberCount: 1, permissions: ['products.view', 'products.cost.view', 'stock.view', 'stock.history.view', 'customers.view', 'orders.view', 'posts.view', 'reports.view', 'reports.financial.view'] },
 ];
 
 interface Person { userId: string; membershipId: string; name: string; email: string; locale: Locale; assignments: { id: string; roleId: string; scopeType: ScopeType; scopeId: string }[] }
@@ -392,6 +393,58 @@ const invites: Invite[] = [
   { id: 'inv-1', email: 'petros@example.com', roleId: 'role-staff', roleName: 'staff', scopeType: 'shop', scopeId: 'shop-marousi', invitedBy: 'u-nikos', createdAt: NOW - DAY, expiresAt: NOW + 6 * DAY },
 ];
 
+// ---------------------------------------------------------------- orders (thinking/19-orders.md)
+
+interface OrderLineRow { lineNo: number; variantId: string; qty: number; requestedQty: number; unitPriceMinor: number | null; note: string | null }
+interface OrderRow {
+  id: string; number: number; shopId: string; customerId: string; status: OrderStatus; priced: boolean;
+  note: string | null; wantedOn: string | null; quoteValidUntil: number | null; quoteMessage: string | null;
+  quotedBy: string | null; cancelReason: string | null; createdAt: number; updatedAt: number; closedAt: number | null;
+  lines: OrderLineRow[]; events: (OrderEvent & { actorId: string | null })[];
+}
+
+const dayString = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+const orderLineRow = (lineNo: number, variantId: string, qty: number, unitPriceMinor: number | null, note: string | null = null): OrderLineRow => ({ lineNo, variantId, qty, requestedQty: qty, unitPriceMinor, note });
+function orderTotalOf(o: { lines: OrderLineRow[] }): number | null {
+  if (o.lines.some((l) => l.unitPriceMinor == null)) return null;
+  return o.lines.reduce((a, l) => a + orderLineTotal(l.unitPriceMinor!, l.qty, productOfVariant(l.variantId)?.uom ?? 'piece'), 0);
+}
+function orderEventRow(kind: OrderEvent['kind'], at: number, by: Person | null, actor: OrderEvent['actor'], extra: Partial<OrderEvent> = {}): OrderEvent & { actorId: string | null } {
+  return { id: uid(), at, actor, actorId: by?.userId ?? null, actorName: by?.name ?? null, kind, totalMinor: null, previousTotalMinor: null, reason: null, message: null, ...extra };
+}
+
+const orders: OrderRow[] = (() => {
+  const [eleniP, nikosP, mariaP, , dimitrisP] = people as [Person, Person, Person, Person, Person];
+  const rows: OrderRow[] = [];
+  const add = (o: Omit<OrderRow, 'events' | 'updatedAt' | 'closedAt' | 'quotedBy' | 'cancelReason' | 'quoteMessage' | 'quoteValidUntil'> & Partial<OrderRow>, events: (OrderEvent & { actorId: string | null })[]) => {
+    const last = events[events.length - 1]!.at;
+    rows.push({ quoteValidUntil: null, quoteMessage: null, quotedBy: null, cancelReason: null, closedAt: null, ...o, updatedAt: last, events });
+  };
+  let t = NOW - 9 * DAY;
+  add({ id: 'o-1001', number: 1001, shopId: 'shop-kifisia', customerId: 'c-2', status: 'completed', priced: true, note: null, wantedOn: dayString(NOW - 8 * DAY), createdAt: t,
+    lines: [orderLineRow(1, 'v-oil-0', 2, 1290), orderLineRow(2, 'v-honey-0', 1, 1290)], closedAt: NOW - 8 * DAY },
+  [orderEventRow('requested', t, null, 'customer', { totalMinor: 3870 }), orderEventRow('confirmed', t + 3_600_000, mariaP, 'staff', { totalMinor: 3870 }),
+    orderEventRow('ready', NOW - 8 * DAY - 7_200_000, dimitrisP, 'staff'), orderEventRow('completed', NOW - 8 * DAY, dimitrisP, 'staff', { totalMinor: 3870 })]);
+  t = NOW - 5 * 3_600_000;
+  add({ id: 'o-1002', number: 1002, shopId: 'shop-kifisia', customerId: 'c-1', status: 'requested', priced: false, note: 'Για γιορτή το Σάββατο, αν γίνεται σε δώρο.', wantedOn: dayString(NOW + 3 * DAY), createdAt: t,
+    lines: [orderLineRow(1, 'v-honey-0', 10, null)] },
+  [orderEventRow('requested', t, null, 'customer')]);
+  t = NOW - 2 * DAY;
+  add({ id: 'o-1003', number: 1003, shopId: 'shop-marousi', customerId: 'c-4', status: 'confirmed', priced: true, note: null, wantedOn: dayString(NOW + DAY), createdAt: t,
+    lines: [orderLineRow(1, 'v-feta-0', 2000, 1490), orderLineRow(2, 'v-mastiha-0', 5, 890)] },
+  [orderEventRow('requested', t, null, 'customer', { totalMinor: 7430 }), orderEventRow('confirmed', t + 5_400_000, nikosP, 'staff', { totalMinor: 7430 })]);
+  t = NOW - DAY;
+  add({ id: 'o-1004', number: 1004, shopId: 'shop-kifisia', customerId: 'c-1', status: 'quoted', priced: false, note: 'Για το γραφείο, 20 σακουλάκια.', wantedOn: null, createdAt: t,
+    lines: [orderLineRow(1, 'v-pistachio-0', 20, 900)], quoteValidUntil: NOW + 2 * DAY, quoteMessage: 'Για 20 σακουλάκια σας κάνουμε 9 € το ένα.', quotedBy: mariaP.userId },
+  [orderEventRow('requested', t, null, 'customer'), orderEventRow('quoted', t + 2 * 3_600_000, mariaP, 'staff', { totalMinor: 18000, message: 'Για 20 σακουλάκια σας κάνουμε 9 € το ένα.', changedLines: [1] })]);
+  t = NOW - 26 * 3_600_000;
+  add({ id: 'o-1005', number: 1005, shopId: 'shop-kifisia', customerId: 'c-6', status: 'ready', priced: true, note: null, wantedOn: dayString(NOW), createdAt: t,
+    lines: [orderLineRow(1, 'v-tahini-0', 3, 480), orderLineRow(2, 'v-oil-0', 1, 1290)] },
+  [orderEventRow('requested', t, null, 'customer', { totalMinor: 2730 }), orderEventRow('confirmed', t + 3_600_000, eleniP, 'staff', { totalMinor: 2730 }), orderEventRow('ready', NOW - 2 * 3_600_000, dimitrisP, 'staff')]);
+  return rows;
+})();
+let nextOrderNumber = 1006;
+
 function logAudit(by: Person | null, action: string, entityType: string, entityId: string, before: unknown = null, after: unknown = null) {
   auditLog.unshift({ id: uid(), actorId: by?.userId ?? null, actorName: by?.name ?? null, actorKind: by ? 'member' : 'system', action, entityType, entityId, before, after, createdAt: Date.now() });
 }
@@ -451,7 +504,9 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     return {
       ...rest,
       variants: p.variants.map((v) => (showCost ? v : { ...v, costMinor: undefined })),
-      levels: levels.filter((l) => ids.has(l.shopId) && p.variants.some((v) => v.id === l.variantId)),
+      // what confirmed and ready orders promise, only where this person sees orders. never taken off
+      levels: levels.filter((l) => ids.has(l.shopId) && p.variants.some((v) => v.id === l.variantId))
+        .map((l) => (canDoSafe('orders.view', l.shopId) ? { ...l, onOrderQty: promisedAt(l.shopId, l.variantId) } : l)),
     };
   };
 
@@ -511,9 +566,123 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
         return { shopId: s.id, shopName: s.name, state: mode === 'off' ? null : state, qty: mode === 'exact' ? Math.max(0, onHand) : null };
       }),
       variantId: v.id,
+      uom: p.uom,
       waitingForIt: isCustomer() && mine.alerts.some((a) => a.productId === p.id && a.status === 'waiting'),
       saved: isCustomer() && mine.saved.has(p.id),
     };
+  };
+
+  // ---------------------------------------------------------------- orders: the views of a row
+  const OPEN: readonly OrderStatus[] = ['requested', 'quoted', 'confirmed', 'ready'];
+  // the sample customer is the first sample customer (Anna)
+  const myCustomerId = () => 'c-1';
+  // names in the language on screen, like the real api answers in the reader's language
+  const readerLocale = () => (typeof document !== 'undefined' && document.documentElement.lang ? document.documentElement.lang : customerUser.locale) as Locale;
+  const customerName = (p: ProductRow) => p.translations?.[readerLocale()]?.name ?? p.name;
+  const unitPriceAt = (p: ProductRow, variantId: string, shopId: string): number | null => {
+    if (!settings.customerPrices) return null;
+    const v = p.variants.find((x) => x.id === variantId);
+    if (!v) return null;
+    return variantId === p.variants[0]?.id && p.shopPrices[shopId] != null ? p.shopPrices[shopId]! : v.priceMinor;
+  };
+  const promisedAt = (shopId: string, variantId: string, except?: string) => orders
+    .filter((o) => o.shopId === shopId && (o.status === 'confirmed' || o.status === 'ready') && o.id !== except)
+    .reduce((a, o) => a + o.lines.filter((l) => l.variantId === variantId).reduce((n, l) => n + l.qty, 0), 0);
+  const staffActions = (o: OrderRow): OrderAction[] => {
+    const quote = canDo('orders.quote', o.shopId);
+    const fulfil = canDo('orders.fulfil', o.shopId);
+    const out: OrderAction[] = [];
+    if (o.status === 'requested') {
+      if (quote) out.push('quote');
+      if (quote && o.priced && o.lines.every((l) => l.unitPriceMinor != null)) out.push('confirm');
+      if (quote) out.push('decline');
+    } else if (o.status === 'quoted') {
+      if (quote) out.push('quote', 'cancel');
+    } else if (o.status === 'confirmed') {
+      if (fulfil) out.push('ready', 'complete');
+      if (quote) out.push('cancel');
+    } else if (o.status === 'ready') {
+      if (fulfil) out.push('complete');
+      if (quote) out.push('cancel');
+    }
+    return out;
+  };
+  const orderSummary = (o: OrderRow, side: 'staff' | 'customer'): OrderSummary => {
+    const names = o.lines.slice(0, 3).map((l) => { const p = productOfVariant(l.variantId); return p ? (side === 'customer' ? customerName(p) : p.name) : ''; });
+    return {
+      id: o.id, number: o.number, shopId: o.shopId, shopName: shops.find((x) => x.id === o.shopId)?.name ?? '', status: o.status, priced: o.priced,
+      currency: settings.currency, totalMinor: orderTotalOf(o), lineCount: o.lines.length, names, wantedOn: o.wantedOn, quoteValidUntil: o.quoteValidUntil,
+      createdAt: o.createdAt, updatedAt: o.updatedAt,
+      ...(side === 'staff' ? { customerName: customers.find((c) => c.id === o.customerId)?.name ?? null } : {}),
+    };
+  };
+  const orderOut = (o: OrderRow, side: 'staff' | 'customer'): Order => {
+    const lines: OrderLine[] = o.lines.map((l) => {
+      const p = productOfVariant(l.variantId);
+      const uom = p?.uom ?? 'piece';
+      return {
+        lineNo: l.lineNo, variantId: l.variantId, productId: p?.id ?? '', name: p ? (side === 'customer' ? customerName(p) : p.name) : '',
+        imageUrl: p?.images[0]?.url ?? null, uom, taxRateBp: p?.taxRateBp ?? 1300, qty: l.qty, requestedQty: l.requestedQty,
+        unitPriceMinor: l.unitPriceMinor, lineTotalMinor: l.unitPriceMinor != null ? orderLineTotal(l.unitPriceMinor, l.qty, uom) : null, note: l.note,
+        ...(side === 'staff' ? { onHand: lvl(o.shopId, l.variantId)?.onHand ?? null, onOtherOrders: promisedAt(o.shopId, l.variantId, o.id) } : {}),
+      };
+    });
+    const c = customers.find((x) => x.id === o.customerId);
+    const fullContact = canDoSafe('customers.contact.view', o.shopId);
+    return {
+      id: o.id, orgId: ORG, number: o.number, shopId: o.shopId, shopName: shops.find((x) => x.id === o.shopId)?.name ?? '', status: o.status, priced: o.priced,
+      note: o.note, wantedOn: o.wantedOn, currency: settings.currency, totalMinor: orderTotalOf(o), quoteValidUntil: o.quoteValidUntil, quoteMessage: o.quoteMessage,
+      cancelReason: o.cancelReason, createdAt: o.createdAt, updatedAt: o.updatedAt, closedAt: o.closedAt, lines,
+      events: o.events.map(({ actorId: _a, ...e }) => { void _a; return side === 'customer' ? { ...e, actorName: null } : e; }),
+      actions: side === 'customer' ? (o.status === 'requested' ? ['cancel'] : o.status === 'quoted' ? ['accept', 'reject', 'cancel'] : []) : staffActions(o),
+      ...(side === 'staff' ? {
+        customer: {
+          id: o.customerId, name: c?.name ?? null, email: c ? (fullContact ? c.email : c.email.replace(/^(.{2}).*@/, '$1***@')) : null,
+          phone: c ? (fullContact ? c.fullPhone : c.fullPhone.replace(/(\+30 69).*(\d{3})$/, '$1** *** $2')) : null,
+          contactMasked: !fullContact, locale: c?.locale ?? 'el', erased: !c?.name,
+        },
+        quotedByName: people.find((p) => p.userId === o.quotedBy)?.name ?? null,
+      } : {}),
+    };
+  };
+  const canDoSafe = (perm: string, shopId?: string) => { try { return canDo(perm, shopId); } catch { return false; } };
+  const staffOrder = (id: string) => {
+    const o = orders.find((x) => x.id === id);
+    if (!o || !canDo('orders.view', o.shopId)) throw new FixtureError(404, 'not_found');
+    return o;
+  };
+  const myOrderRow = (id: string) => {
+    const o = orders.find((x) => x.id === id);
+    if (!o || !isCustomer() || o.customerId !== myCustomerId()) throw new FixtureError(404, 'not_found');
+    return o;
+  };
+  const stepOrder = (o: OrderRow, status: OrderStatus, kind: OrderEvent['kind'], actor: OrderEvent['actor'], extra: Partial<OrderEvent> = {}) => {
+    const now = Date.now();
+    o.status = status;
+    o.updatedAt = now;
+    if (!OPEN.includes(status)) o.closedAt = now;
+    o.events.push(orderEventRow(kind, now, actor === 'staff' ? me() : null, actor, extra));
+  };
+  // what the dev outbox shows: the customer by push and email, the shop by push
+  const tellCustomer = (o: OrderRow, kind: string) => {
+    const c = customers.find((x) => x.id === o.customerId);
+    if (!c) return;
+    const titles: Record<string, string> = {
+      orderReceived: `We got your order #${o.number}`, orderQuote: `Your price for order #${o.number}`, orderConfirmed: `Order #${o.number} is confirmed`,
+      orderReady: `Order #${o.number} is ready to pick up`, orderDeclined: `Order #${o.number} was declined`, orderCancelled: `Order #${o.number} was cancelled`,
+    };
+    const title = titles[kind] ?? `Order #${o.number}`;
+    const body = shops.find((x) => x.id === o.shopId)?.name ?? '';
+    if (kind !== 'orderReceived' && c.pushOk) queueOutbox('push', c, title, body, { type: kind, orderId: o.id });
+    queueOutbox('email', c, title, body, { type: kind, orderId: o.id });
+  };
+  const tellShop = (o: OrderRow, title: string) => {
+    for (const p of people) {
+      const a = access(p);
+      const can = a.orgPerms.includes('orders.quote') || a.shops.some((x) => x.shopId === o.shopId && x.perms.includes('orders.quote'));
+      if (!can) continue;
+      outbox.unshift({ id: uid(), channel: 'push', orgId: ORG, userId: p.userId, customerId: null, to: p.name, locale: p.locale, title, body: shops.find((x) => x.id === o.shopId)?.name ?? '', payload: { type: 'order', orderId: o.id }, createdAt: Date.now() });
+    }
   };
 
   const api: Partial<CustockApi> = {
@@ -608,7 +777,14 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async product(_org, id) {
       const p = products.find((x) => x.id === id);
       if (!p) throw new FixtureError(404, 'not_found');
-      return productOut(p);
+      const variantIds = new Set(p.variants.map((v) => v.id));
+      const orderHolds: OrderHold[] = orders
+        .filter((o) => (o.status === 'confirmed' || o.status === 'ready') && canDoSafe('orders.view', o.shopId))
+        .flatMap((o) => o.lines.filter((l) => variantIds.has(l.variantId)).map((l) => ({
+          shopId: o.shopId, variantId: l.variantId, orderId: o.id, number: o.number, qty: l.qty, status: o.status, wantedOn: o.wantedOn,
+          customerName: canDoSafe('customers.view', o.shopId) ? customers.find((c) => c.id === o.customerId)?.name ?? null : null,
+        })));
+      return { ...productOut(p), orderHolds };
     },
     async createProduct(_org, input: ProductInput) {
       if (!canDo('products.create')) throw new FixtureError(403, 'forbidden');
@@ -872,6 +1048,7 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
         countsInReview: 1,
         transfersOnTheWay: ls.filter((l) => l.inTransitIn > 0).length,
         unknownCodes: unknownScans.filter((u) => ids.includes(u.shopId)).length,
+        newOrders: orders.filter((o) => o.status === 'requested' && ids.includes(o.shopId) && canDoSafe('orders.view', o.shopId)).length,
         stockValueCostMinor: money ? Math.round(value) : null,
         salesTodayMinor: money ? today.reduce((a, m) => a + -m.qtyDelta * (m.unitPriceMinor ?? 0), 0) : null,
       };
@@ -1279,6 +1456,210 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     async setPlatformPolicies() { throw new FixtureError(403, 'forbidden'); },
     async businessPolicies() { throw new FixtureError(403, 'forbidden'); },
     async setBusinessPolicies() { throw new FixtureError(403, 'forbidden'); },
+
+    // ---------------------------------------------------------------- orders, staff side
+    async orders(_org, q = {}) {
+      let list = orders.filter((o) => canDo('orders.view', o.shopId) && (!q.shopId || o.shopId === q.shopId));
+      if (q.status === 'open') list = list.filter((o) => OPEN.includes(o.status));
+      else if (q.status === 'closed') list = list.filter((o) => !OPEN.includes(o.status));
+      else if (q.status) list = list.filter((o) => o.status === q.status);
+      list = [...list].sort((a, b) => b.updatedAt - a.updatedAt);
+      return page(list.map((o) => orderSummary(o, 'staff')), q.cursor, q.limit ?? 50);
+    },
+    async orderCounts(_org, shopId) {
+      const list = orders.filter((o) => canDo('orders.view', o.shopId) && (!shopId || o.shopId === shopId));
+      const n = (s: OrderStatus) => list.filter((o) => o.status === s).length;
+      return { requested: n('requested'), quoted: n('quoted'), confirmed: n('confirmed'), ready: n('ready') };
+    },
+    async order(_org, id) { return orderOut(staffOrder(id), 'staff'); },
+    async quoteOrder(_org, id, input) {
+      const o = staffOrder(id);
+      if (!canDo('orders.quote', o.shopId)) throw new FixtureError(403, 'forbidden');
+      if (!['requested', 'quoted'].includes(o.status)) throw new FixtureError(409, 'conflict');
+      const before = orderTotalOf(o);
+      const changed: number[] = [];
+      for (const l of input.lines) {
+        const line = o.lines.find((x) => x.lineNo === l.lineNo);
+        if (!line) continue;
+        if (line.unitPriceMinor !== l.unitPriceMinor || (l.qty != null && l.qty !== line.qty)) changed.push(line.lineNo);
+        line.unitPriceMinor = l.unitPriceMinor;
+        if (l.qty != null) line.qty = l.qty;
+        if (l.note !== undefined) line.note = l.note ?? null;
+      }
+      if (o.lines.some((l) => l.unitPriceMinor == null)) throw new FixtureError(400, 'invalid');
+      const now = Date.now();
+      o.status = 'quoted';
+      o.quoteValidUntil = input.validUntil ?? now + 3 * DAY;
+      o.quoteMessage = input.message ?? null;
+      o.quotedBy = currentUser;
+      o.updatedAt = now;
+      o.events.push(orderEventRow('quoted', now, me(), 'staff', { totalMinor: orderTotalOf(o), previousTotalMinor: before, message: o.quoteMessage, changedLines: changed }));
+      logAudit(me(), 'order.quoted', 'order', o.id);
+      tellCustomer(o, 'orderQuote');
+      return orderOut(o, 'staff');
+    },
+    async confirmOrder(_org, id) {
+      const o = staffOrder(id);
+      if (!canDo('orders.quote', o.shopId)) throw new FixtureError(403, 'forbidden');
+      if (o.status === 'confirmed') return orderOut(o, 'staff');
+      if (o.status !== 'requested' || !o.priced || orderTotalOf(o) == null) throw new FixtureError(409, 'conflict');
+      stepOrder(o, 'confirmed', 'confirmed', 'staff', { totalMinor: orderTotalOf(o) });
+      logAudit(me(), 'order.confirmed', 'order', o.id);
+      tellCustomer(o, 'orderConfirmed');
+      return orderOut(o, 'staff');
+    },
+    async declineOrder(_org, id, reason) {
+      const o = staffOrder(id);
+      if (!canDo('orders.quote', o.shopId)) throw new FixtureError(403, 'forbidden');
+      if (o.status === 'declined') return orderOut(o, 'staff');
+      if (o.status !== 'requested') throw new FixtureError(409, 'conflict');
+      o.cancelReason = reason;
+      stepOrder(o, 'declined', 'declined', 'staff', { reason });
+      logAudit(me(), 'order.declined', 'order', o.id);
+      tellCustomer(o, 'orderDeclined');
+      return orderOut(o, 'staff');
+    },
+    async readyOrder(_org, id) {
+      const o = staffOrder(id);
+      if (!canDo('orders.fulfil', o.shopId)) throw new FixtureError(403, 'forbidden');
+      if (o.status === 'ready') return orderOut(o, 'staff');
+      if (o.status !== 'confirmed') throw new FixtureError(409, 'conflict');
+      stepOrder(o, 'ready', 'ready', 'staff');
+      logAudit(me(), 'order.ready', 'order', o.id);
+      tellCustomer(o, 'orderReady');
+      return orderOut(o, 'staff');
+    },
+    async completeOrder(_org, id) {
+      const o = staffOrder(id);
+      if (!canDo('orders.fulfil', o.shopId)) throw new FixtureError(403, 'forbidden');
+      if (o.status === 'completed') return orderOut(o, 'staff');
+      if (!['confirmed', 'ready'].includes(o.status)) throw new FixtureError(409, 'conflict');
+      const by = me()!;
+      const now = Date.now();
+      // picked up: the stock goes down as sales, one per line, tied to the order
+      for (const l of o.lines) {
+        const level = lvl(o.shopId, l.variantId);
+        if (!level) continue;
+        level.onHand -= l.qty;
+        level.lastMovementAt = now;
+        movements.unshift({ id: uid(), orgId: ORG, shopId: o.shopId, variantId: l.variantId, qtyDelta: -l.qty, kind: 'sale', occurredAt: now, recordedAt: now, createdBy: by.userId, createdByName: by.name, unitPriceMinor: l.unitPriceMinor ?? undefined, refType: 'order', refId: o.id } as Movement);
+      }
+      stepOrder(o, 'completed', 'completed', 'staff', { totalMinor: orderTotalOf(o) });
+      logAudit(me(), 'order.completed', 'order', o.id);
+      return orderOut(o, 'staff');
+    },
+    async cancelOrder(_org, id, reason) {
+      const o = staffOrder(id);
+      if (!canDo('orders.quote', o.shopId)) throw new FixtureError(403, 'forbidden');
+      if (o.status === 'cancelled') return orderOut(o, 'staff');
+      if (!OPEN.includes(o.status)) throw new FixtureError(409, 'conflict');
+      o.cancelReason = reason;
+      stepOrder(o, 'cancelled', 'cancelled', 'staff', { reason });
+      logAudit(me(), 'order.cancelled', 'order', o.id);
+      tellCustomer(o, 'orderCancelled');
+      return orderOut(o, 'staff');
+    },
+
+    // ---------------------------------------------------------------- orders, customer side
+    async orderOptions(): Promise<PublicOrderOptions> {
+      const mode = settings.customerOrders ?? 'off';
+      return {
+        mode,
+        pricesShown: settings.customerPrices,
+        shops: mode === 'off' ? [] : shops.filter((x) => x.customerVisible && x.customerOrders !== 'off').map((x) => ({ id: x.id, name: x.name, address: x.address, city: x.city })),
+        limits: { maxLines: 30, maxQty: 999, openPerCustomer: 5 },
+      };
+    },
+    async previewOrder(_slug, input) {
+      if ((settings.customerOrders ?? 'off') === 'off' || shops.find((x) => x.id === input.shopId)?.customerOrders === 'off') throw new FixtureError(403, 'orders_off');
+      const lines = input.lines.map((l) => {
+        const p = productOfVariant(l.variantId);
+        const v = p?.variants.find((x) => x.id === l.variantId);
+        const unit = p && v ? unitPriceAt(p, v.id, input.shopId) : null;
+        const tooMany = p ? l.qty > 999 * (p.uom === 'piece' ? 1 : 1000) : false;
+        return {
+          variantId: l.variantId, productId: p?.id ?? null, name: p ? customerName(p) : '', imageUrl: p?.images[0]?.url ?? null, uom: p?.uom ?? 'piece', qty: l.qty,
+          unitPriceMinor: unit, lineTotalMinor: unit != null && p ? orderLineTotal(unit, l.qty, p.uom) : null,
+          problem: !p || p.archivedAt || !p.customerVisible ? 'unavailable' as const : tooMany ? 'too_many' as const : null,
+        };
+      });
+      const priced = settings.customerOrders === 'priced' && settings.customerPrices && lines.every((l) => l.unitPriceMinor != null);
+      const open = orders.filter((o) => o.customerId === myCustomerId() && OPEN.includes(o.status)).length;
+      return {
+        shopId: input.shopId, priced, currency: settings.currency, lines,
+        totalMinor: priced ? lines.reduce((a, l) => a + (l.lineTotalMinor ?? 0), 0) : null,
+        limits: { maxLines: 30, maxQty: 999, openLeft: Math.max(0, 5 - open) },
+      };
+    },
+    async placeOrder(_slug, input) {
+      if (!isCustomer() || !mine.following) throw new FixtureError(403, 'forbidden');
+      if ((settings.customerOrders ?? 'off') === 'off' || shops.find((x) => x.id === input.shopId)?.customerOrders === 'off') throw new FixtureError(403, 'orders_off');
+      if (orders.filter((o) => o.customerId === myCustomerId() && OPEN.includes(o.status)).length >= 5) throw new FixtureError(403, 'limit_reached');
+      const priced = settings.customerOrders === 'priced' && settings.customerPrices;
+      const merged = new Map<string, { qty: number; seen: number | null; note: string | null }>();
+      for (const l of input.lines) {
+        const m = merged.get(l.variantId);
+        merged.set(l.variantId, { qty: (m?.qty ?? 0) + l.qty, seen: l.seenUnitPriceMinor ?? null, note: l.note ?? m?.note ?? null });
+      }
+      const lines: OrderLineRow[] = [];
+      for (const [variantId, l] of merged) {
+        const p = productOfVariant(variantId);
+        if (!p || p.archivedAt || !p.customerVisible) throw new FixtureError(400, 'invalid');
+        const unit = priced ? unitPriceAt(p, variantId, input.shopId) : null;
+        if (priced && l.seen !== unit) throw new FixtureError(409, 'prices_changed');
+        lines.push(orderLineRow(lines.length + 1, variantId, l.qty, unit, l.note));
+      }
+      const allPriced = priced && lines.every((l) => l.unitPriceMinor != null);
+      const now = Date.now();
+      const o: OrderRow = {
+        id: entityId('o-', () => `o-${uid().slice(0, 8)}`), number: nextOrderNumber++, shopId: input.shopId, customerId: myCustomerId(), status: 'requested',
+        priced: allPriced, note: input.note ?? null, wantedOn: input.wantedOn ?? null, quoteValidUntil: null, quoteMessage: null, quotedBy: null, cancelReason: null,
+        createdAt: now, updatedAt: now, closedAt: null, lines: allPriced ? lines : lines.map((l) => ({ ...l, unitPriceMinor: null })), events: [],
+      };
+      o.events.push(orderEventRow('requested', now, null, 'customer', { totalMinor: orderTotalOf(o) }));
+      orders.unshift(o);
+      tellShop(o, `New order #${o.number}`);
+      tellCustomer(o, 'orderReceived');
+      return orderOut(o, 'customer');
+    },
+    async myOrders(_slug, q = {}) {
+      let list = orders.filter((o) => isCustomer() && o.customerId === myCustomerId());
+      if (q.status === 'open') list = list.filter((o) => OPEN.includes(o.status));
+      else if (q.status === 'closed') list = list.filter((o) => !OPEN.includes(o.status));
+      else if (q.status) list = list.filter((o) => o.status === q.status);
+      list = [...list].sort((a, b) => b.createdAt - a.createdAt);
+      return page(list.map((o) => orderSummary(o, 'customer')), q.cursor, q.limit ?? 50);
+    },
+    async myOrder(_slug, id) { return orderOut(myOrderRow(id), 'customer'); },
+    async acceptQuote(_slug, id) {
+      const o = myOrderRow(id);
+      if (o.status === 'confirmed') return orderOut(o, 'customer');
+      if (o.status !== 'quoted') throw new FixtureError(409, 'conflict');
+      if ((o.quoteValidUntil ?? 0) < Date.now()) {
+        stepOrder(o, 'expired', 'expired', 'system');
+        throw new FixtureError(410, 'quote_expired');
+      }
+      stepOrder(o, 'confirmed', 'accepted', 'customer', { totalMinor: orderTotalOf(o) });
+      tellShop(o, `#${o.number}: price accepted`);
+      return orderOut(o, 'customer');
+    },
+    async rejectQuote(_slug, id) {
+      const o = myOrderRow(id);
+      if (o.status === 'rejected') return orderOut(o, 'customer');
+      if (o.status !== 'quoted') throw new FixtureError(409, 'conflict');
+      stepOrder(o, 'rejected', 'rejected', 'customer');
+      tellShop(o, `#${o.number}: price turned down`);
+      return orderOut(o, 'customer');
+    },
+    async cancelMyOrder(_slug, id, reason) {
+      const o = myOrderRow(id);
+      if (o.status === 'cancelled') return orderOut(o, 'customer');
+      if (!['requested', 'quoted'].includes(o.status)) throw new FixtureError(409, 'conflict');
+      o.cancelReason = reason ?? null;
+      stepOrder(o, 'cancelled', 'cancelled', 'customer', { reason: reason ?? null });
+      tellShop(o, `#${o.number}: cancelled by the customer`);
+      return orderOut(o, 'customer');
+    },
   };
   // anything the sample data does not cover answers like a missing endpoint
   return new Proxy(api, {
@@ -1309,5 +1690,6 @@ export function demoRouteIds() {
     roles: [...roles.map((r) => r.id), ...series('role-')],
     joinLinks: [...joinLinks.map((l) => l.id), ...series('jl-')],
     joinCodes: joinLinks.map((l) => l.code),
+    orders: [...orders.map((o) => o.id), ...series('o-')],
   };
 }

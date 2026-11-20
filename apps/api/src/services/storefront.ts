@@ -85,6 +85,7 @@ export function storefrontProducts(
           : null,
         availability,
         variantId: v.id,
+        uom: p.uom,
         waitingForIt: waiting,
         saved,
       };

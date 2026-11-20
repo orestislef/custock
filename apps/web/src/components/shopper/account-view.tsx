@@ -5,7 +5,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import type { PublicProduct, StockAlertItem } from '@custock/core';
+import type { OrderSummary, PublicProduct, StockAlertItem } from '@custock/core';
 import { normalizeOtp } from '@custock/core';
 import { AppIcon, InstallRow, InstallSteps } from '@/components/pwa/install-coach';
 import { PushRow } from '@/components/pwa/push-row';
@@ -19,12 +19,14 @@ import { IconBell, IconChevronRight, IconDownload, IconHeart, IconLogout, IconMa
 import { useT } from '@/lib/i18n-client';
 import { orgIconSrc } from './org-coach';
 import { SignInCard } from './sign-in';
+import { OrderRowLink } from './my-orders';
 import { useShopper } from './shopper-context';
 
 export function AccountView() {
   const t = useT();
   const toast = useToast();
-  const { api, status, me, follow, slug, orgName, joinCode, signOut, reload, iconVersion, quietHours, pushDailyCap } = useShopper();
+  const { api, status, me, follow, slug, orgName, joinCode, signOut, reload, iconVersion, quietHours, pushDailyCap, orders } = useShopper();
+  const [myOrders, setMyOrders] = useState<OrderSummary[] | null>(null);
   const [alerts, setAlerts] = useState<StockAlertItem[] | null>(null);
   const [saved, setSaved] = useState<PublicProduct[] | null>(null);
   const [emailOn, setEmailOn] = useState(true);
@@ -41,7 +43,8 @@ export function AccountView() {
     if (!follow) return;
     void api.alerts().then((a) => setAlerts(a.filter((x) => x.orgId === follow.orgId && x.status === 'waiting')), () => setAlerts([]));
     void api.favorites().then((f) => setSaved(f.filter((x) => x.orgId === follow.orgId)), () => setSaved([]));
-  }, [api, follow]);
+    void api.myOrders(slug, { status: 'open', limit: 3 }).then((r) => setMyOrders(r.items), () => setMyOrders([]));
+  }, [api, follow, slug]);
 
   if (status === 'loading') return <div className="h-40 rounded-[16px] skel" aria-busy="true" />;
   if (status === 'signedOut' || !me) {
@@ -146,6 +149,20 @@ export function AccountView() {
 
       {follow ? (
         <>
+          {orders || myOrders?.length ? (
+            <section className="inset-group">
+              <h2 className="inset-group-head">{t('orders.mineTitle')}</h2>
+              <ul className="list" role="list">
+                {(myOrders ?? []).map((o) => <li key={o.id}><OrderRowLink o={o} href={`/s/${slug}/orders/${o.id}`} /></li>)}
+                <li>
+                  <Link href={`/s/${slug}/orders`} className="row hover:no-underline" style={{ color: 'var(--c-ink)' }}>
+                    <span className="row-main row-title">{t('orders.all')}</span>
+                    <IconChevronRight size={16} className="chev" />
+                  </Link>
+                </li>
+              </ul>
+            </section>
+          ) : null}
           <section className="inset-group">
             <h2 className="inset-group-head">{t('shopper.me.waiting')}</h2>
             <ul className="list" role="list">

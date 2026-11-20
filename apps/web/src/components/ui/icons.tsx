@@ -320,3 +320,10 @@ export const IconEyeOff = make(() => (
     <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3.5 3.5l17 17" />
   </>
 ));
+// an order: a shop bag
+export const IconBag = make(() => (
+  <>
+    <path d="M5.2 8h13.6l-1 11.6a1.5 1.5 0 0 1-1.5 1.4H7.7a1.5 1.5 0 0 1-1.5-1.4z" />
+    <path d="M9 8V7a3 3 0 0 1 6 0v1" fill="none" />
+  </>
+), true);

@@ -608,6 +608,8 @@ export const PublicProduct = z.object({
   offer: z.object({ postId: z.string(), priceMinor: z.number(), wasMinor: z.number().nullable(), validUntil: z.number().nullable() }).nullable(),
   availability: z.array(Availability),
   variantId: z.string(),
+  // pieces, or kg/l/m: how an order counts it (orders keep grams, ml and mm like the ledger)
+  uom: Uom.optional(),
   waitingForIt: z.boolean(),
   saved: z.boolean(),
 });

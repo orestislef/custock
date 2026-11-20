@@ -101,11 +101,15 @@ export function PolicyControl({ entry, onChange, busy, title: titleOverride, sub
   }
   if (def.type === 'enum') {
     return (
-      <Row title={title} subtitle={subtitle} trailing={control(
-        <Picker variant="plain" label={text} value={String(current)} disabled={busy}
-          options={(def.options ?? []).map((o) => ({ value: o, label: t(`common:policyOption.${def.key}.${o}`) }))}
-          onChange={(v) => onChange(v)} />,
-      )} />
+      // a long choice ("order at the shown prices" in greek) goes under the name instead of squeezing it
+      <div className="row flex-wrap gap-y-1">
+        <span className="row-main min-w-[9rem]"><span className="row-title block">{title}</span>{subtitle ? <span className="row-sub block">{subtitle}</span> : null}</span>
+        {control(
+          <Picker variant="plain" label={text} value={String(current)} disabled={busy}
+            options={(def.options ?? []).map((o) => ({ value: o, label: t(`common:policyOption.${def.key}.${o}`) }))}
+            onChange={(v) => onChange(v)} />,
+        )}
+      </div>
     );
   }
   if (def.type === 'window') {

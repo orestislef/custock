@@ -18,7 +18,7 @@ import { LocaleSwitch, Picker, Sheet, useToast } from '@/components/ui/client-ki
 import { AppearanceRow } from '@/components/ui/appearance-switch';
 import { OtherDevicesRow } from '@/components/ui/other-devices-row';
 import {
-  IconBox, IconChart, IconChevronDown, IconChevronLeft, IconChevronRight, IconGear, IconHome, IconLink, IconLogout, IconMegaphone, IconMore, IconPeople, IconShield, IconShop, IconHistory, IconMail, IconScan, IconWifiOff, IconPhoneApp,
+  IconBag, IconBox, IconChart, IconChevronDown, IconChevronLeft, IconChevronRight, IconGear, IconHome, IconLink, IconLogout, IconMegaphone, IconMore, IconPeople, IconShield, IconShop, IconHistory, IconMail, IconScan, IconWifiOff, IconPhoneApp,
 } from '@/components/ui/icons';
 import { AppIcon, InstallRow, InstallSteps } from '@/components/pwa/install-coach';
 import { PushRow } from '@/components/pwa/push-row';
@@ -37,7 +37,7 @@ type Section = 'main' | 'business' | 'dev';
 type NavItem = { href: string; key: string; icon: (p: { filled?: boolean; size?: number }) => ReactNode; show: boolean; section: Section; children?: { href: string; key: string; show: boolean }[] };
 
 export function useNav(): NavItem[] {
-  const { can, org, transfersPossible } = useAdmin();
+  const { can, org, transfersPossible, settings } = useAdmin();
   // a feature the super admin switched off for this business takes its screens away
   const anyShop = (perm: string) => org.orgPerms.includes(perm) || org.shops.some((s) => s.perms.includes(perm)) || org.anyPerms.includes(perm);
   const on = (f: Feature) => featureOn(org, f);
@@ -53,6 +53,8 @@ export function useNav(): NavItem[] {
     },
     // the same rule as the scan screen's modes: looking a code up counts, so viewers get Scan with Look up only
     { href: '/admin/scan', key: 'scan', icon: IconScan, show: ['products.view', 'stock.sell', 'stock.receive', 'stock.count', 'stock.transfer.send'].some(anyShop), section: 'main' },
+    // orders from customers: only when the business takes them (or still has some open, see Home)
+    { href: '/admin/orders', key: 'orders', icon: IconBag, show: on('orders') && anyShop('orders.view') && (settings?.customerOrders ?? 'off') !== 'off', section: 'main' },
     { href: '/admin/customers', key: 'customers', icon: IconPeople, show: anyShop('customers.view'), section: 'main' },
     { href: '/admin/posts', key: 'posts', icon: IconMegaphone, show: on('posts') && anyShop('posts.view'), section: 'main' },
     { href: '/admin/reports', key: 'reports', icon: IconChart, show: on('reports') && anyShop('reports.view'), section: 'main' },
@@ -70,12 +72,35 @@ function isActive(pathname: string, href: string, exact = false) {
   return pathname.startsWith(href);
 }
 
+// new orders waiting for the shop, for the menu. asked again every minute and when the app comes back
+function useNewOrders(enabled: boolean): number {
+  const { api, org, shopId } = useAdmin();
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    const load = () => { void api.orderCounts(org.orgId, shopId ?? undefined).then((c) => { if (alive) setN(c.requested); }, () => {}); };
+    load();
+    const timer = window.setInterval(load, 60_000);
+    const onVis = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { alive = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVis); };
+  }, [api, org.orgId, shopId, enabled]);
+  return enabled ? n : 0;
+}
+
+function CountDot({ n, label }: { n: number; label: string }) {
+  if (!n) return null;
+  return <span className="count-dot tnum" aria-label={label}>{n > 99 ? '99+' : n}</span>;
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const { t, api, org, me, shops, shopId, setShopId, logout, locale, refresh, superadmin } = useAdmin();
   const [orgsOpen, setOrgsOpen] = useState(false);
   const pathname = usePathname();
   const routeOff = featureForRoute(pathname);
   const nav = useNav();
+  const newOrders = useNewOrders(nav.some((i) => i.key === 'orders'));
   const toast = useToast();
   const online = useOnline();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -103,7 +128,8 @@ export function Shell({ children }: { children: ReactNode }) {
       <li key={item.href}>
         <Link href={item.href} aria-current={active ? 'page' : undefined} className="nav-link flex items-center gap-3 px-3 min-h-[40px] rounded-[10px] t-body">
           <Icon size={20} filled={active} />
-          {t(`nav.${item.key}`)}
+          <span className="flex-1">{t(`nav.${item.key}`)}</span>
+          {item.key === 'orders' ? <CountDot n={newOrders} label={t('orders.newCount', { count: newOrders })} /> : null}
         </Link>
         {item.children?.some((c) => c.show) && isActive(pathname, item.href) ? (
           <ul className="list-none p-0 m-0 mt-0.5 flex flex-col gap-0.5">
@@ -205,7 +231,10 @@ export function Shell({ children }: { children: ReactNode }) {
           return (
             <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined} className="flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 hover:no-underline"
               style={{ color: active ? 'var(--c-accent)' : 'var(--c-ink-2)' }}>
-              <Icon size={24} filled={active} />
+              <span className="relative inline-flex">
+                <Icon size={24} filled={active} />
+                {item.key === 'orders' && newOrders ? <span className="absolute -top-1 -right-2"><CountDot n={newOrders} label={t('orders.newCount', { count: newOrders })} /></span> : null}
+              </span>
               <span className="t-cap2 truncate max-w-full" style={{ fontWeight: active ? 600 : 500 }}>{t(`nav.${item.key}`)}</span>
             </Link>
           );
@@ -241,6 +270,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 <Link href={item.href} className="row has-icon" onClick={() => setMoreOpen(false)}>
                   <span className="icon-tile"><Icon size={18} /></span>
                   <span className="row-main row-title">{t(`nav.${item.key}`)}</span>
+                  {item.key === 'orders' ? <CountDot n={newOrders} label={t('orders.newCount', { count: newOrders })} /> : null}
                   <IconChevronRight size={16} className="chev" />
                 </Link>
               </li>

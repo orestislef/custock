@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useMemo, useState } from 'react';
+import { isOrdersPermission, ordersOn } from '@/lib/orders-on';
 import { useOrgRouter as useRouter } from '@/components/admin/org-link';
 import type { Role } from '@custock/core';
 import { useAdmin } from '@/components/admin/admin-context';
@@ -26,7 +27,8 @@ export default function RoleEditorPage({ params }: { params: Promise<{ id: strin
 }
 
 function Editor({ role, all }: { role: Role | null; all: Role[] }) {
-  const { api, org, t } = useAdmin();
+  const { api, org, t, settings } = useAdmin();
+  const orders = ordersOn(org, settings);
   const router = useRouter();
   const toast = useToast();
   const myRank = rankAt(org);
@@ -86,7 +88,7 @@ function Editor({ role, all }: { role: Role | null; all: Role[] }) {
         </section>
         <div />
         {/* only what this person may hand out. anything else on the role stays as it is */}
-        {PERM_GROUPS.map((g) => ({ ...g, perms: g.perms.filter((p) => mine.has(p)) })).filter((g) => g.perms.length).map((g) => (
+        {PERM_GROUPS.map((g) => ({ ...g, perms: g.perms.filter((p) => mine.has(p) && (orders || !isOrdersPermission(p))) })).filter((g) => g.perms.length).map((g) => (
           <section key={g.group} className="inset-group">
             <h2 className="inset-group-head">{t(`common:permGroup.${g.group}`)}</h2>
             <ul className="list" role="list">
