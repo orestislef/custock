@@ -816,7 +816,8 @@
     "coverPhoto": "Cover, shown first",
     "barcodeOn": "Already on {{name}}.",
     "barcodeOpen": "Open it",
-    "conflict": "Someone else saved this product a moment ago. Save again to keep your changes, or reload to see theirs."
+    "conflict": "Someone else saved this product a moment ago. Save again to keep your changes, or reload to see theirs.",
+    "otherNames": "Name in other languages"
   },
   "shopSettings": {
     "open": "Settings for {{shop}}",

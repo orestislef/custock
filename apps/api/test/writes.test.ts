@@ -282,6 +282,7 @@ describe('transfers', () => {
 });
 
 describe('products', () => {
+
   it('staff cannot add products, managers can, a barcode can only live once', async () => {
     expect((await call('POST', `${org()}/products`, 'dimitris', { name: 'X' })).status).toBe(403);
     const code = ean13('520111111111');
@@ -706,5 +707,25 @@ describe('the customer side', () => {
     expect((await call('DELETE', '/v1/me', 'walkin', { code: start.body.devCode })).status).toBe(204);
     expect((await call('GET', '/v1/me/context', 'walkin')).status).toBe(401);
     expect(q("SELECT count(*) n FROM customers WHERE email = 'walk.in@example.com'").n).toBe(0);
+  });
+});
+
+describe('product names in other languages', () => {
+  it('a name in other languages is saved, found by search, and changed or removed later', async () => {
+    const made = await call('POST', `${org()}/products`, 'maria', {
+      name: 'Πελμένι ανάμικτα', priceMinor: 1200, taxRateBp: 1300,
+      translations: { ru: { name: 'Пельмени микс' }, en: { name: 'Mixed pelmeni', description: 'Pork and beef' } },
+    });
+    expect(made.status).toBe(201);
+    expect(made.body.translations.ru.name).toBe('Пельмени микс');
+    expect(made.body.translations.en).toEqual({ name: 'Mixed pelmeni', description: 'Pork and beef' });
+    // found by the russian name, written in latin letters too
+    const found = await call('GET', `${org()}/products?q=${encodeURIComponent('пельмени')}`, 'maria');
+    expect(found.body.items.map((p: { id: string }) => p.id)).toContain(made.body.id);
+    // an empty name removes that language, one left out stays
+    const changed = await call('PATCH', `${org()}/products/${made.body.id}`, 'maria', { translations: { en: { name: '' }, ru: { name: 'Пельмени ассорти' } } });
+    expect(changed.status).toBe(200);
+    expect(changed.body.translations.en).toBeUndefined();
+    expect(changed.body.translations.ru.name).toBe('Пельмени ассорти');
   });
 });

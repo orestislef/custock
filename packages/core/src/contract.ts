@@ -340,6 +340,12 @@ export const ProductInput = z.object({
   variants: z.array(VariantInput).min(1).max(50).optional(),
   // the full list of photos, in order. https, or an upload url from presignUpload.
   imageUrls: z.array(z.string().url().max(2000)).max(10).optional(),
+  // the name (and description) in other languages, shown to people who read that language. an
+  // empty name or null removes that language. languages left out stay as they are.
+  translations: z.partialRecord(z.enum(['en', 'el', 'ru']), z.object({
+    name: zLine(LIMITS.productName, 0).nullable(),
+    description: zText(LIMITS.description).nullable().optional(),
+  }).nullable()).optional(),
 });
 export type ProductInput = z.infer<typeof ProductInput>;
 

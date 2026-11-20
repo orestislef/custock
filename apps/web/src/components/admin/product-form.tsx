@@ -36,6 +36,9 @@ const supportsImages = apiMode === 'fixtures' || 'imageUrls' in shape;
 
 interface Option { name: string; values: string }
 
+const NAME_LOCALES = ['el', 'en', 'ru'] as const;
+type NameLocale = (typeof NAME_LOCALES)[number];
+
 // one field pattern for every text input: a small label above, the value below
 // the picker entry that opens the new category sheet instead of choosing
 const NEW_CATEGORY = '__new_category__';
@@ -85,6 +88,14 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
   const descF = useTextField(draft?.description ?? product?.description, { max: LIMITS.description });
   const name = nameF.text;
   const [cat, setCat] = useState(draft?.cat ?? product?.categoryId ?? '');
+  // the name in each language, for customers who read it (empty: the main name shows)
+  const [names, setNames] = useState<Record<NameLocale, string>>(() => ({
+    el: product?.translations?.el?.name ?? '', en: product?.translations?.en?.name ?? '', ru: product?.translations?.ru?.name ?? '',
+  }));
+  const translations = () => Object.fromEntries(NAME_LOCALES.map((l) => {
+    const name = cleanLine(names[l]).slice(0, LIMITS.productName);
+    return [l, name ? { name, description: product?.translations?.[l]?.description ?? null } : null];
+  })) as ProductInput['translations'];
   const [newCat, setNewCat] = useState(false);
   const [uom, setUom] = useState<Uom>(draft?.uom ?? product?.uom ?? 'piece');
   const [vat, setVat] = useState(draft?.vat ?? String(product?.taxRateBp ?? rates[0]));
@@ -146,6 +157,7 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
             ...(i === 0 && barcodeV ? { barcodes: [{ code: barcodeV, packQty: 1 }] } : {}),
           })) } : {}),
           ...(supportsImages && images.length ? { imageUrls: images } : {}),
+          ...(NAME_LOCALES.some((l) => names[l].trim()) ? { translations: translations() } : {}),
         };
         const p = await api.createProduct(org.orgId, input);
         if (draftKey) clearDraft(draftKey);
@@ -166,6 +178,7 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
           ...(canCost && costMinor != null && costMinor !== v0?.costMinor ? { costMinor } : {}),
           ...(barcodeV ? { barcode: barcodeV } : {}),
           ...(supportsImages && imagesChanged ? { imageUrls: images } : {}),
+          translations: translations(),
         };
         await api.updateProduct(org.orgId, product.id, patch);
         forgetCatalog(org.orgId);
@@ -231,6 +244,19 @@ export function ProductForm({ product, initialBarcode }: { product?: Product & {
                 ]} />
             </li>
           </ul>
+        </section>
+
+        <section className="inset-group">
+          <h2 className="inset-group-head">{t('productForm.otherNames')}</h2>
+          <ul className="list" role="list">
+            {NAME_LOCALES.map((l, i) => (
+              <Field key={l} label={t(`categories.nameIn.${l}`)} sep={i > 0}>
+                <input className="field pt-1" value={names[l]} maxLength={LIMITS.productName} placeholder={t('categories.optional')} autoComplete="off" autoCapitalize="sentences"
+                  lang={l} onChange={(e) => setNames((x) => ({ ...x, [l]: e.target.value }))} />
+              </Field>
+            ))}
+          </ul>
+          <p className="inset-group-foot">{t('categories.foot')}</p>
         </section>
 
         <section className="inset-group">

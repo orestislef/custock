@@ -41,6 +41,22 @@ function productSearchKey(t: Tenant, productId: string, name: string): string {
   return searchKey(name, ...tr.map((x) => x.name));
 }
 
+// names in other languages: an empty name removes that language, a language left out stays
+function applyTranslations(t: Tenant, productId: string, translations: NonNullable<ProductInput['translations']>) {
+  for (const [locale, v] of Object.entries(translations)) {
+    const name = v?.name?.trim();
+    if (!name) {
+      t.run('DELETE FROM product_translations WHERE locale = @l AND product_id = (SELECT id FROM products WHERE org_id = @org AND id = @p)', { l: locale, p: productId });
+      continue;
+    }
+    t.run(
+      `INSERT INTO product_translations (product_id, locale, name, description) SELECT id, @l, @name, @desc FROM products WHERE org_id = @org AND id = @p
+       ON CONFLICT (product_id, locale) DO UPDATE SET name = excluded.name, description = excluded.description`,
+      { p: productId, l: locale, name, desc: v?.description?.trim() || null },
+    );
+  }
+}
+
 function attach(c: Context<AppEnv>, variantId: string, raw: string, packQty = 1, symbology?: string | null) {
   attachBarcode(c, variantId, raw, packQty, symbology);
   orgOf(c).t.run('UPDATE products SET updated_at = @now WHERE org_id = @org AND id = (SELECT product_id FROM product_variants WHERE id = @v)', { now: nowOf(c), v: variantId });
@@ -153,6 +169,10 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
           if (input.barcode) attach(c, vid, input.barcode);
         }
         if (input.imageUrls) applyImages(c, pid, input.imageUrls);
+        if (input.translations) {
+          applyTranslations(t, pid, input.translations);
+          t.run('UPDATE products SET search_key = @key WHERE org_id = @org AND id = @id', { key: productSearchKey(t, pid, input.name), id: pid });
+        }
         audit(t, { id: user }, 'product.created', { type: 'product', id: pid }, null, { name: input.name }, now);
       })();
       const [p] = loadProducts(t, [pid], { withCost: has(c, 'products.cost.view'), levelShops: [] });
@@ -174,6 +194,8 @@ export function stockWriteRoutes(app: Hono<AppEnv>) {
     if (patch.costMinor != null && !has(c, 'products.cost.edit')) throw forbidden('products.cost.edit');
     const now = nextStamp(row.updated_at, nowOf(c));
     cfgOf(c).db.transaction(() => {
+      // before the search key below, which reads them
+      if (patch.translations) applyTranslations(t, id, patch.translations);
       const name = patch.name ?? row.name;
       t.run(
         `UPDATE products SET name = coalesce(@name, name), description = CASE WHEN @hasDesc THEN @desc ELSE description END,
