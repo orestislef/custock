@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-20T15:00:00+02:00",
+  "updated": "2026-11-20T17:00:00+02:00",
   "overall": 100,
   "areas": [
     {
@@ -184,6 +184,10 @@
     {
       "at": "2026-11-20T15:00:00+02:00",
       "text": "Orders and price requests: a cart in the shop's app, prices from the shop, accept or no thanks, ready and picked up, push and email, history, on orders on the stock. 24 new api tests and end to end tests. In the demo too."
+    },
+    {
+      "at": "2026-11-20T17:00:00+02:00",
+      "text": "Product names in Greek, English and Russian, prices per kg say so on the shop page. The first real business set up with its menu."
     }
   ],
   "screens": [
