@@ -23,6 +23,7 @@ one before. The clickable demo is at [orestislef.github.io/custock/demo](https:/
 | 16 | [ideas](16-ideas.md) | good to have later |
 | 17 | [roadmap](17-roadmap.md) | phases, what the first usable version is |
 | 18 | [open questions](18-open-questions.md) | things i still need to decide, and what we assume until then |
+| 19 | [orders](19-orders.md) | customers order or ask for a price, the shop answers, pick up and pay at the shop |
 
 ## how to read these
 

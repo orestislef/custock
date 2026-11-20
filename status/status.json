@@ -1,13 +1,13 @@
 {
-  "updated": "2026-11-19T11:00:00+02:00",
+  "updated": "2026-11-20T15:00:00+02:00",
   "overall": 100,
   "areas": [
     {
       "key": "thinking",
-      "name": "Thinking (18 planning docs)",
+      "name": "Thinking (19 planning docs)",
       "percent": 100,
       "state": "done",
-      "note": "Vision, roles, permissions, data model, stock, customers, auth, platform, design, languages, reports, stack, api, edge cases, ideas, roadmap, open questions."
+      "note": "Vision, roles, permissions, data model, stock, customers, auth, platform, design, languages, reports, stack, api, edge cases, ideas, roadmap, open questions, orders and price requests."
     },
     {
       "key": "demo",
@@ -47,6 +47,13 @@
       "percent": 100,
       "state": "done",
       "note": "Live on its own subdomain with real email, web push and photos in a bucket. Tested end to end with real email, push on an iPhone and the camera, then wiped: only the super admin is left, every option back to its default."
+    },
+    {
+      "key": "orders",
+      "name": "Orders and price requests",
+      "percent": 100,
+      "state": "done",
+      "note": "Customers order from the shop's app or ask for a price for a big order, the shop answers with a price, the customer says yes or no, then ready and picked up, stock down as a sale. Push and email at every step, a history on both sides, what confirmed orders promise shown on the stock. Off unless the business turns it on, and the super admin can hide it completely."
     },
     {
       "name": "Super admin and settings",
@@ -173,6 +180,10 @@
     {
       "at": "2026-11-19T12:30:00+02:00",
       "text": "The demo is now the real app on made up data, built from the code instead of the first hand made prototype."
+    },
+    {
+      "at": "2026-11-20T15:00:00+02:00",
+      "text": "Orders and price requests: a cart in the shop's app, prices from the shop, accept or no thanks, ready and picked up, push and email, history, on orders on the stock. 24 new api tests and end to end tests. In the demo too."
     }
   ],
   "screens": [

@@ -81,6 +81,13 @@ email in the shop's own look, linked to products, with the lowest price of the l
 offers. Notify me when back in stock, favourites, tags, notes. Each business decides if customers
 see the catalog, prices and stock. Every business gets its own home screen app with its own icon.
 
+**Orders**: customers put products in an order from the shop's app and pick a shop to collect from.
+The shop answers with a price (for a big order, or when prices are not shown), the customer says yes
+or no, the shop marks it ready and picked up, and the stock goes down as a sale. Or orders go in at
+the shown prices and the shop only confirms. Push and email at every step, a history of who did what,
+and what confirmed orders promise shows on the stock without taking it off. Pay and collect at the
+shop.
+
 **Both together**: the most wanted out of stock products, which QR poster brings people in,
 what sells after an offer goes out. Reports and dashboards per role.
 
