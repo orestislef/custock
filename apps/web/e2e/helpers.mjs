@@ -20,10 +20,12 @@ export async function newPerson(email, { role = 'staff', shop = 'kifisia', name 
 }
 
 // the super admin of the run: an account made by create-business, then the business goes away again
-let sa = null;
+// the sign in comes from login(), which renews it before the 15 minute token runs out: a full run
+// takes longer than that
+let saReady = false;
 export async function superAdmin() {
-  if (sa) return sa;
   const email = 'root@example.com';
+  if (saReady) return { email, tokens: await login(email, PW) };
   const exists = one('SELECT id FROM users WHERE email = @e', { e: email });
   if (!exists) {
     const made = cli(['create-business', '--name', 'Bootstrap', '--slug', 'bootstrap', '--owner-email', email, '--owner-name', 'Root Admin', '--set-password'], { CUSTOCK_NEW_PASSWORD: PW });
@@ -33,8 +35,8 @@ export async function superAdmin() {
     const del = cli(['delete-business', '--slug', 'bootstrap', '--confirm', 'bootstrap']);
     if (del.code !== 0) throw new Fail('delete the bootstrap business', 'exit 0', del.out.slice(0, 300));
   }
-  sa = { email, tokens: await login(email, PW, { fresh: true }) };
-  return sa;
+  saReady = true;
+  return { email, tokens: await login(email, PW, { fresh: true }) };
 }
 
 export async function signIn(page, email, password) {
