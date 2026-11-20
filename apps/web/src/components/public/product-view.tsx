@@ -58,11 +58,13 @@ export function ProductView({ p, t, locale, joinHref, notifyHref, actions }: { p
 }
 
 export function PriceLine({ p, t, locale, small }: { p: PublicProduct; t: TFunction; locale: string; small?: boolean }) {
+  // sold by weight, length or volume: the price is per kg, m or l, and says so
+  const per = p.uom && p.uom !== 'piece' ? <span className="t-sub t-2 font-normal"> / {t(`common:uom.${p.uom}`)}</span> : null;
   if (p.offer) {
     return (
       <div className={small ? 'mt-1' : 'mt-3'}>
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className={`${small ? 't-headline' : 't-title2'} tnum`} style={{ color: 'var(--c-accent)' }}>{money(p.offer.priceMinor, p.currency, locale)}</span>
+          <span className={`${small ? 't-headline' : 't-title2'} tnum`} style={{ color: 'var(--c-accent)' }}>{money(p.offer.priceMinor, p.currency, locale)}{per}</span>
           {p.offer.wasMinor != null ? <s className="t-sub t-2 tnum">{money(p.offer.wasMinor, p.currency, locale)}</s> : null}
           <span className="badge badge-accent">{t('common:postKind.offer')}</span>
         </div>
@@ -76,5 +78,5 @@ export function PriceLine({ p, t, locale, small }: { p: PublicProduct; t: TFunct
     );
   }
   if (p.priceMinor == null) return small ? null : <p className="t-sub t-2 mt-3 mb-0">{t('product.priceInShop')}</p>;
-  return <p className={`${small ? 't-headline mt-1' : 't-title2 mt-3'} tnum mb-0`}>{money(p.priceMinor, p.currency, locale)}</p>;
+  return <p className={`${small ? 't-headline mt-1' : 't-title2 mt-3'} tnum mb-0`}>{money(p.priceMinor, p.currency, locale)}{per}</p>;
 }
