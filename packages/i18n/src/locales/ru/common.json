@@ -480,5 +480,15 @@
     "rejected": "Не принят",
     "cancelled": "Отменён",
     "expired": "Истёк"
+  },
+  "hours": {
+    "title": "Часы работы",
+    "openNow": "Открыто · до {{time}}",
+    "opensToday": "Закрыто · откроется в {{time}}",
+    "opensTomorrow": "Закрыто · откроется завтра в {{time}}",
+    "opensDay": "Закрыто · откроется: {{day}}, {{time}}",
+    "closed": "Выходной",
+    "shops": "Наши магазины",
+    "call": "Позвонить: {{shop}}"
   }
 }

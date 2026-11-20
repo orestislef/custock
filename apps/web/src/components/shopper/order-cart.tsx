@@ -4,6 +4,7 @@
 // and a day, the prices at that shop when the business shows them, then send. the order stays on
 // the phone until the server took it (thinking/19-orders.md).
 
+import { OpenNow } from '@/components/ui/shop-hours';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -146,6 +147,7 @@ export function OrderCart() {
                   <span className="row-main">
                     <span className="row-title block">{s.name}</span>
                     {s.address || s.city ? <span className="row-sub block">{[s.address, s.city].filter(Boolean).join(', ')}</span> : null}
+                    {s.hours && s.timezone ? <OpenNow hours={s.hours} timeZone={s.timezone} className="t-foot block" /> : null}
                   </span>
                   {s.id === shopId ? <IconCheck size={20} style={{ color: 'var(--c-accent)' }} /> : null}
                 </button>
@@ -159,6 +161,7 @@ export function OrderCart() {
               <span className="row-main">
                 <span className="row-title block">{shopsTaking[0]?.name}</span>
                 {shopsTaking[0]?.address || shopsTaking[0]?.city ? <span className="row-sub block">{[shopsTaking[0]?.address, shopsTaking[0]?.city].filter(Boolean).join(', ')}</span> : null}
+                {shopsTaking[0]?.hours && shopsTaking[0].timezone ? <OpenNow hours={shopsTaking[0].hours} timeZone={shopsTaking[0].timezone} className="t-foot block" /> : null}
               </span>
             </div>
           </div>

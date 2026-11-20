@@ -4,7 +4,7 @@
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import {
-  canEditRole, canGrantRole, canManageMember, checkOwnersAfter, effectiveAtScope, InviteInput, InviteRegisterInput, isPermission, LIMITS, passwordProblem, ShopInput, uuidv7, zLine, zPhone,
+  canEditRole, canGrantRole, canManageMember, checkOwnersAfter, effectiveAtScope, InviteInput, InviteRegisterInput, isPermission, LIMITS, passwordProblem, ShopHours, ShopInput, uuidv7, zLine, zPhone,
   type AccessAssignment, type AuditEntry, type Invite, type InviteCreated, type InvitePreview, type OrgSettings,
 } from '@custock/core';
 import { hashPasswordAsync, randomToken, sha256, type Db } from '@custock/db';
@@ -488,16 +488,19 @@ export function teamWriteRoutes(app: Hono<AppEnv>) {
         name: zLine(LIMITS.shopName), city: zLine(LIMITS.city, 0).nullable(), address: zLine(LIMITS.address, 0).nullable(), phone: zPhone.or(z.literal('')).nullable(),
         timezone: z.string().refine(isTimezone, 'unknown timezone').nullable(), customerVisible: z.boolean(), customerStock: z.enum(['off', 'availability', 'exact']).nullable(),
         customerOrders: z.enum(['off']).nullable(),
+        // opening hours (packages/core/src/hours.ts), null clears them
+        hours: ShopHours.nullable(),
       })
       .partial()
       .parse(await c.req.json());
-    const cols: Record<string, string> = { name: 'name', city: 'city', address: 'address', phone: 'phone', timezone: 'timezone', customerVisible: 'customer_visible', customerStock: 'customer_stock', customerOrders: 'customer_orders' };
+    const cols: Record<string, string> = { name: 'name', city: 'city', address: 'address', phone: 'phone', timezone: 'timezone', customerVisible: 'customer_visible', customerStock: 'customer_stock', customerOrders: 'customer_orders', hours: 'opening_hours' };
     const { t } = orgOf(c);
     // a shop of another business, or none at all, is not found (and nothing is audited)
     if (!t.get('SELECT 1 FROM shops WHERE org_id = @org AND id = @id', { id: shopId })) throw notFound('shop');
     for (const [k, v] of Object.entries(patch)) {
       if (v === undefined) continue;
-      t.run(`UPDATE shops SET ${cols[k]} = @v WHERE org_id = @org AND id = @id`, { v: typeof v === 'boolean' ? (v ? 1 : 0) : v, id: shopId });
+      const value = k === 'hours' ? (v === null ? null : JSON.stringify(v)) : typeof v === 'boolean' ? (v ? 1 : 0) : v;
+      t.run(`UPDATE shops SET ${cols[k]} = @v WHERE org_id = @org AND id = @id`, { v: value, id: shopId });
     }
     audit(t, { id: c.get('user').id }, 'shop.updated', { type: 'shop', id: shopId }, null, patch, nowOf(c));
     return c.json(loadShops(t, [shopId])[0]);

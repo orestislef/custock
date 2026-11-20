@@ -29,14 +29,15 @@ export default async function ShelfProductPage({ params, searchParams }: PagePro
 
   // a poster QR can carry the shop's join code, so "notify me" and "join" land on the right shop.
   // without one, the business's own join link, so a visitor is never left without a way in
-  const businessJoin = p.orgSlug ? (await orgInfo(p.orgSlug, locale)).joinCode : null;
+  const info = p.orgSlug ? await orgInfo(p.orgSlug, locale) : null;
+  const businessJoin = info?.joinCode ?? null;
   const joinCode = typeof sp.j === 'string' ? sp.j : businessJoin ?? defaultJoinCode();
   const joinHref = joinCode ? `/j/${encodeURIComponent(joinCode)}` : null;
   const notifyHref = joinHref ? `${joinHref}?notify=${encodeURIComponent(p.name)}` : null;
 
   return (
     <PublicShell orgName={p.orgName} t={t}>
-      <ProductView p={p} t={t} locale={locale} joinHref={joinHref} notifyHref={notifyHref} />
+      <ProductView p={p} t={t} locale={locale} joinHref={joinHref} notifyHref={notifyHref} shops={info?.shops} />
     </PublicShell>
   );
 }

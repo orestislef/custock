@@ -7,7 +7,8 @@
 
 import { useState } from 'react';
 import type { Shop } from '@custock/core';
-import { LIMITS } from '@custock/core';
+import { cleanLine, emptyWeek, LIMITS, ShopHours, WEEKDAYS } from '@custock/core';
+import { HoursEditor } from './hours-editor';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Group, IconTile, Row } from '@/components/ui/kit';
 import { Sheet, useToast } from '@/components/ui/client-kit';
@@ -53,11 +54,18 @@ function ShopSheet({ shop, onClose, onSaved }: { shop: Shop | null; onClose: () 
   const cityF = useLineField(shop?.city ?? '', { max: LIMITS.city, capitalize: 'words' });
   const addressF = useLineField(shop?.address ?? '', { max: LIMITS.address, capitalize: 'words' });
   const phoneF = usePhoneField(shop?.phone ?? '');
+  const [week, setWeek] = useState<ShopHours['week']>(() => shop?.hours?.week ?? emptyWeek());
+  const [note, setNote] = useState(shop?.hours?.note ?? '');
+  // nothing set is no hours at all; anything else must read as opening hours to be saved
+  const hoursEmpty = WEEKDAYS.every((d) => !week[d].length) && !cleanLine(note);
+  const parsed = hoursEmpty ? null : ShopHours.safeParse({ week, note: cleanLine(note) || null });
+  const hoursInvalid = !!parsed && !parsed.success;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
-    if (busy || !checkAll([nameF, cityF, addressF, phoneF])) return;
+    if (busy || !checkAll([nameF, cityF, addressF, phoneF]) || hoursInvalid) return;
+    const hours = parsed?.success ? parsed.data : null;
     const name = nameF.check()!;
     const city = cityF.check() || null;
     const address = addressF.check() || null;
@@ -65,9 +73,10 @@ function ShopSheet({ shop, onClose, onSaved }: { shop: Shop | null; onClose: () 
     setBusy(true);
     setError(null);
     try {
+      const made = shop ? null : await api.createShop(org.orgId, { name, ...(city ? { city } : {}), ...(address ? { address } : {}), ...(phone ? { phone } : {}) });
       const saved = shop
-        ? await api.updateShop(org.orgId, shop.id, { name, city, address, phone })
-        : await api.createShop(org.orgId, { name, ...(city ? { city } : {}), ...(address ? { address } : {}), ...(phone ? { phone } : {}) });
+        ? await api.updateShop(org.orgId, shop.id, { name, city, address, phone, hours })
+        : hours ? await api.updateShop(org.orgId, made!.id, { hours }) : made!;
       toast(shop ? t('settings.saved') : t('settings.shops.added', { shop: saved.name }));
       onSaved(saved, !shop);
     } catch (e) {
@@ -85,7 +94,7 @@ function ShopSheet({ shop, onClose, onSaved }: { shop: Shop | null; onClose: () 
     <Sheet open onClose={onClose} title={shop ? t('settings.shops.editTitle') : t('settings.shops.newTitle')} error={error}
       footer={<>
         <button type="button" className="btn btn-gray" onClick={onClose}>{t('common:action.cancel')}</button>
-        <button type="button" className="btn btn-primary" disabled={busy || !nameF.text.trim()} onClick={() => void save()}>
+        <button type="button" className="btn btn-primary" disabled={busy || !nameF.text.trim() || hoursInvalid} onClick={() => void save()}>
           {shop ? t('common:action.save') : t('settings.shops.addButton')}
         </button>
       </>}>
@@ -112,6 +121,7 @@ function ShopSheet({ shop, onClose, onSaved }: { shop: Shop | null; onClose: () 
         <FieldMessage id={phoneF.errorId} kind="phone" error={phoneF.error} />
       </FormNav>
       <p className="t-foot t-2 m-0 px-4">{shop ? t('settings.shops.editFoot') : t('settings.shops.newFoot')}</p>
+      <HoursEditor week={week} note={note} onWeek={setWeek} onNote={setNote} invalid={hoursInvalid} />
     </Sheet>
   );
 }

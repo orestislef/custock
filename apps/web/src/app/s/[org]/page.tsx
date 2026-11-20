@@ -12,6 +12,7 @@ import { CustomerPushCard } from '@/components/shopper/push-card';
 import { Empty } from '@/components/ui/kit';
 import { IconSearch } from '@/components/ui/icons';
 import { orgInfo } from '@/lib/storefront';
+import { ShopList } from '@/components/public/shop-list';
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getT();
@@ -61,6 +62,7 @@ export default async function CatalogPage({ params, searchParams }: PageProps<'/
       ) : (
         <div className="mt-6"><FollowerCatalog categories={info.categories} categoryId={category} /></div>
       )}
+      <ShopList shops={info.shops} className="mt-8" />
     </PublicShell>
   );
 }

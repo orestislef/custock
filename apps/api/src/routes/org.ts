@@ -2,6 +2,7 @@
 
 import type { Hono } from 'hono';
 import { can, type MeContext, type OrgSettings, type Shop } from '@custock/core';
+import { readHours } from '../lib/shop-hours';
 import type { Db } from '@custock/db';
 import type { AppEnv, OrgRow } from '../types';
 import { buildContextFor, categoryNameSql, cfgOf, orgOf, preloadContexts, readerLocale, requireAuth } from '../lib/context';
@@ -47,11 +48,12 @@ interface ShopRow {
   customer_visible: number;
   customer_stock: Shop['customerStock'];
   customer_orders: 'off' | null;
+  opening_hours: string | null;
 }
 
 export function loadShops(t: Tenant, onlyIds?: string[]): Shop[] {
   const rows = t.all<ShopRow>(
-    `SELECT s.id, s.name, s.slug, s.city, s.address, s.phone, s.timezone, f.storage_key, s.customer_visible, s.customer_stock, s.customer_orders
+    `SELECT s.id, s.name, s.slug, s.city, s.address, s.phone, s.timezone, f.storage_key, s.customer_visible, s.customer_stock, s.customer_orders, s.opening_hours
        FROM shops s LEFT JOIN files f ON f.id = s.image_file_id
       WHERE s.org_id = @org AND s.archived_at IS NULL ORDER BY s.created_at, s.name`,
   );
@@ -71,6 +73,7 @@ export function loadShops(t: Tenant, onlyIds?: string[]): Shop[] {
       customerVisible: !!r.customer_visible,
       customerStock: r.customer_stock,
       customerOrders: r.customer_orders,
+      hours: readHours(r.opening_hours),
       groupIds: groups.filter((g) => g.shop_id === r.id).map((g) => g.group_id),
     }));
 }

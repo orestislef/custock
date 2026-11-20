@@ -7,10 +7,10 @@ import type {
   GrantableRole, JoinInput, JoinLink, JoinPage, Locale, MeContext, Member, Movement, MovementBatchResult,
   MovementInput, OrgAccess, OrgSettings, Page, Post, PostInput, Product, ProductInput, PublicProduct, Role,
   ScanResult, ScopeType, SeriesPoint, Shop, ShopGroup, StockAlertItem, StockLevel, Tokens, Variant,
-  Order, OrderAction, OrderEvent, OrderHold, OrderLine, OrderStatus, OrderSummary, PublicOrderOptions,
+  Order, OrderAction, OrderEvent, OrderHold, OrderLine, OrderStatus, OrderSummary, PublicOrderOptions, PublicShop, ShopHours,
 } from '@custock/core';
 import { ALL_PERMISSIONS } from './perms';
-import { deviceOf, matches, orderLineTotal, searchKey } from '@custock/core';
+import { deviceOf, emptyWeek, matches, orderLineTotal, searchKey, WEEKDAYS } from '@custock/core';
 
 const DAY = 86_400_000;
 const NOW = Date.now();
@@ -72,10 +72,17 @@ const settings: OrgSettings = {
   customerStock: 'availability', fewLeftThreshold: 3, customerOrders: 'priced',
 };
 
+// opening hours: a long day, a greek lunch break, open every day
+const OPEN_HOURS = (from: string, to: string) => [{ from, to }];
+const hoursOf = (week: Partial<Record<(typeof WEEKDAYS)[number], { from: string; to: string }[]>>, note: string | null = null): ShopHours => ({ week: { ...emptyWeek(), ...week }, note });
+const SPLIT = [{ from: '09:00', to: '14:00' }, { from: '17:30', to: '21:00' }];
 const shops: Shop[] = [
-  { id: 'shop-kifisia', orgId: ORG, name: 'Kifisia', slug: 'kifisia', city: 'Κηφισιά', address: 'Κασσαβέτη 12', phone: '+30 210 800 0001', timezone: null, imageUrl: IMG.kifisia, customerVisible: true, customerStock: null, groupIds: ['grp-north'] },
-  { id: 'shop-marousi', orgId: ORG, name: 'Marousi', slug: 'marousi', city: 'Μαρούσι', address: 'Βασ. Σοφίας 41', phone: '+30 210 800 0002', timezone: null, imageUrl: IMG.marousi, customerVisible: true, customerStock: null, groupIds: ['grp-north'] },
-  { id: 'shop-glyfada', orgId: ORG, name: 'Glyfada', slug: 'glyfada', city: 'Γλυφάδα', address: 'Μεταξά 7', phone: '+30 210 800 0003', timezone: null, imageUrl: IMG.glyfada, customerVisible: true, customerStock: null, groupIds: [] },
+  { id: 'shop-kifisia', orgId: ORG, name: 'Kifisia', slug: 'kifisia', city: 'Κηφισιά', address: 'Κασσαβέτη 12', phone: '+30 210 800 0001', timezone: null, imageUrl: IMG.kifisia, customerVisible: true, customerStock: null, groupIds: ['grp-north'],
+    hours: hoursOf({ mon: OPEN_HOURS('08:00', '21:00'), tue: OPEN_HOURS('08:00', '21:00'), wed: OPEN_HOURS('08:00', '21:00'), thu: OPEN_HOURS('08:00', '21:00'), fri: OPEN_HOURS('08:00', '21:00'), sat: OPEN_HOURS('08:00', '18:00') }) },
+  { id: 'shop-marousi', orgId: ORG, name: 'Marousi', slug: 'marousi', city: 'Μαρούσι', address: 'Βασ. Σοφίας 41', phone: '+30 210 800 0002', timezone: null, imageUrl: IMG.marousi, customerVisible: true, customerStock: null, groupIds: ['grp-north'],
+    hours: hoursOf({ mon: SPLIT, tue: [{ from: '09:00', to: '15:00' }], wed: [{ from: '09:00', to: '15:00' }], thu: SPLIT, fri: SPLIT, sat: [{ from: '09:00', to: '15:00' }] }, 'Τρίτη, Τετάρτη και Σάββατο ως τις 15:00') },
+  { id: 'shop-glyfada', orgId: ORG, name: 'Glyfada', slug: 'glyfada', city: 'Γλυφάδα', address: 'Μεταξά 7', phone: '+30 210 800 0003', timezone: null, imageUrl: IMG.glyfada, customerVisible: true, customerStock: null, groupIds: [],
+    hours: hoursOf(Object.fromEntries(WEEKDAYS.map((d) => [d, OPEN_HOURS('09:00', '22:00')]))) },
 ];
 
 const groups: ShopGroup[] = [{ id: 'grp-north', name: 'North Athens', shopIds: ['shop-kifisia', 'shop-marousi'] }];
@@ -1561,12 +1568,15 @@ export function createFixtureApi(initialUser?: string | null): CustockApi {
     },
 
     // ---------------------------------------------------------------- orders, customer side
+    async publicShops(): Promise<PublicShop[]> {
+      return shops.filter((x) => x.customerVisible).map((x) => ({ id: x.id, name: x.name, address: x.address, city: x.city, phone: x.phone, timezone: x.timezone ?? settings.timezone, hours: x.hours ?? null }));
+    },
     async orderOptions(): Promise<PublicOrderOptions> {
       const mode = settings.customerOrders ?? 'off';
       return {
         mode,
         pricesShown: settings.customerPrices,
-        shops: mode === 'off' ? [] : shops.filter((x) => x.customerVisible && x.customerOrders !== 'off').map((x) => ({ id: x.id, name: x.name, address: x.address, city: x.city })),
+        shops: mode === 'off' ? [] : shops.filter((x) => x.customerVisible && x.customerOrders !== 'off').map((x) => ({ id: x.id, name: x.name, address: x.address, city: x.city, timezone: x.timezone ?? settings.timezone, hours: x.hours ?? null })),
         limits: { maxLines: 30, maxQty: 999, openPerCustomer: 5 },
       };
     },

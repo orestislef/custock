@@ -50,6 +50,7 @@ export const LIMITS = {
   tag: 40,
   city: 80,
   address: 200,
+  hoursNote: 120,
   phone: 30,
   url: 2000,
   search: 200,

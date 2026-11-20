@@ -488,7 +488,13 @@
     "untilNone": "No end date",
     "capRule_one": "Nobody gets more than {{count}} push a day from you. Extra ones still reach the feed.",
     "capRule_other": "Nobody gets more than {{count}} pushes a day from you. Extra ones still reach the feed.",
-    "belowCost": "Below cost ({{cost}}). Customers still get it."
+    "belowCost": "Below cost ({{cost}}). Customers still get it.",
+    "photo": "Photo",
+    "photoAdd": "Add a photo",
+    "photoChange": "Change photo",
+    "photoRemove": "Remove",
+    "photoUploading": "Uploading…",
+    "photoFoot": "Shown on the post, in the email and on Android notifications. Without one, the first product's photo is used."
   },
   "post": {
     "approve": "Approve and publish",
@@ -713,7 +719,20 @@
       "phone": "Phone",
       "added": "{{shop}} added",
       "newFoot": "The new shop starts with no stock. People with business wide roles can work in it right away.",
-      "editFoot": "The new details show on the shop's pages and QR posters at once."
+      "editFoot": "The new details show on the shop's pages and QR posters at once.",
+      "hours": {
+        "title": "Opening hours",
+        "openOn": "Open on {{day}}",
+        "from": "Opens on {{day}}",
+        "to": "Closes on {{day}}",
+        "add": "More hours on {{day}}",
+        "remove": "Remove these hours on {{day}}",
+        "copyMonday": "Same hours Tuesday to Friday",
+        "note": "Note",
+        "notePlaceholder": "For example: Saturday by appointment",
+        "foot": "Customers see them on the shop page, with whether the shop is open right now.",
+        "invalid": "Each closing time must be after its opening time, and hours on one day may not overlap."
+      }
     },
     "orders": "Orders from customers",
     "ordersMode": {

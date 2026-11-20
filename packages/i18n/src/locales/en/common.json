@@ -468,5 +468,15 @@
     "rejected": "Turned down",
     "cancelled": "Cancelled",
     "expired": "Expired"
+  },
+  "hours": {
+    "title": "Opening hours",
+    "openNow": "Open now · until {{time}}",
+    "opensToday": "Closed · opens at {{time}}",
+    "opensTomorrow": "Closed · opens tomorrow at {{time}}",
+    "opensDay": "Closed · opens {{day}} at {{time}}",
+    "closed": "Closed",
+    "shops": "Our shops",
+    "call": "Call {{shop}}"
   }
 }

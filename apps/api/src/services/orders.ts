@@ -5,7 +5,7 @@
 import {
   formatMoney, formatQty, intlLocale, maskEmail, maskPhone, PROMISED_ORDER_STATUSES, uuidv7,
   type Order, type OrderAction, type OrderEvent, type OrderEventKind, type OrderHold, type OrderLine, type OrderStatus, type OrderSummary,
-  type PublicOrderOptions, type Uom,
+  type PublicOrderOptions, type ShopHours, type Uom,
 } from '@custock/core';
 import type { Db } from '@custock/db';
 import { pickLocale, translator, type AppLocale } from '@custock/i18n';
@@ -17,6 +17,7 @@ import { devOutboxTransport, emailMessage } from '../lib/transport';
 import { pushReachableSql } from '../lib/webpush';
 import { notifyMembers, notifyUser } from '../lib/notify';
 import { fileUrl, orgLogoUrl } from './catalog';
+import { readHours } from '../lib/shop-hours';
 import { orderEmail, type OrderMailEvent } from '../email/messages';
 
 export interface OrderRow {
@@ -69,12 +70,13 @@ export function orderMode(db: Db, org: OrgRow): OrgRow['customer_orders'] {
 }
 
 // the shops a customer can order from: shown to customers, open, not switched off
-export function orderShops(db: Db, org: OrgRow): { id: string; name: string; address: string | null; city: string | null }[] {
+// with their opening hours, for the customer choosing where to pick up
+export function orderShops(db: Db, org: OrgRow): { id: string; name: string; address: string | null; city: string | null; timezone: string; hours: ShopHours | null }[] {
   if (orderMode(db, org) === 'off') return [];
-  return new Tenant(db, org.id).all<{ id: string; name: string; address: string | null; city: string | null }>(
-    `SELECT id, name, address, city FROM shops WHERE org_id = @org AND archived_at IS NULL AND customer_visible = 1 AND customer_orders IS NULL
+  return new Tenant(db, org.id).all<{ id: string; name: string; address: string | null; city: string | null; timezone: string | null; opening_hours: string | null }>(
+    `SELECT id, name, address, city, timezone, opening_hours FROM shops WHERE org_id = @org AND archived_at IS NULL AND customer_visible = 1 AND customer_orders IS NULL
       ORDER BY created_at, name`,
-  );
+  ).map(({ timezone, opening_hours, ...s }) => ({ ...s, timezone: timezone || org.timezone, hours: readHours(opening_hours) }));
 }
 
 export function orderLimits(db: Db, orgId: string) {

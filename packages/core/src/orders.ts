@@ -4,6 +4,7 @@
 import { z } from './zod';
 import { CustomerOrdersMode, Locale, Uom, zMoneyMinor, zText } from './contract';
 import { LIMITS, MAX_QTY_BASE } from './validate';
+import { ShopHours } from './hours';
 import { UOM_SCALE } from './qty';
 import type { Uom as UomT } from './contract';
 
@@ -242,7 +243,7 @@ export const PublicOrderOptions = z.object({
   // prices are shown: with mode priced an order can go in at those prices
   pricesShown: z.boolean(),
   // the shops that take orders, to pick up from
-  shops: z.array(z.object({ id: z.string(), name: z.string(), address: z.string().nullable(), city: z.string().nullable() })),
+  shops: z.array(z.object({ id: z.string(), name: z.string(), address: z.string().nullable(), city: z.string().nullable(), timezone: z.string().optional(), hours: ShopHours.nullable().optional() })),
   limits: z.object({ maxLines: z.number(), maxQty: z.number(), openPerCustomer: z.number() }),
 });
 export type PublicOrderOptions = z.infer<typeof PublicOrderOptions>;

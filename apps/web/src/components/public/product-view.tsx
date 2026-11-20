@@ -1,16 +1,18 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import type { PublicProduct } from '@custock/core';
+import type { PublicProduct, PublicShop } from '@custock/core';
 import type { TFunction } from '@custock/i18n/client';
 import { money, date } from '@/lib/format';
 import { Group, Row, StockBadge } from '@/components/ui/kit';
 import { Photo } from '@/components/ui/client-kit';
 import { CategoryPlaceholder } from '@/components/ui/category-picture';
 import { IconBell, IconShop } from '@/components/ui/icons';
+import { OpenNow } from '@/components/ui/shop-hours';
 
 // the product as a customer sees it: what the merchant allows, and nothing else
-// actions replaces the join and notify links, for a signed in follower in the business's app
-export function ProductView({ p, t, locale, joinHref, notifyHref, actions }: { p: PublicProduct; t: TFunction; locale: string; joinHref?: string | null; notifyHref?: string | null; actions?: ReactNode }) {
+// actions replaces the join and notify links, for a signed in follower in the business's app.
+// shops: the business's shops, so each one in the list says whether it is open now
+export function ProductView({ p, t, locale, joinHref, notifyHref, actions, shops }: { p: PublicProduct; t: TFunction; locale: string; joinHref?: string | null; notifyHref?: string | null; actions?: ReactNode; shops?: PublicShop[] }) {
   const anyOut = p.availability.some((a) => a.state === 'out');
   const stockShown = p.availability.some((a) => a.state != null);
   return (
@@ -32,6 +34,7 @@ export function ProductView({ p, t, locale, joinHref, notifyHref, actions }: { p
               key={a.shopId}
               leading={<span className="icon-tile" style={{ background: 'var(--c-fill)', color: 'var(--c-ink-2)' }}><IconShop size={18} /></span>}
               title={a.shopName}
+              subtitle={(() => { const s = shops?.find((x) => x.id === a.shopId); return s?.hours ? <OpenNow hours={s.hours} timeZone={s.timezone} /> : undefined; })()}
               trailing={
                 a.state == null ? null
                   : a.qty != null && a.state !== 'out' ? <span className="t-sub t-2 tnum">{t('common:stock.qtyInStock', { count: a.qty })}</span>

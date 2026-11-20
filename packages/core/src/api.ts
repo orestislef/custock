@@ -9,7 +9,7 @@ import type {
   AudiencePreview, Audience, Category, CategoryInput, Customer, CustomerDetail, DashboardCards, FeedItem,
   GrantableRole, InviteInput, JoinInput, JoinLink, JoinPage, Locale, MeContext, Member,
   Movement, MovementBatchResult, MovementInput, OrgSettings, Post, PostInput, Product,
-  ProductInput, PublicProduct, Role, ScanResult, SeriesPoint, Shop, ShopGroup, StockLevel,
+  ProductInput, PublicProduct, PublicShop, Role, ScanResult, SeriesPoint, Shop, ShopGroup, StockLevel,
   Tokens, ScopeType, Uom,
   AddCustomerInput, AuditEntry, DevOutboxItem, Invite, ShopVariantSettingsInput, StockAlertItem, StockCount,
   StockCountLine, SyncResult, Transfer, TransferInput, UncountedPolicy, UnsubscribePage, PresignInput, PresignResult,
@@ -338,6 +338,8 @@ export interface CustockApi {
 
   // customer side, in one business's app. 403 orders_off when it takes no orders
   orderOptions(orgSlug: string): Promise<PublicOrderOptions>;
+  // the shops customers can see, with address, phone and opening hours (no sign in needed)
+  publicShops(orgSlug: string): Promise<PublicShop[]>;
   previewOrder(orgSlug: string, input: OrderPreviewInput): Promise<OrderPreview>;
   // 409 prices_changed when a price differs from the one the app showed (preview again),
   // 403 limit_reached over a limit, 403 forbidden when not following the business

@@ -28,7 +28,7 @@ export default async function CatalogProductPage({ params, searchParams }: PageP
   const p = await publicProductById(org, id, locale);
   return (
     <PublicShell orgName={info.name} logoUrl={info.logoUrl} t={t} back={back}>
-      {p ? <ProductView p={p} t={t} locale={locale} actions={<ProductActions p={p} joinHref={joinHref} />} />
+      {p ? <ProductView p={p} t={t} locale={locale} shops={info.shops} actions={<ProductActions p={p} joinHref={joinHref} />} />
         // the catalog is open to everyone, so a missing product is really gone
         : info.catalogShared ? <Gone title={t('gone.shopProduct.title')} body={t('gone.shopProduct.body', { org: info.name })} href={`/s/${org}`} cta={t('gone.shopProduct.cta', { org: info.name })} />
         : <FollowerProduct id={id} joinHref={joinHref} />}

@@ -365,6 +365,7 @@ export function createApiClient(opts: ApiClientOptions): CustockApi & {
 
     // orders, customer side
     orderOptions: (slug) => get(`/v1/public/orgs/${enc(slug)}/order-options`),
+    publicShops: (slug) => get(`/v1/public/orgs/${enc(slug)}/shops`),
     previewOrder: (slug, input) => post(`/v1/c/orgs/${enc(slug)}/orders/preview`, input),
     placeOrder: (slug, input) => post(`/v1/c/orgs/${enc(slug)}/orders`, input),
     myOrders: (slug, q) => get(`/v1/c/orgs/${enc(slug)}/orders`, q as Query),

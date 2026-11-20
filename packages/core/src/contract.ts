@@ -2,6 +2,7 @@
 // shapes follow thinking/14-api-sketch.md and thinking/db/schema.sql.
 // money is integer minor units, quantities are integer base units, times are epoch ms.
 
+import { ShopHours } from './hours';
 import { z } from './zod';
 
 import { CATEGORY_ICON_KEYS, type CategoryIconKey } from './category-icons';
@@ -239,9 +240,24 @@ export const Shop = z.object({
   customerStock: CustomerStockMode.nullable(),
   // null: the business setting. off: this shop takes no orders
   customerOrders: z.enum(['off']).nullable().optional(),
+  // opening hours, null when not set (see hours.ts)
+  hours: ShopHours.nullable().optional(),
   groupIds: z.array(z.string()),
 });
 export type Shop = z.infer<typeof Shop>;
+
+// a shop as customers see it on the business's pages: where it is, how to call, when it is open
+export const PublicShop = z.object({
+  id: z.string(),
+  name: z.string(),
+  address: z.string().nullable(),
+  city: z.string().nullable(),
+  phone: z.string().nullable(),
+  // the shop's time zone, else the business's, for reading its hours
+  timezone: z.string(),
+  hours: ShopHours.nullable(),
+});
+export type PublicShop = z.infer<typeof PublicShop>;
 
 export const ShopGroup = z.object({ id: z.string(), name: z.string(), shopIds: z.array(z.string()) });
 export type ShopGroup = z.infer<typeof ShopGroup>;

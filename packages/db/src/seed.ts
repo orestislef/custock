@@ -122,6 +122,8 @@ export function seed(db: Db, opts: { now?: number; passwordHash?: string } = {})
       { key: 'marousi', name: 'Marousi', city: 'Μαρούσι', address: 'Βασ. Σοφίας 45', phone: '+302106142290', img: 's-marousi', lat: 38.0499, lng: 23.8046 },
       { key: 'glyfada', name: 'Glyfada', city: 'Γλυφάδα', address: 'Μεταξά 7', phone: '+302108945512', img: 's-glyfada', lat: 37.8659, lng: 23.7538 },
     ] as const;
+    // opening hours (packages/core/src/hours.ts): weekdays 9 to 9, saturday 9 to 6, sunday closed
+    const WEEKDAY = [{ from: '09:00', to: '21:00' }];
     const shops = {} as SeedResult['shops'];
     for (const s of shopDefs) {
       const sid = id(now - 61 * DAY);
@@ -130,7 +132,7 @@ export function seed(db: Db, opts: { now?: number; passwordHash?: string } = {})
       ins('shops', {
         id: sid, org_id: orgId, name: s.name, slug: s.key, address: s.address, city: s.city, phone: s.phone,
         email: `${s.key}@lemoni.example.com`, timezone: null, lat: s.lat, lng: s.lng,
-        opening_hours: JSON.stringify({ mon_fri: '09:00-21:00', sat: '09:00-18:00', sun: null }),
+        opening_hours: JSON.stringify({ week: { mon: WEEKDAY, tue: WEEKDAY, wed: WEEKDAY, thu: WEEKDAY, fri: WEEKDAY, sat: [{ from: '09:00', to: '18:00' }], sun: [] }, note: null }),
         image_file_id: img, customer_visible: 1, customer_stock: null, created_at: now - 61 * DAY,
       });
     }

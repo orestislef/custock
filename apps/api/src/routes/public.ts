@@ -1,7 +1,9 @@
 // public endpoints, no login, rate limited: join page, shelf product page, public catalog
 
 import type { Hono } from 'hono';
-import { normalizeBarcode, type JoinPage, type PublicProduct } from '@custock/core';
+import { normalizeBarcode, type JoinPage, type PublicProduct, type PublicShop } from '@custock/core';
+import type { Db } from '@custock/db';
+import { readHours } from '../lib/shop-hours';
 import type { AppEnv, OrgRow } from '../types';
 import { categoryNameSql, cfgOf, nowOf, optionalAuth, ORG_COLUMNS, readerLocale } from '../lib/context';
 import { forbidden, notFound } from '../lib/problem';
@@ -18,6 +20,13 @@ import { orderOptions } from '../services/orders';
 // a product as a visitor who does not follow a followers only business sees it on the shelf page
 export function shelfTeaser(p: PublicProduct): PublicProduct {
   return { ...p, priceMinor: null, offer: null, availability: [], waitingForIt: false, saved: false };
+}
+
+// the shops of a business that customers see, with their hours in the shop's time zone
+function publicShops(db: Db, org: OrgRow): PublicShop[] {
+  return new Tenant(db, org.id).all<{ id: string; name: string; address: string | null; city: string | null; phone: string | null; timezone: string | null; opening_hours: string | null }>(
+    `SELECT id, name, address, city, phone, timezone, opening_hours FROM shops WHERE org_id = @org AND archived_at IS NULL AND customer_visible = 1 ORDER BY created_at, name`,
+  ).map(({ timezone, opening_hours, ...s }) => ({ ...s, timezone: timezone || org.timezone, hours: readHours(opening_hours) }));
 }
 
 export function publicRoutes(app: Hono<AppEnv>) {
@@ -144,7 +153,15 @@ export function publicRoutes(app: Hono<AppEnv>) {
             { loc: readerLocale(c, org.default_locale) },
           )
           .map((x) => ({ id: x.id, name: x.name, ...pictureOf(x) }));
-    return c.json({ slug: org.slug, name: org.name, catalog: org.customer_catalog, joinCode: link?.code ?? null, logoUrl: fileUrl(logo?.storage_key), timezone: org.timezone, quietHours: org.quiet_hours, pushDailyCap: org.push_daily_cap, categories, orders: orderOptions(db, org) });
+    return c.json({ slug: org.slug, name: org.name, catalog: org.customer_catalog, joinCode: link?.code ?? null, logoUrl: fileUrl(logo?.storage_key), timezone: org.timezone, quietHours: org.quiet_hours, pushDailyCap: org.push_daily_cap, categories, orders: orderOptions(db, org), shops: publicShops(db, org) });
+  });
+
+  // the shops customers can see: where, the phone and the opening hours (PublicShop)
+  app.get('/v1/public/orgs/:slug/shops', (c) => {
+    const db = cfgOf(c).db;
+    const org = platform(db).get<OrgRow>(`SELECT ${ORG_COLUMNS} FROM organizations WHERE slug = @s AND archived_at IS NULL`, { s: c.req.param('slug') });
+    if (!org) throw notFound('organization');
+    return c.json(publicShops(db, org));
   });
 
   // whether the business takes orders, from which shops, and the limits (PublicOrderOptions)

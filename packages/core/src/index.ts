@@ -19,6 +19,7 @@ export * from './icons';
 export * from './category-icons';
 export * from './barcode-draw';
 export * from './scan-filter';
+export * from './hours';
 export * from './policies';
 export * from './policy-schemas';
 export * from './validate';
