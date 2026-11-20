@@ -91,8 +91,8 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
           <h1 className="t-title1 t-display m-0 mt-1">{productName(p, locale)}</h1>
           {productName(p, locale) !== p.name ? <p className="t-sub t-2 m-0 mt-1">{p.name}</p> : null}
           <div className="flex gap-2 mt-5 flex-wrap">
-            {canReceive ? <button type="button" className="btn btn-primary" onClick={() => setSheet('receive')}><IconPlus size={18} />{t('product.receive')}</button> : null}
-            {canAdjust ? <button type="button" className="btn btn-gray" onClick={() => setSheet('adjust')}>{t('product.adjust')}</button> : null}
+            {canReceive && p.trackStock !== false ? <button type="button" className="btn btn-primary" onClick={() => setSheet('receive')}><IconPlus size={18} />{t('product.receive')}</button> : null}
+            {canAdjust && p.trackStock !== false ? <button type="button" className="btn btn-gray" onClick={() => setSheet('adjust')}>{t('product.adjust')}</button> : null}
             {can('products.edit', null) ? <Link href={`/admin/stock/${p.id}/edit`} className="btn btn-gray"><IconEdit size={18} />{t('common:action.edit')}</Link> : null}
             {can('products.edit', null) && p.variants.some((v) => v.barcodes.length) ? <Link href={`/admin/print/label/${p.id}`} className="btn btn-gray"><IconPrint size={18} />{t('label.open')}</Link> : null}
           </div>
@@ -101,7 +101,12 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
 
       <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-2 gap-x-6 mt-8">
         <div>
-          {p.variants.map((v) => (
+          {/* made to order or a service: no stock to show, receive or adjust */}
+          {p.trackStock === false ? (
+            <Group title={t('product.stockPerShop')}>
+              <Row title={t('product.notTracked')} subtitle={can('products.edit', null) ? t('product.notTrackedSub') : undefined} chevron={false} />
+            </Group>
+          ) : p.variants.map((v) => (
             <Group key={v.id} title={p.variants.length > 1 ? variantLabel(v.options) : t('product.stockPerShop')} footer={p.variants.length > 1 ? undefined : t('product.stockFoot')}>
               {p.levels.filter((l) => l.variantId === v.id).map((l) => {
                 const shop = shops.find((s) => s.id === l.shopId);
