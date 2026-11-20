@@ -248,7 +248,8 @@ function Preview({ s, shops, product }: { s: OrgSettings; shops: Shop[]; product
       </div>
       <div style={{ borderTop: '0.5px solid var(--c-line)' }}>
         {shops.filter((sh) => sh.customerVisible).map((sh) => {
-          const mode = sh.customerStock ?? s.customerStock;
+          // like the shop page: a product that does not track stock shows nothing about it
+          const mode = product && (!product.trackStock || product.customerStockHidden) ? 'off' : sh.customerStock ?? s.customerStock;
           const level = product && variant ? product.levels.find((l) => l.shopId === sh.id && l.variantId === variant.id) : undefined;
           const on = product ? Math.max(0, level?.onHand ?? 0) : null;
           const state = on == null ? null : on === 0 ? 'out' : on <= s.fewLeftThreshold ? 'few' : 'in';
