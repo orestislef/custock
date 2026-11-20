@@ -831,6 +831,13 @@ html[data-kb] .toast { bottom: calc(var(--kb-page, 0px) + 12px); }
 /* category tiles above a business's catalog: a row that scrolls sideways */
 .cat-tiles { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 6px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .cat-tiles::-webkit-scrollbar { display: none; }
+
+/* a mouse cannot swipe sideways: rows that slide on a phone (chips, reasons, filters, modes, tabs,
+   category tiles) wrap onto a new line instead, so nothing sits out of reach past the edge */
+@media (hover: hover) and (pointer: fine) {
+  .fade-x, .scroll-x, .cat-tiles { flex-wrap: wrap; overflow-x: visible; padding-right: 0; -webkit-mask-image: none !important; mask-image: none !important; }
+  .tabs.fade-x { overflow-y: visible; }
+}
 .cat-tile { flex: none; width: 76px; display: flex; flex-direction: column; align-items: center; gap: 6px; scroll-snap-align: start; color: var(--c-ink); text-decoration: none; border-radius: 14px; padding: 4px 2px; min-height: 44px; }
 .cat-tile:hover { text-decoration: none; }
 .cat-tile .cat-tile-pic { width: 60px; height: 60px; border-radius: 16px; display: grid; place-items: center; background: var(--c-fill); color: var(--c-ink-2); overflow: hidden; box-shadow: inset 0 0 0 2px transparent; transition: box-shadow 150ms; }
