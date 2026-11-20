@@ -9,6 +9,7 @@ import {
   type PlatformSettingsPatch, type SuperAdmins, RESERVED_SLUGS } from '@custock/core';
 import { randomToken, sha256, type Db } from '@custock/db';
 import { pickLocale } from '@custock/i18n';
+import { orgLogoUrl } from './catalog';
 import { ApiProblem, badRequest, notFound } from '../lib/problem';
 import { orgFlags, platformSettings, storageBytes, storageUse } from '../lib/platform-access';
 import { encodeCursor, parseJson, platform, Tenant } from '../lib/tenant';
@@ -158,6 +159,7 @@ function businessOf(db: Db, r: OrgListRow, now: number, batch?: PlatformBatch): 
     counts: batch ? batch.counts.get(r.id) ?? { shops: 0, staff: 0, products: 0, customers: 0 } : counts(db, r.id),
     pendingOwnerInvites: batch ? batch.invites.get(r.id) ?? [] : pendingOwnerInvites(db, r.id, now),
     storageBytes: batch ? batch.storage.get(r.id) ?? 0 : storageBytes(db, r.id),
+    logoUrl: orgLogoUrl(db, r.id),
   };
 }
 

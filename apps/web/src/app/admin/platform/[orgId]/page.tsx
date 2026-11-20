@@ -3,6 +3,7 @@
 // one business seen from the platform: its owners and owner invites, its numbers, and what the
 // super admin decides for it (features, limits, paused). opening it switches the admin into it.
 
+import { BusinessMark } from '@/components/ui/business-mark';
 import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FEATURES, type Feature, type Locale, type OrgControlsPatch } from '@custock/core';
@@ -90,7 +91,7 @@ function Business({ orgId }: { orgId: string }) {
   const paused = d.controls.status === 'suspended';
   return (
     <Page title={d.name} back={{ href: '/admin/platform', label: t('platform.title') }}
-      subtitle={<span className="inline-flex items-center gap-2 flex-wrap">/s/{d.slug} · {t('platform.detail.since', { date: date(d.createdAt, locale, { day: 'numeric', month: 'short', year: 'numeric' }) })}{paused ? <span className="badge badge-neg">{t('platform.pausedBadge')}</span> : null}</span>}
+      subtitle={<span className="inline-flex items-center gap-2 flex-wrap"><BusinessMark logoUrl={d.logoUrl} size={24} tile={false} />/s/{d.slug} · {t('platform.detail.since', { date: date(d.createdAt, locale, { day: 'numeric', month: 'short', year: 'numeric' }) })}{paused ? <span className="badge badge-neg">{t('platform.pausedBadge')}</span> : null}</span>}
       actions={<>
         <button type="button" className="btn btn-gray" onClick={() => openOrg(orgId, '/admin/reports')}><IconChart size={18} />{t('platform.detail.reports')}</button>
         <button type="button" className="btn btn-primary" onClick={() => openOrg(orgId)}>{t('platform.detail.open')}</button>

@@ -6,7 +6,8 @@
 import Link from 'next/link';
 import { useAdmin } from '@/components/admin/admin-context';
 import { Sheet } from '@/components/ui/client-kit';
-import { IconCheck, IconChevronRight, IconShield, IconShop } from '@/components/ui/icons';
+import { IconCheck, IconChevronRight, IconShield } from '@/components/ui/icons';
+import { BusinessMark } from '@/components/ui/business-mark';
 
 export function OrgSwitcher({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { me, org, openOrg, t, superadmin } = useAdmin();
@@ -15,7 +16,7 @@ export function OrgSwitcher({ open, onClose }: { open: boolean; onClose: () => v
   const row = (o: (typeof me.orgs)[number]) => (
     <li key={o.orgId}>
       <button type="button" className="row has-icon" onClick={() => { onClose(); if (o.orgId !== org.orgId) openOrg(o.orgId); }} aria-current={o.orgId === org.orgId ? 'true' : undefined}>
-        <span className="icon-tile"><IconShop size={18} /></span>
+        <BusinessMark logoUrl={o.logoUrl} />
         <span className="row-main">
           <span className="row-title block truncate">{o.name}</span>
           {o.suspended && superadmin ? <span className="row-sub block">{t('platform.pausedBadge')}</span> : null}

@@ -3,6 +3,7 @@
 // all businesses, for a super admin: the numbers across the platform, the photo storage free
 // tier, the emergency switches, every business with its owner, and the other super admins.
 
+import { BusinessMark } from '@/components/ui/business-mark';
 import { useMemo, useState } from 'react';
 import type { PlatformSettings, PlatformSwitch } from '@custock/core';
 import { usePlatform } from '@/components/admin/admin-context';
@@ -126,7 +127,7 @@ function PlatformHome() {
                 const pending = b.pendingOwnerInvites.find((i) => !i.expired);
                 return (
                   <Row key={b.orgId} href={`/admin/platform/${b.orgId}`}
-                    leading={<span className="icon-tile"><IconShop size={18} /></span>}
+                    leading={<BusinessMark logoUrl={b.logoUrl} />}
                     title={<span className="inline-flex items-center gap-2 min-w-0"><span className="truncate">{b.name}</span>{b.status === 'suspended' ? <span className="badge badge-neg">{t('platform.pausedBadge')}</span> : null}</span>}
                     subtitle={[
                       owner ? (owner.name ?? owner.email) : pending ? t('platform.ownerInvited', { email: pending.email }) : t('platform.noOwner'),

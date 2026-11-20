@@ -73,6 +73,8 @@ export const PlatformBusiness = z.object({
   pendingOwnerInvites: z.array(PendingInvite),
   // bytes of the photos this business keeps in storage
   storageBytes: z.number(),
+  // the business's logo, shown beside its name
+  logoUrl: z.string().nullable().optional(),
 });
 export type PlatformBusiness = z.infer<typeof PlatformBusiness>;
 

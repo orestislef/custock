@@ -166,6 +166,8 @@ export const OrgAccess = z.object({
   anyPerms: z.array(z.string()),
   shops: z.array(ShopAccess),
   permsVersion: z.number(),
+  // the business's logo, shown beside its name in the menu and the business switcher
+  logoUrl: z.string().nullable().optional(),
   // set for a super admin who is not a member: access comes from the platform role
   platformAccess: z.boolean().optional(),
   // the business is paused by a super admin, its staff see a paused screen

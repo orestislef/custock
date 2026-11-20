@@ -3,6 +3,7 @@
 // the admin frame: a sidebar on wide screens, a floating tab bar on phones, and a translucent
 // toolbar with the business and shop switcher. sections exist only with the permission behind them.
 
+import { BusinessMark } from '@/components/ui/business-mark';
 import Link from '@/components/admin/org-link';
 import { useSectionPath as usePathname } from '@/components/admin/org-link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -164,10 +165,10 @@ export function Shell({ children }: { children: ReactNode }) {
           ) : null}
           {me.orgs.length > 1 ? (
             <button type="button" className="flex items-center gap-1 border-0 bg-transparent p-0 cursor-pointer text-left max-w-full" onClick={() => setOrgsOpen(true)} aria-label={t('platform.switchBusiness')}>
-              <span className="t-title3 t-display truncate">{org.name}</span><IconChevronDown size={16} className="flex-none t-2" />
+              <BusinessMark logoUrl={org.logoUrl} size={28} tile={false} /><span className="t-title3 t-display truncate ml-1">{org.name}</span><IconChevronDown size={16} className="flex-none t-2" />
             </button>
           ) : (
-            <p className="t-title3 t-display m-0">{org.name}</p>
+            <p className="t-title3 t-display m-0 flex items-center gap-2"><BusinessMark logoUrl={org.logoUrl} size={28} tile={false} /><span className="truncate">{org.name}</span></p>
           )}
           {org.platformAccess ? <div className="mt-1"><SuperAdminPill label={t('platform.access')} /></div> : null}
         </div>

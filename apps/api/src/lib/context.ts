@@ -9,6 +9,7 @@ import { verifyAccess } from './auth';
 import { verifyExternal } from './external-auth';
 import { forbidden, notFound, unauthorized } from './problem';
 import { Tenant, platform } from './tenant';
+import { orgLogoUrl } from '../services/catalog';
 import { FEATURES, type Feature } from '@custock/core';
 import { isSuperadmin, orgFlags, orgFull, platformAssignment, platformPaused, shopsUsed, staffUsed, type OrgFlags } from './platform-access';
 
@@ -237,6 +238,7 @@ export function buildContextFor(db: Db, orgId: string, userId: string, pre?: Con
       topology,
       shopNames,
     }),
+    ...(org.logo_file_id ? { logoUrl: orgLogoUrl(db, org.id) } : {}),
     ...(viaPlatform ? { platformAccess: true } : {}),
     ...(flags?.status === 'suspended' ? { suspended: true } : {}),
     ...(flags?.disabledFeatures.length ? { disabledFeatures: [...flags.disabledFeatures] } : {}),
